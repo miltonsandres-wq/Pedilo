@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { buttonClass, inputClass, labelClass } from "@/lib/ui";
 import { BrandMark } from "@/components/BrandMark";
-import { BotonGoogle } from "@/components/BotonGoogle";
 import { iniciarSesion } from "./actions";
 
 export default function LoginPage() {
@@ -65,14 +64,6 @@ function FormularioLogin() {
 
           <h1 className="mb-1 text-lg font-semibold text-ink-900">Bienvenido de nuevo</h1>
           <p className="mb-5 text-sm text-ink-500">Ingresa con tu usuario para continuar</p>
-
-          <BotonGoogle next={searchParams.get("next") ?? "/"} />
-
-          <div className="my-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-ink-100" />
-            <span className="text-xs text-ink-400">o con tu correo</span>
-            <div className="h-px flex-1 bg-ink-100" />
-          </div>
 
           <form action={formAction}>
           <input type="hidden" name="next" value={searchParams.get("next") ?? "/"} />

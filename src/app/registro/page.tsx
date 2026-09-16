@@ -6,7 +6,6 @@ import Link from "next/link";
 import { User, Mail, Lock, Building2, MapPin, Phone, Check, Plus, Trash2 } from "lucide-react";
 import { inputClass, labelClass, buttonClass } from "@/lib/ui";
 import { BrandMark } from "@/components/BrandMark";
-import { BotonGoogle } from "@/components/BotonGoogle";
 import { registrarNegocio, type RegistroPayload, type SucursalRegistro } from "./actions";
 
 const PASOS = [
@@ -150,12 +149,6 @@ export default function RegistroPage() {
 
           {paso === 0 && (
             <div className="space-y-4">
-              <BotonGoogle next="/" />
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-ink-100" />
-                <span className="text-xs text-ink-400">o con tu correo</span>
-                <div className="h-px flex-1 bg-ink-100" />
-              </div>
               <IconField
                 icon={User}
                 label="Tu nombre"
