@@ -28,11 +28,11 @@ export async function crearTenantConSucursales(
   const admin = createAdminClient();
 
   // Plan según cuántas sucursales pidió desde el registro: 1 o 2 sucursales
-  // son los planes de catálogo (L900/L1200); 3+ queda "personalizado" — sin
+  // son los planes de catálogo (L1200/L1500); 3+ queda "personalizado" — sin
   // precio fijo, vos se lo asignás a mano en /plataforma. Todo tenant nuevo
   // arranca en prueba 15 días, sin importar el plan.
   const plan = sucursales.length === 1 ? "plan_1" : sucursales.length === 2 ? "plan_2" : "personalizado";
-  const precioMensual = sucursales.length === 1 ? 900 : sucursales.length === 2 ? 1200 : null;
+  const precioMensual = sucursales.length === 1 ? 1200 : sucursales.length === 2 ? 1500 : null;
   const pruebaVenceEl = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: tenant, error: errTenant } = await admin

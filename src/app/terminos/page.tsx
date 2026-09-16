@@ -60,8 +60,8 @@ export default function TerminosPage() {
               adelantado. Después de la prueba:
             </p>
             <ul className="list-disc space-y-1.5 pl-5">
-              <li>1 sucursal: L900/mes.</li>
-              <li>2 sucursales: L1200/mes.</li>
+              <li>1 sucursal: L1200/mes.</li>
+              <li>2 sucursales: L1500/mes.</li>
               <li>Compra única o planes a la medida: precio acordado directamente.</li>
             </ul>
             <p className="mt-2">

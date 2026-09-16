@@ -1,6 +1,6 @@
 export const NOMBRE_PLAN: Record<string, string> = {
-  plan_1: "1 sucursal — L900",
-  plan_2: "2 sucursales — L1200",
+  plan_1: "1 sucursal — L1200",
+  plan_2: "2 sucursales — L1500",
   compra_unica: "Compra única",
   personalizado: "Personalizado",
 };

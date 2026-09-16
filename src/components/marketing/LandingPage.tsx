@@ -61,7 +61,7 @@ const CARACTERISTICAS = [
 const PLANES = [
   {
     nombre: "1 sucursal",
-    precio: "L 900",
+    precio: "L 1,200",
     periodo: "/mes",
     destacado: false,
     descripcion: "Para un solo local: mesas, cocina, caja y cierre diario, todo en un panel.",
@@ -69,7 +69,7 @@ const PLANES = [
   },
   {
     nombre: "2 sucursales",
-    precio: "L 1,200",
+    precio: "L 1,500",
     periodo: "/mes",
     destacado: true,
     descripcion: "Lo mismo que el plan anterior, para dos locales administrados desde una sola cuenta.",
@@ -224,7 +224,7 @@ export function LandingPage() {
         <div className="mx-auto mb-12 max-w-xl text-center">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-600">Precios</p>
           <h2 className="text-2xl font-semibold text-ink-900 sm:text-3xl">
-            Simple, sin letra pequeña
+            Precios claros, sin sorpresas
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
