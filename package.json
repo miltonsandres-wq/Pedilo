@@ -1,0 +1,42 @@
+{
+  "name": "pedilo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "db:types": "node scripts/gen-types.mjs",
+    "seed": "node scripts/seed-tenant.mjs"
+  },
+  "dependencies": {
+    "next": "15.5.25",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/ssr": "^0.12.7",
+    "dexie": "^4.0.10",
+    "dexie-react-hooks": "^1.1.7",
+    "zod": "^3.24.1",
+    "clsx": "^2.1.1",
+    "server-only": "^0.0.1",
+    "lucide-react": "^1.45.0",
+    "qrcode": "^1.5.4",
+    "pdf-parse": "^2.4.5",
+    "@anthropic-ai/sdk": "^0.125.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.3",
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.5.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "15.5.25",
+    "@eslint/eslintrc": "^3.2.0",
+    "@types/qrcode": "^1.5.6"
+  }
+}

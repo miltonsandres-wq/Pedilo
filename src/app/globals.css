@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f6f7f9;
+  --foreground: #14171e;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Scrollbars discretos (look de app de escritorio, no de página web) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme(colors.ink.300) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: theme(colors.ink.300);
+  border-radius: 9999px;
+}

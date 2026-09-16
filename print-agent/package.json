@@ -1,0 +1,15 @@
+{
+  "name": "print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Servicio local por sucursal: recibe comandas por HTTP y las imprime en la térmica de cocina vía ESC/POS.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "node-thermal-printer": "^4.4.4"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+dist/
+.turbo/
+*.log
+.DS_Store
+*.tsbuildinfo
+marketing/video-promo/**/*.mp4
+marketing/video-promo/**/*.mov
+marketing/video-promo/**/*.webm
+scripts/_tmp-record.mjs
+supabase/.temp/
