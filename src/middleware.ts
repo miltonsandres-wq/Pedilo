@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Rutas públicas que no requieren sesión.
-const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta"];
+const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos"];
 
 export async function middleware(request: NextRequest) {
   // /carta/[token] lo abren clientes sin cuenta (QR de la mesa): ni falta

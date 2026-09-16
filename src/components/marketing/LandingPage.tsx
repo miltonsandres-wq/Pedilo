@@ -321,7 +321,15 @@ export function LandingPage() {
       </section>
 
       <footer className="border-t border-ink-100 py-8 text-center text-xs text-ink-400">
-        © {new Date().getFullYear()} Pedilo — un producto de Codegent
+        <p>© {new Date().getFullYear()} Pedilo — un producto de Codegent</p>
+        <p className="mt-2 flex items-center justify-center gap-3">
+          <Link href="/privacidad" className="hover:text-ink-700 hover:underline">
+            Privacidad
+          </Link>
+          <Link href="/terminos" className="hover:text-ink-700 hover:underline">
+            Términos
+          </Link>
+        </p>
       </footer>
     </div>
   );
