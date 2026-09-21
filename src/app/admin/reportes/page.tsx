@@ -1,4 +1,4 @@
-import { Wallet, Flame, Calendar } from "lucide-react";
+import { Wallet, Flame, Calendar, Receipt } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { obtenerCierreDiario, rangoDelDia } from "@/lib/reportes/cierreDiario";
@@ -29,6 +29,7 @@ export default async function ReportesPage({
   );
 
   const totalTenant = cierres.reduce((acc, c) => acc + c.totalCobrado, 0);
+  const ordenesTenant = cierres.reduce((acc, c) => acc + c.totalOrdenes, 0);
 
   return (
     <div>
@@ -50,15 +51,26 @@ export default async function ReportesPage({
         </Button>
       </form>
 
-      <Card className="mb-6 flex items-center gap-4 p-5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-          <Wallet className="h-5 w-5" strokeWidth={2} />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-ink-500">Total del tenant (todas las sucursales)</p>
-          <p className="text-2xl font-semibold text-ink-900">L. {totalTenant.toFixed(2)}</p>
-        </div>
-      </Card>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <Wallet className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-ink-500">Total del tenant (todas las sucursales)</p>
+            <p className="text-2xl font-semibold text-ink-900">L. {totalTenant.toFixed(2)}</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
+            <Receipt className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-ink-500">Órdenes del día (todas las sucursales)</p>
+            <p className="text-2xl font-semibold text-ink-900">{ordenesTenant}</p>
+          </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(sucursales ?? []).map((s, idx) => {
@@ -67,9 +79,13 @@ export default async function ReportesPage({
             <Card key={s.id}>
               <CardHeader title={s.nombre} />
               <div className="p-5">
-                <p className="mb-4 text-2xl font-semibold text-ink-900">
-                  L. {c.totalCobrado.toFixed(2)}
-                </p>
+                <div className="mb-4 flex items-end justify-between">
+                  <p className="text-2xl font-semibold text-ink-900">L. {c.totalCobrado.toFixed(2)}</p>
+                  <p className="flex items-center gap-1 text-sm text-ink-500">
+                    <Receipt className="h-3.5 w-3.5" strokeWidth={2} />
+                    {c.totalOrdenes} {c.totalOrdenes === 1 ? "orden" : "órdenes"}
+                  </p>
+                </div>
 
                 <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
                   Por forma de pago

@@ -243,6 +243,7 @@ export type Database = {
           id: string
           mesa_id: string
           motivo_cancelacion: string | null
+          numero_dia: number | null
           pagada_at: string | null
           personas: number | null
           sucursal_id: string
@@ -259,6 +260,7 @@ export type Database = {
           id?: string
           mesa_id: string
           motivo_cancelacion?: string | null
+          numero_dia?: number | null
           pagada_at?: string | null
           personas?: number | null
           sucursal_id: string
@@ -275,6 +277,7 @@ export type Database = {
           id?: string
           mesa_id?: string
           motivo_cancelacion?: string | null
+          numero_dia?: number | null
           pagada_at?: string | null
           personas?: number | null
           sucursal_id?: string
@@ -631,6 +634,32 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contadores_orden_diario: {
+        Row: {
+          fecha: string
+          sucursal_id: string
+          ultimo_numero: number
+        }
+        Insert: {
+          fecha: string
+          sucursal_id: string
+          ultimo_numero?: number
+        }
+        Update: {
+          fecha?: string
+          sucursal_id?: string
+          ultimo_numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contadores_orden_diario_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]

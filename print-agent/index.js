@@ -51,7 +51,7 @@ async function imprimirComanda(comanda) {
 
   printer.alignCenter();
   printer.setTextDoubleHeight();
-  printer.println("COMANDA");
+  printer.println(comanda.numeroDia != null ? `COMANDA #${comanda.numeroDia}` : "COMANDA");
   printer.setTextNormal();
   printer.println(`Mesa: ${comanda.mesa}`);
   printer.println(new Date(comanda.creadaEn).toLocaleString("es-HN"));

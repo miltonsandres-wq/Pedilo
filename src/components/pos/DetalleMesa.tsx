@@ -116,6 +116,12 @@ export function DetalleMesa({
         </span>
       </div>
 
+      {orden.numero_dia != null && (
+        <p className="mb-1 text-center text-xs font-medium text-ink-400">
+          Orden <span className="font-mono text-ink-600">#{orden.numero_dia}</span> de hoy
+        </p>
+      )}
+
       {(orden.cliente_nombre || orden.personas) && (
         <p className="mb-4 flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
           {orden.cliente_nombre && <span className="font-medium text-ink-700">{orden.cliente_nombre}</span>}

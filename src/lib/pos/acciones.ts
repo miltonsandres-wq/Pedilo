@@ -40,6 +40,7 @@ export async function abrirOrden(params: {
     total: 0,
     cliente_nombre: clienteNombre,
     personas,
+    numero_dia: null,
     created_at: ahora,
     enviada_at: null,
     pagada_at: null,
@@ -135,6 +136,7 @@ export async function enviarACocina(ordenId: string, mesaNombre: string) {
       mesa: mesaNombre,
       sucursalId: orden.sucursal_id,
       creadaEn: new Date().toISOString(),
+      numeroDia: orden.numero_dia,
       items: pendientes.map((i) => ({
         ordenItemId: i.id,
         nombre: i.nombre_producto,

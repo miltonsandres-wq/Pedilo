@@ -9,6 +9,7 @@ import type { Database } from "@/lib/types/database.types";
 export interface CierreDiario {
   sucursalId: string;
   totalCobrado: number;
+  totalOrdenes: number;
   porFormaPago: Record<string, number>;
   productosMasVendidos: { nombre: string; cantidad: number; subtotal: number }[];
 }
@@ -30,6 +31,16 @@ export async function obtenerCierreDiario(
     porFormaPago[p.forma_pago] = (porFormaPago[p.forma_pago] ?? 0) + Number(p.monto);
     totalCobrado += Number(p.monto);
   }
+
+  // Cuenta TODAS las órdenes abiertas ese día (pagadas, canceladas, etc.) —
+  // cada una consumió un número de orden al crearse, sin importar en qué
+  // haya terminado.
+  const { count: totalOrdenes } = await supabase
+    .from("ordenes")
+    .select("*", { count: "exact", head: true })
+    .eq("sucursal_id", params.sucursalId)
+    .gte("created_at", params.desde)
+    .lte("created_at", params.hasta);
 
   const { data: ordenesPagadas } = await supabase
     .from("ordenes")
@@ -61,7 +72,13 @@ export async function obtenerCierreDiario(
       .slice(0, 10);
   }
 
-  return { sucursalId: params.sucursalId, totalCobrado, porFormaPago, productosMasVendidos };
+  return {
+    sucursalId: params.sucursalId,
+    totalCobrado,
+    totalOrdenes: totalOrdenes ?? 0,
+    porFormaPago,
+    productosMasVendidos,
+  };
 }
 
 /** Rango [00:00, 23:59:59] del día dado (o hoy) en ISO, hora local del servidor. */

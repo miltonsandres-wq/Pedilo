@@ -44,6 +44,10 @@ export interface OrdenLocal {
   total: number;
   cliente_nombre: string | null;
   personas: number | null;
+  // Lo asigna el servidor al insertar (ver 0014_numero_orden_diario.sql), no
+  // el cliente — así dos dispositivos offline nunca pueden repetir número.
+  // Queda null hasta que la orden sincroniza y Realtime trae el valor real.
+  numero_dia: number | null;
   created_at: string;
   enviada_at: string | null;
   pagada_at: string | null;

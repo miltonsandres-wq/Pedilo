@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp } from "lucide-react";
+import { Wallet, TrendingUp, Receipt } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/session";
 import { obtenerCierreDiario, rangoDelDia } from "@/lib/reportes/cierreDiario";
@@ -20,27 +20,45 @@ export default async function AdminResumenPage() {
     (sucursales ?? []).map((s) => obtenerCierreDiario(supabase, { sucursalId: s.id, desde, hasta }))
   );
   const totalHoy = cierres.reduce((acc, c) => acc + c.totalCobrado, 0);
+  const ordenesHoy = cierres.reduce((acc, c) => acc + c.totalOrdenes, 0);
 
   return (
     <div>
       <PageHeader title={`Hola, ${sesion.nombre.split(" ")[0]}`} subtitle="Así va el negocio hoy." />
 
-      <Card className="mb-6 flex items-center gap-4 p-5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-          <TrendingUp className="h-5 w-5" strokeWidth={2} />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-ink-500">Cobrado hoy (todas las sucursales)</p>
-          <p className="text-2xl font-semibold text-ink-900">L. {totalHoy.toFixed(2)}</p>
-        </div>
-      </Card>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <TrendingUp className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-ink-500">Cobrado hoy (todas las sucursales)</p>
+            <p className="text-2xl font-semibold text-ink-900">L. {totalHoy.toFixed(2)}</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
+            <Receipt className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-ink-500">Órdenes hoy (todas las sucursales)</p>
+            <p className="text-2xl font-semibold text-ink-900">{ordenesHoy}</p>
+          </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(sucursales ?? []).map((s, idx) => {
           const c = cierres[idx];
           return (
             <Card key={s.id} className="p-5">
-              <p className="text-sm font-medium text-ink-500">{s.nombre}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-ink-500">{s.nombre}</p>
+                <p className="flex items-center gap-1 text-xs text-ink-400">
+                  <Receipt className="h-3 w-3" strokeWidth={2} />
+                  {c.totalOrdenes}
+                </p>
+              </div>
               <p className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
                 L. {c.totalCobrado.toFixed(2)}
               </p>
