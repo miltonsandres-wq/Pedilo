@@ -205,6 +205,9 @@ export default async function MenuPage({
       </div>
 
       <Colapsable
+        // key cambia con la cantidad de productos: vuelve a "cerrado" en vez
+        // de quedarse abierto después de crear uno.
+        key={`nuevo-producto-${productos?.length ?? 0}`}
         className="rounded-2xl"
         resumen={
           <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">

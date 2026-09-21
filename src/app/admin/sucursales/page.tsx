@@ -139,6 +139,7 @@ export default async function SucursalesPage({
         </div>
         <div className="border-t border-ink-100 p-5">
           <Colapsable
+            key={`agregar-admin-${admins.length}`}
             resumen={
               <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
                 <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
@@ -327,6 +328,7 @@ export default async function SucursalesPage({
               </div>
               <div className="border-t border-ink-100 p-5">
                 <Colapsable
+                  key={`agregar-personal-${s.id}-${personal.length}`}
                   resumen={
                     <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
                       <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
@@ -360,6 +362,7 @@ export default async function SucursalesPage({
       </div>
 
       <Colapsable
+        key={`nueva-sucursal-${(sucursales ?? []).length}`}
         resumen={
           <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
             <Plus className="h-4 w-4 text-brand-600" strokeWidth={2} />

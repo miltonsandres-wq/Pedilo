@@ -77,6 +77,10 @@ export default async function MesasPage({
           </div>
 
           <Colapsable
+            // key cambia cuando cambia la cantidad de mesas: fuerza a React a
+            // tratarlo como una instancia nueva (vuelve a "cerrado") en vez
+            // de conservar el estado abierto de después de crear una mesa.
+            key={`nueva-mesa-${mesas?.length ?? 0}`}
             className="mb-6 rounded-2xl"
             resumen={
               <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
