@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UtensilsCrossed, Tag, Plus, ImageOff, FileUp } from "lucide-react";
+import { UtensilsCrossed, Tag, Plus, ImageOff, FileUp, ChevronDown } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
@@ -134,6 +134,10 @@ export default async function MenuPage({
               <Badge tone={p.disponible ? "success" : "danger"}>
                 {p.disponible ? "disponible" : "agotado"}
               </Badge>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-ink-400 transition-transform group-open:rotate-180"
+                strokeWidth={2}
+              />
             </summary>
             <form
               action={actualizarProducto.bind(null, p.id)}
@@ -198,16 +202,24 @@ export default async function MenuPage({
         )}
       </div>
 
-      <Card>
-        <CardHeader
-          title="Nuevo producto"
-          subtitle={
-            sucursalFiltro
-              ? "Se marcará para esta sucursal — puedes agregar más abajo."
-              : "Aparece en el menú del mesero apenas lo asignes a una sucursal."
-          }
-        />
-        <form action={crearProducto} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+      <details className="group rounded-2xl border border-ink-100 bg-white shadow-card">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4">
+          <Plus className="h-4 w-4 text-brand-600" strokeWidth={2} />
+          <span className="text-sm font-semibold text-ink-900">Nuevo producto</span>
+          <ChevronDown
+            className="ml-auto h-4 w-4 text-ink-400 transition-transform group-open:rotate-180"
+            strokeWidth={2}
+          />
+        </summary>
+        <p className="px-5 pb-1 text-xs text-ink-500">
+          {sucursalFiltro
+            ? "Se marcará para esta sucursal — puedes agregar más abajo."
+            : "Aparece en el menú del mesero apenas lo asignes a una sucursal."}
+        </p>
+        <form
+          action={crearProducto}
+          className="grid grid-cols-1 gap-3 border-t border-ink-100 p-5 sm:grid-cols-2"
+        >
           <Field label="Nombre" name="nombre" required />
           <Field label="Precio" name="precio" type="number" step="0.01" required />
           <SelectField label="Categoría" name="categoria_id">
@@ -244,7 +256,7 @@ export default async function MenuPage({
             </Button>
           </div>
         </form>
-      </Card>
+      </details>
     </div>
   );
 }
