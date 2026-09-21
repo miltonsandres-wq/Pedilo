@@ -7,67 +7,131 @@ import { cn } from "@/lib/ui";
 
 type Mesa = Tables<"mesas">;
 
-const TAMANO_MESA = 34; // px — lado del cuadrado / diámetro del círculo
-const RADIO_SILLAS = 27; // px de la mesa al centro de cada silla
-const ANCHO_SILLA = 9; // px
-const ALTO_SILLA = 12; // px (más alta que ancha: simula el respaldo)
+const ANCHO_ASIENTO = 12;
+const ALTO_ASIENTO = 11;
+const ANCHO_RESPALDO = 9;
+const ALTO_RESPALDO = 5;
 
-/** Puntos (x,y relativos al centro, en px) + el ángulo hacia afuera de cada silla. */
-function posicionesSillas(capacidad: number) {
+/** Tamaño de la mesa: crece con la capacidad, para que un 2-top y un 8-top se
+ * distingan a simple vista como en un plano real, no solo por el número. */
+function ladoMesa(capacidad: number) {
+  return 30 + Math.min(Math.max(capacidad, 1), 8) * 3.5;
+}
+
+/** Puntos (x,y relativos al centro, en px) + el ángulo hacia afuera de cada
+ * silla. El radio depende del tamaño de la mesa (no es fijo) para que el
+ * espacio silla-mesa se vea proporcional en un 2-top y en un 8-top. */
+function posicionesSillas(capacidad: number, lado: number) {
   const n = Math.min(Math.max(capacidad, 1), 12);
+  const radio = lado / 2 + 11;
   return Array.from({ length: n }, (_, i) => {
     const angulo = (i / n) * 2 * Math.PI - Math.PI / 2;
     return {
-      x: Math.cos(angulo) * RADIO_SILLAS,
-      y: Math.sin(angulo) * RADIO_SILLAS,
+      x: Math.cos(angulo) * radio,
+      y: Math.sin(angulo) * radio,
       deg: (angulo * 180) / Math.PI + 90,
     };
   });
 }
 
+/** Una silla vista de arriba: respaldo (barra angosta, tono más oscuro) +
+ * asiento (bloque, tono más claro), rotados juntos para "mirar" hacia el
+ * centro de la mesa. El contraste de tono es lo que hace que a este tamaño
+ * se lea como silla — dos piezas del MISMO color se ven como un solo blob. */
+function Silla({
+  x,
+  y,
+  deg,
+  colorAsiento,
+  colorRespaldo,
+}: {
+  x: number;
+  y: number;
+  deg: number;
+  colorAsiento: string;
+  colorRespaldo: string;
+}) {
+  return (
+    <div
+      className="absolute flex flex-col items-center"
+      style={{
+        left: `calc(50% + ${x}px)`,
+        top: `calc(50% + ${y}px)`,
+        transform: `translate(-50%, -50%) rotate(${deg}deg)`,
+      }}
+    >
+      <div
+        className={cn("rounded-t-[2px]", colorRespaldo)}
+        style={{ width: ANCHO_RESPALDO, height: ALTO_RESPALDO }}
+      />
+      <div
+        className={cn("rounded-[2px] shadow-sm", colorAsiento)}
+        style={{ width: ANCHO_ASIENTO, height: ALTO_ASIENTO }}
+      />
+    </div>
+  );
+}
+
 /**
- * Una mesa con sus sillas alrededor, vista de arriba — cada silla rotada para
- * "mirar" hacia el centro de la mesa, y la superficie con un degradado sutil
- * en vez de un color plano, para que se lea como un mueble real y no un ícono.
+ * Una mesa con sus sillas alrededor, vista de arriba — sillas con forma real
+ * (respaldo + asiento), tamaño según capacidad, y una superficie con
+ * degradado + sombra en dos capas para que se lea como un mueble con volumen
+ * sobre el piso, no como un ícono plano.
  */
 function MesaConSillas({ mesa, arrastrando }: { mesa: Mesa; arrastrando: boolean }) {
   const libre = mesa.estado === "libre";
   const colorBorde = libre ? "border-libre-border" : "border-ocupada-border";
   const colorTexto = libre ? "text-libre-text" : "text-ocupada-text";
-  const colorSilla = libre ? "bg-libre-border" : "bg-ocupada-border";
+  const colorAsiento = libre ? "bg-libre-border" : "bg-ocupada-border";
+  const colorRespaldo = libre ? "bg-libre-dot" : "bg-ocupada-dot";
   const superficie = libre
-    ? "radial-gradient(circle at 32% 28%, #ffffff, #ecfdf5 75%)"
-    : "radial-gradient(circle at 32% 28%, #fff6f6, #fef2f2 75%)";
+    ? "radial-gradient(circle at 32% 26%, #ffffff, #ecfdf5 78%)"
+    : "radial-gradient(circle at 32% 26%, #fff6f6, #fef2f2 78%)";
+  const lado = ladoMesa(mesa.capacidad);
 
   return (
     <div
       className={cn(
-        "relative flex h-[5.5rem] w-[5.5rem] items-center justify-center transition-transform",
+        "relative flex h-28 w-28 items-center justify-center transition-transform",
         arrastrando && "scale-110"
       )}
     >
-      {posicionesSillas(mesa.capacidad).map((p, i) => (
-        <span
+      {/* sombra de contacto: ancla la mesa al piso, independiente de la de elevación */}
+      <div
+        className="absolute rounded-full bg-black/10 blur-[3px]"
+        style={{
+          width: lado * 0.85,
+          height: lado * 0.32,
+          left: "50%",
+          top: "58%",
+          transform: "translateX(-50%)",
+        }}
+      />
+      {posicionesSillas(mesa.capacidad, lado).map((p, i) => (
+        <Silla
           key={i}
-          className={cn("absolute rounded-[3px] shadow-sm", colorSilla)}
-          style={{
-            width: ANCHO_SILLA,
-            height: ALTO_SILLA,
-            left: `calc(50% + ${p.x}px - ${ANCHO_SILLA / 2}px)`,
-            top: `calc(50% + ${p.y}px - ${ALTO_SILLA / 2}px)`,
-            transform: `rotate(${p.deg}deg)`,
-          }}
+          x={p.x}
+          y={p.y}
+          deg={p.deg}
+          colorAsiento={colorAsiento}
+          colorRespaldo={colorRespaldo}
         />
       ))}
       <div
         className={cn(
-          "flex flex-col items-center justify-center border-2 text-[10px] font-semibold leading-tight ring-1 ring-black/5",
-          mesa.forma === "redonda" ? "rounded-full" : "rounded-md",
+          "relative flex flex-col items-center justify-center border-2 text-[10px] font-semibold leading-tight ring-1 ring-black/5",
+          mesa.forma === "redonda" ? "rounded-full" : "rounded-lg",
           colorBorde,
-          colorTexto,
-          arrastrando ? "shadow-xl" : "shadow-md"
+          colorTexto
         )}
-        style={{ width: TAMANO_MESA + 12, height: TAMANO_MESA + 12, background: superficie }}
+        style={{
+          width: lado,
+          height: lado,
+          background: superficie,
+          boxShadow: arrastrando
+            ? "inset 0 1px 2px rgba(255,255,255,0.9), inset 0 -2px 3px rgba(0,0,0,0.08), 0 12px 20px -6px rgba(20,23,30,0.35)"
+            : "inset 0 1px 2px rgba(255,255,255,0.9), inset 0 -2px 3px rgba(0,0,0,0.08), 0 4px 8px -2px rgba(20,23,30,0.18)",
+        }}
       >
         <span>{mesa.nombre}</span>
       </div>
@@ -134,9 +198,11 @@ export function PlanoMesas({ mesas }: { mesas: Mesa[] }) {
       ref={lienzoRef}
       className="relative h-[28rem] w-full overflow-hidden rounded-2xl border border-ink-100 shadow-card"
       style={{
-        backgroundColor: "#fbfaf8",
-        backgroundImage: "radial-gradient(circle, rgba(20,23,30,0.08) 1px, transparent 1px)",
-        backgroundSize: "20px 20px",
+        backgroundColor: "#f3e9dc",
+        // "Piso de madera" sutil: vetas verticales (tablones) + una veta
+        // horizontal más tenue — todo en gradientes, sin imágenes.
+        backgroundImage:
+          "repeating-linear-gradient(90deg, rgba(120,84,45,0.07) 0px, rgba(120,84,45,0.07) 1px, transparent 1px, transparent 46px), repeating-linear-gradient(0deg, rgba(120,84,45,0.04) 0px, rgba(120,84,45,0.04) 1px, transparent 1px, transparent 180px), linear-gradient(160deg, rgba(255,255,255,0.5), transparent 40%)",
       }}
     >
       {mesas.map((m) => {
