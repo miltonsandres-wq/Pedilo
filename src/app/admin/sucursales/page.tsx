@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Users,
   MessageCircle,
+  Pencil,
 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +20,7 @@ import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Field, SelectField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Colapsable } from "@/components/ui/Colapsable";
 import { SucursalLogoUploader } from "@/components/admin/SucursalLogoUploader";
 import { linkWhatsapp } from "@/lib/whatsapp";
 import { crearSucursal, actualizarSucursal, desactivarSucursal, crearUsuario, actualizarUsuario } from "./actions";
@@ -92,53 +94,71 @@ export default async function SucursalesPage({
         />
         <div className="space-y-2 p-5 pb-3">
           {admins.map((u) => (
-            <form
+            <Colapsable
               key={u.id}
-              action={actualizarUsuario.bind(null, u.id)}
-              className="flex flex-wrap items-end gap-3 rounded-xl border border-ink-100 bg-ink-50/60 p-3"
+              className="rounded-xl"
+              resumen={
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-ink-900">{u.nombre}</span>
+                  <Badge tone={ROL_TONE.admin}>
+                    <ShieldCheck className="h-3 w-3" strokeWidth={2} />
+                    admin
+                  </Badge>
+                  {!u.activo && <Badge tone="danger">inactivo</Badge>}
+                </div>
+              }
             >
-              <input type="hidden" name="rol" value="admin" />
-              <div className="min-w-32 flex-1">
-                <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
-                <input
-                  name="nombre"
-                  defaultValue={u.nombre}
-                  className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-              <Badge tone={ROL_TONE.admin} className="mb-2">
-                <ShieldCheck className="h-3 w-3" strokeWidth={2} />
-                admin
-              </Badge>
-              <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
-                <input
-                  type="checkbox"
-                  name="activo"
-                  defaultChecked={u.activo}
-                  className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                />
-                Activo
-              </label>
-              <Button size="sm" variant="secondary" className="ml-auto">
-                Guardar
-              </Button>
-            </form>
+              <form action={actualizarUsuario.bind(null, u.id)} className="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="rol" value="admin" />
+                <div className="min-w-32 flex-1">
+                  <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
+                  <input
+                    name="nombre"
+                    defaultValue={u.nombre}
+                    className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
+                <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
+                  <input
+                    type="checkbox"
+                    name="activo"
+                    defaultChecked={u.activo}
+                    className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  Activo
+                </label>
+                <Button size="sm" variant="secondary" className="ml-auto">
+                  Guardar
+                </Button>
+              </form>
+            </Colapsable>
           ))}
           {admins.length === 0 && (
             <p className="py-2 text-center text-sm text-ink-400">Todavía no hay otros administradores.</p>
           )}
         </div>
-        <form action={crearUsuario} className="grid grid-cols-1 gap-3 border-t border-ink-100 p-5 sm:grid-cols-3">
-          <input type="hidden" name="rol" value="admin" />
-          <Field label="Nombre" name="nombre" required />
-          <Field label="Correo" name="email" type="email" required />
-          <div className="flex items-end">
-            <Button type="submit" size="sm" className="w-full">
-              <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
-              Agregar administrador
-            </Button>
-          </div>
-        </form>
+        <div className="border-t border-ink-100 p-5">
+          <Colapsable
+            resumen={
+              <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
+                Agregar administrador
+              </span>
+            }
+          >
+            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <input type="hidden" name="rol" value="admin" />
+              <Field label="Nombre" name="nombre" required />
+              <Field label="Correo" name="email" type="email" required />
+              <div className="flex items-end">
+                <Button type="submit" size="sm" className="w-full">
+                  <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
+                  Agregar administrador
+                </Button>
+              </div>
+            </form>
+          </Colapsable>
+        </div>
       </Card>
 
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -178,45 +198,55 @@ export default async function SucursalesPage({
               </div>
 
               <div className="border-b border-ink-100 p-5">
-                <SucursalLogoUploader sucursalId={s.id} logoUrl={s.logo_url} />
-              </div>
-
-              <form action={actualizarSucursal.bind(null, s.id)} className="space-y-3 border-b border-ink-100 p-5">
-                <Field label="Nombre" name="nombre" defaultValue={s.nombre} />
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Teléfono" name="telefono" defaultValue={s.telefono ?? ""} />
-                  <Field label="Dirección" name="direccion" defaultValue={s.direccion ?? ""} />
-                </div>
-                <Field
-                  label="URL del agente de impresión"
-                  name="agente_impresion_url"
-                  defaultValue={s.agente_impresion_url ?? ""}
-                  placeholder="https://cocina-xxx.tunnel.example.com/comanda"
-                />
-                <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm">Guardar</Button>
-                  <Button
-                    type="submit"
-                    formAction={desactivarSucursal.bind(null, s.id)}
-                    variant="danger"
-                    size="sm"
-                  >
-                    Desactivar
-                  </Button>
-                  <div className="ml-auto flex items-center gap-3 text-xs text-ink-400">
-                    {s.telefono && (
-                      <span className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" /> {s.telefono}
-                      </span>
-                    )}
-                    {s.agente_impresion_url && (
-                      <span className="flex items-center gap-1" title="Agente de impresión configurado">
-                        <Printer className="h-3 w-3" />
-                      </span>
-                    )}
+                <Colapsable
+                  resumen={
+                    <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                      <Pencil className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
+                      Editar datos de la sucursal
+                    </span>
+                  }
+                >
+                  <div className="mb-4">
+                    <SucursalLogoUploader sucursalId={s.id} logoUrl={s.logo_url} />
                   </div>
+                  <form action={actualizarSucursal.bind(null, s.id)} className="space-y-3">
+                    <Field label="Nombre" name="nombre" defaultValue={s.nombre} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Teléfono" name="telefono" defaultValue={s.telefono ?? ""} />
+                      <Field label="Dirección" name="direccion" defaultValue={s.direccion ?? ""} />
+                    </div>
+                    <Field
+                      label="URL del agente de impresión"
+                      name="agente_impresion_url"
+                      defaultValue={s.agente_impresion_url ?? ""}
+                      placeholder="https://cocina-xxx.tunnel.example.com/comanda"
+                    />
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button size="sm">Guardar</Button>
+                      <Button
+                        type="submit"
+                        formAction={desactivarSucursal.bind(null, s.id)}
+                        variant="danger"
+                        size="sm"
+                      >
+                        Desactivar
+                      </Button>
+                    </div>
+                  </form>
+                </Colapsable>
+                <div className="mt-3 flex items-center gap-3 text-xs text-ink-400">
+                  {s.telefono && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3" /> {s.telefono}
+                    </span>
+                  )}
+                  {s.agente_impresion_url && (
+                    <span className="flex items-center gap-1" title="Agente de impresión configurado">
+                      <Printer className="h-3 w-3" /> Impresión configurada
+                    </span>
+                  )}
                 </div>
-              </form>
+              </div>
 
               <div className="border-b border-ink-100 px-5 py-3">
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
@@ -226,60 +256,68 @@ export default async function SucursalesPage({
               </div>
               <div className="space-y-2 p-5 pb-3">
                 {personal.map((u) => (
-                  <form
+                  <Colapsable
                     key={u.id}
-                    action={actualizarUsuario.bind(null, u.id)}
-                    className="flex flex-wrap items-end gap-3 rounded-xl border border-ink-100 bg-white p-3 shadow-card"
+                    className="rounded-xl"
+                    resumen={
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-ink-900">{u.nombre}</span>
+                        <Badge tone={ROL_TONE[u.rol as "cajero" | "mesero"] ?? "neutral"}>{u.rol}</Badge>
+                        {!u.activo && <Badge tone="danger">inactivo</Badge>}
+                      </div>
+                    }
                   >
-                    <div className="min-w-28 flex-1">
-                      <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
-                      <input
-                        name="nombre"
-                        defaultValue={u.nombre}
-                        className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-ink-500">Rol</label>
-                      <select
-                        name="rol"
-                        defaultValue={u.rol}
-                        className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
-                      >
-                        <option value="cajero">Cajero</option>
-                        <option value="mesero">Mesero</option>
-                      </select>
-                    </div>
-                    <Badge tone={ROL_TONE[u.rol as "cajero" | "mesero"] ?? "neutral"} className="mb-2">
-                      {u.rol}
-                    </Badge>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-ink-500">Sucursal</label>
-                      <select
-                        name="sucursal_id"
-                        defaultValue={s.id}
-                        className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
-                      >
-                        {(sucursales ?? []).map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
-                      <input
-                        type="checkbox"
-                        name="activo"
-                        defaultChecked={u.activo}
-                        className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                      />
-                      Activo
-                    </label>
-                    <Button size="sm" variant="secondary" className="ml-auto">
-                      Guardar
-                    </Button>
-                  </form>
+                    <form
+                      action={actualizarUsuario.bind(null, u.id)}
+                      className="flex flex-wrap items-end gap-3"
+                    >
+                      <div className="min-w-28 flex-1">
+                        <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
+                        <input
+                          name="nombre"
+                          defaultValue={u.nombre}
+                          className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-ink-500">Rol</label>
+                        <select
+                          name="rol"
+                          defaultValue={u.rol}
+                          className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
+                        >
+                          <option value="cajero">Cajero</option>
+                          <option value="mesero">Mesero</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-ink-500">Sucursal</label>
+                        <select
+                          name="sucursal_id"
+                          defaultValue={s.id}
+                          className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
+                        >
+                          {(sucursales ?? []).map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
+                        <input
+                          type="checkbox"
+                          name="activo"
+                          defaultChecked={u.activo}
+                          className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                        />
+                        Activo
+                      </label>
+                      <Button size="sm" variant="secondary" className="ml-auto">
+                        Guardar
+                      </Button>
+                    </form>
+                  </Colapsable>
                 ))}
                 {personal.length === 0 && (
                   <p className="py-2 text-center text-sm text-ink-400">
@@ -287,24 +325,32 @@ export default async function SucursalesPage({
                   </p>
                 )}
               </div>
-              <form
-                action={crearUsuario}
-                className="grid grid-cols-1 gap-3 border-t border-ink-100 p-5 sm:grid-cols-4"
-              >
-                <input type="hidden" name="sucursal_id" value={s.id} />
-                <Field label="Nombre" name="nombre" required />
-                <Field label="Correo" name="email" type="email" required />
-                <SelectField label="Rol" name="rol" defaultValue="mesero">
-                  <option value="mesero">Mesero</option>
-                  <option value="cajero">Cajero</option>
-                </SelectField>
-                <div className="flex items-end">
-                  <Button type="submit" size="sm" className="w-full">
-                    <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
-                    Agregar
-                  </Button>
-                </div>
-              </form>
+              <div className="border-t border-ink-100 p-5">
+                <Colapsable
+                  resumen={
+                    <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                      <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
+                      Agregar cajero o mesero
+                    </span>
+                  }
+                >
+                  <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <input type="hidden" name="sucursal_id" value={s.id} />
+                    <Field label="Nombre" name="nombre" required />
+                    <Field label="Correo" name="email" type="email" required />
+                    <SelectField label="Rol" name="rol" defaultValue="mesero">
+                      <option value="mesero">Mesero</option>
+                      <option value="cajero">Cajero</option>
+                    </SelectField>
+                    <div className="flex items-end">
+                      <Button type="submit" size="sm" className="w-full">
+                        <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
+                        Agregar
+                      </Button>
+                    </div>
+                  </form>
+                </Colapsable>
+              </div>
             </Card>
           );
         })}
@@ -313,9 +359,16 @@ export default async function SucursalesPage({
         )}
       </div>
 
-      <Card>
-        <CardHeader title="Nueva sucursal" subtitle="Agrega un local más a tu negocio." />
-        <form action={crearSucursal} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+      <Colapsable
+        resumen={
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+            <Plus className="h-4 w-4 text-brand-600" strokeWidth={2} />
+            Nueva sucursal
+          </span>
+        }
+      >
+        <p className="mb-3 text-xs text-ink-500">Agrega un local más a tu negocio.</p>
+        <form action={crearSucursal} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nombre" name="nombre" required placeholder="Ej. Fondita — barrio" />
           <Field label="Teléfono" name="telefono" />
           <Field label="Dirección" name="direccion" full />
@@ -326,7 +379,7 @@ export default async function SucursalesPage({
             </Button>
           </div>
         </form>
-      </Card>
+      </Colapsable>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ChevronDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PlanoMesas } from "@/components/PlanoMesas";
@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/Card";
 import { Field, SelectField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Colapsable } from "@/components/ui/Colapsable";
 import { MesaQr } from "@/components/admin/MesaQr";
 import { cn } from "@/lib/ui";
 import { crearMesa, actualizarMesa, eliminarMesa } from "./actions";
@@ -75,19 +76,16 @@ export default async function MesasPage({
             <PlanoMesas mesas={mesas ?? []} />
           </div>
 
-          <details className="group mb-6 rounded-2xl border border-ink-100 bg-white shadow-card">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 text-sm font-semibold text-ink-900">
-              <Plus className="h-4 w-4 text-brand-600" strokeWidth={2} />
-              Nueva mesa
-              <ChevronDown
-                className="ml-auto h-4 w-4 text-ink-400 transition-transform group-open:rotate-180"
-                strokeWidth={2}
-              />
-            </summary>
-            <form
-              action={crearMesa}
-              className="flex flex-wrap items-end gap-3 border-t border-ink-100 p-5 pt-4"
-            >
+          <Colapsable
+            className="mb-6 rounded-2xl"
+            resumen={
+              <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                <Plus className="h-4 w-4 text-brand-600" strokeWidth={2} />
+                Nueva mesa
+              </span>
+            }
+          >
+            <form action={crearMesa} className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="sucursal_id" value={sucursalId} />
               <Field label="Nombre" name="nombre" required placeholder="Mesa 1" />
               <Field
@@ -107,59 +105,54 @@ export default async function MesasPage({
                 Agregar
               </Button>
             </form>
-          </details>
+          </Colapsable>
 
           <div className="space-y-2">
             {(mesas ?? []).map((m) => (
-              <details key={m.id} className="group rounded-xl border border-ink-100 bg-white shadow-card">
-                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink-900">{m.nombre}</p>
-                    <p className="text-xs text-ink-500">
-                      {m.capacidad} personas{m.zona ? ` · ${m.zona}` : ""}
-                    </p>
-                  </div>
-                  <Badge tone={m.estado === "libre" ? "success" : "danger"}>{m.estado}</Badge>
-                  <ChevronDown
-                    className="h-4 w-4 shrink-0 text-ink-400 transition-transform group-open:rotate-180"
-                    strokeWidth={2}
-                  />
-                </summary>
-                <div className="border-t border-ink-100 p-4">
-                  <form
-                    action={actualizarMesa.bind(null, m.id)}
-                    className="flex flex-wrap items-end gap-3"
-                  >
-                    <Field label="Nombre" name="nombre" defaultValue={m.nombre} className="w-36" />
-                    <Field
-                      label="Capacidad"
-                      name="capacidad"
-                      type="number"
-                      defaultValue={m.capacidad}
-                      className="w-20"
-                    />
-                    <Field label="Zona" name="zona" defaultValue={m.zona ?? ""} className="w-32" />
-                    <SelectField label="Forma" name="forma" defaultValue={m.forma} className="w-28">
-                      <option value="cuadrada">Cuadrada</option>
-                      <option value="redonda">Redonda</option>
-                    </SelectField>
-                    <div className="ml-auto flex gap-2">
-                      <Button size="sm">Guardar</Button>
-                      <Button
-                        type="submit"
-                        formAction={eliminarMesa.bind(null, m.id)}
-                        variant="danger"
-                        size="sm"
-                      >
-                        Eliminar
-                      </Button>
+              <Colapsable
+                key={m.id}
+                resumen={
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink-900">{m.nombre}</p>
+                      <p className="text-xs text-ink-500">
+                        {m.capacidad} personas{m.zona ? ` · ${m.zona}` : ""}
+                      </p>
                     </div>
-                  </form>
-                  <div className="mt-3">
-                    <MesaQr mesaId={m.id} qrToken={m.qr_token} />
+                    <Badge tone={m.estado === "libre" ? "success" : "danger"}>{m.estado}</Badge>
                   </div>
+                }
+              >
+                <form action={actualizarMesa.bind(null, m.id)} className="flex flex-wrap items-end gap-3">
+                  <Field label="Nombre" name="nombre" defaultValue={m.nombre} className="w-36" />
+                  <Field
+                    label="Capacidad"
+                    name="capacidad"
+                    type="number"
+                    defaultValue={m.capacidad}
+                    className="w-20"
+                  />
+                  <Field label="Zona" name="zona" defaultValue={m.zona ?? ""} className="w-32" />
+                  <SelectField label="Forma" name="forma" defaultValue={m.forma} className="w-28">
+                    <option value="cuadrada">Cuadrada</option>
+                    <option value="redonda">Redonda</option>
+                  </SelectField>
+                  <div className="ml-auto flex gap-2">
+                    <Button size="sm">Guardar</Button>
+                    <Button
+                      type="submit"
+                      formAction={eliminarMesa.bind(null, m.id)}
+                      variant="danger"
+                      size="sm"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </form>
+                <div className="mt-3">
+                  <MesaQr mesaId={m.id} qrToken={m.qr_token} />
                 </div>
-              </details>
+              </Colapsable>
             ))}
           </div>
         </>
