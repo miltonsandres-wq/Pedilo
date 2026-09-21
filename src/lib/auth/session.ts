@@ -107,6 +107,19 @@ export async function requireSucursal(): Promise<
 }
 
 /**
+ * Exige sesión de cualquier rol operativo (admin/cajero/mesero) con
+ * suscripción al día. A diferencia de requireSucursal(), NO exige una
+ * sucursal fija — la usan pantallas como /cocina que el admin también
+ * necesita poder abrir, y que resuelven la sucursal ellas mismas (fija
+ * para cajero/mesero, elegible por query param para el admin).
+ */
+export async function requireOperativo(): Promise<SesionUsuario> {
+  const sesion = await requireSesion();
+  if (await bloqueadoPorSuscripcion(sesion.tenant_id)) redirect("/suspendida");
+  return sesion;
+}
+
+/**
  * Exige sesión y que el usuario esté en `plataforma_admins` (sos vos, el
  * dueño de Pedilo). Deliberadamente NO pasa por bloqueadoPorSuscripcion: tu
  * acceso al panel de plataforma nunca depende del estado de tu propio tenant.

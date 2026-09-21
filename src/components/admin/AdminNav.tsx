@@ -7,6 +7,7 @@ import {
   Building2,
   UtensilsCrossed,
   LayoutGrid,
+  ChefHat,
   Wallet,
   BarChart3,
 } from "lucide-react";
@@ -17,6 +18,7 @@ const NAV = [
   { href: "/admin/sucursales", label: "Sucursales", icon: Building2 },
   { href: "/admin/menu", label: "Menú digital", icon: UtensilsCrossed },
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },
+  { href: "/cocina", label: "Pantalla de cocina", icon: ChefHat },
   { href: "/admin/formas-pago", label: "Formas de pago", icon: Wallet },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];

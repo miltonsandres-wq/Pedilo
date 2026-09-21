@@ -241,6 +241,7 @@ export type Database = {
           enviada_at: string | null
           estado: string
           id: string
+          lista_cocina: boolean
           mesa_id: string
           motivo_cancelacion: string | null
           numero_dia: number | null
@@ -258,6 +259,7 @@ export type Database = {
           enviada_at?: string | null
           estado?: string
           id?: string
+          lista_cocina?: boolean
           mesa_id: string
           motivo_cancelacion?: string | null
           numero_dia?: number | null
@@ -275,6 +277,7 @@ export type Database = {
           enviada_at?: string | null
           estado?: string
           id?: string
+          lista_cocina?: boolean
           mesa_id?: string
           motivo_cancelacion?: string | null
           numero_dia?: number | null

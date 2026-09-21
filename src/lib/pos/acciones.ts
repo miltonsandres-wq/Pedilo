@@ -41,6 +41,7 @@ export async function abrirOrden(params: {
     cliente_nombre: clienteNombre,
     personas,
     numero_dia: null,
+    lista_cocina: false,
     created_at: ahora,
     enviada_at: null,
     pagada_at: null,
@@ -122,13 +123,18 @@ export async function enviarACocina(ordenId: string, mesaNombre: string) {
   const agenteUrl = (sucursalCfg?.valor as { agenteImpresionUrl?: string } | undefined)
     ?.agenteImpresionUrl;
 
+  // lista_cocina se resetea SIEMPRE que hay ítems nuevos — si la orden ya
+  // estaba marcada "lista" en /cocina y le agregan algo más (ej. un postre
+  // después del plato fuerte), tiene que reaparecer en la pantalla.
+  const cambiosOrden: { estado?: "enviada"; enviada_at?: string; lista_cocina: false } = {
+    lista_cocina: false,
+  };
   if (orden.estado === "abierta") {
-    await db.ordenes.update(ordenId, { estado: "enviada", enviada_at: new Date().toISOString() });
-    await encolar("ordenes", "update", ordenId, {
-      estado: "enviada",
-      enviada_at: new Date().toISOString(),
-    });
+    cambiosOrden.estado = "enviada";
+    cambiosOrden.enviada_at = new Date().toISOString();
   }
+  await db.ordenes.update(ordenId, cambiosOrden);
+  await encolar("ordenes", "update", ordenId, cambiosOrden);
 
   if (agenteUrl) {
     const comanda: Comanda = {
@@ -285,6 +291,16 @@ export async function anularOrden(params: { ordenId: string; mesaId: string; mot
     motivo_cancelacion: motivo,
   });
   await encolar("mesas", "update", params.mesaId, { estado: "libre" });
+}
+
+/**
+ * 10. Cocina marca la orden como lista desde /cocina — desaparece de esa
+ * pantalla. No toca `estado`: la mesa sigue "enviada" hasta que el cajero
+ * cobra, esto es solo para que cocina sepa qué ya está preparado.
+ */
+export async function marcarListoCocina(ordenId: string) {
+  await db.ordenes.update(ordenId, { lista_cocina: true });
+  await encolar("ordenes", "update", ordenId, { lista_cocina: true });
 }
 
 async function recalcularTotalLocal(ordenId: string) {

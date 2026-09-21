@@ -48,6 +48,9 @@ export interface OrdenLocal {
   // el cliente — así dos dispositivos offline nunca pueden repetir número.
   // Queda null hasta que la orden sincroniza y Realtime trae el valor real.
   numero_dia: number | null;
+  // true cuando cocina la marca "lista" desde /cocina (ver 0015). Separado
+  // de `estado` a propósito: no toca la lógica de cobro/liberar la mesa.
+  lista_cocina: boolean;
   created_at: string;
   enviada_at: string | null;
   pagada_at: string | null;

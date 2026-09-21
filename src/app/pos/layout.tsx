@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChefHat } from "lucide-react";
 import { requireSucursal } from "@/lib/auth/session";
 import { ProveedorSync } from "@/components/ProveedorSync";
 import { SyncIndicator } from "@/components/SyncIndicator";
@@ -22,6 +23,13 @@ export default async function PosLayout({ children }: { children: React.ReactNod
           </div>
         </Link>
         <div className="flex items-center gap-3">
+          <Link
+            href="/cocina"
+            title="Pantalla de cocina"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+          >
+            <ChefHat className="h-4 w-4" strokeWidth={2} />
+          </Link>
           <SyncIndicator />
           <CerrarSesionBoton />
         </div>
