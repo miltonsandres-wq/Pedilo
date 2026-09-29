@@ -21,7 +21,7 @@ src/
     reportes/              Cierre diario (consulta, no tabla)
   app/
     login/                 Login
-    admin/                 Panel del dueño (sucursales, menú, mesas, usuarios, formas de pago, reportes)
+    admin/                 Panel del dueño (sucursales, menú, inventario, mesas, usuarios, formas de pago, reportes)
     pos/                   Vista de mesero/cajero (mapa de mesas + detalle de orden)
 print-agent/              Servicio Node standalone que corre EN la sucursal e imprime ESC/POS
 ```

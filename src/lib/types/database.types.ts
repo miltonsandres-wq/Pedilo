@@ -110,6 +110,131 @@ export type Database = {
           },
         ]
       }
+      inventario_categorias: {
+        Row: {
+          created_at: string
+          id: string
+          nombre: string
+          orden: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nombre: string
+          orden?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_categorias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventario_items: {
+        Row: {
+          activo: boolean
+          categoria_id: string | null
+          costo_unitario: number | null
+          created_at: string
+          id: string
+          nombre: string
+          proveedor: string | null
+          stock_minimo: number
+          tenant_id: string
+          unidad: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria_id?: string | null
+          costo_unitario?: number | null
+          created_at?: string
+          id?: string
+          nombre: string
+          proveedor?: string | null
+          stock_minimo?: number
+          tenant_id: string
+          unidad?: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria_id?: string | null
+          costo_unitario?: number | null
+          created_at?: string
+          id?: string
+          nombre?: string
+          proveedor?: string | null
+          stock_minimo?: number
+          tenant_id?: string
+          unidad?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_items_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventario_stock: {
+        Row: {
+          cantidad: number
+          item_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          cantidad?: number
+          item_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          item_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_stock_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_stock_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mesas: {
         Row: {
           activa: boolean

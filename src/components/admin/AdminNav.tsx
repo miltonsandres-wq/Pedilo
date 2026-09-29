@@ -10,6 +10,7 @@ import {
   ChefHat,
   Wallet,
   BarChart3,
+  Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
@@ -17,6 +18,7 @@ const NAV = [
   { href: "/admin", label: "Resumen", icon: LayoutDashboard },
   { href: "/admin/sucursales", label: "Sucursales", icon: Building2 },
   { href: "/admin/menu", label: "Menú digital", icon: UtensilsCrossed },
+  { href: "/admin/inventario", label: "Inventario", icon: Boxes },
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },
   { href: "/cocina", label: "Pantalla de cocina", icon: ChefHat },
   { href: "/admin/formas-pago", label: "Formas de pago", icon: Wallet },
