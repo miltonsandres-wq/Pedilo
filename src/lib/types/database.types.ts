@@ -110,6 +110,423 @@ export type Database = {
           },
         ]
       }
+      cai_rangos: {
+        Row: {
+          cai: string
+          clase: string
+          created_at: string
+          desde: number
+          dispositivo_id: string | null
+          establecimiento: string
+          estado: string
+          fecha_limite: string
+          hasta: number
+          id: string
+          punto_emision: string
+          siguiente: number
+          sucursal_id: string
+          tenant_id: string
+          tipo_doc: string
+        }
+        Insert: {
+          cai: string
+          clase?: string
+          created_at?: string
+          desde: number
+          dispositivo_id?: string | null
+          establecimiento: string
+          estado?: string
+          fecha_limite: string
+          hasta: number
+          id?: string
+          punto_emision: string
+          siguiente?: number
+          sucursal_id: string
+          tenant_id: string
+          tipo_doc: string
+        }
+        Update: {
+          cai?: string
+          clase?: string
+          created_at?: string
+          desde?: number
+          dispositivo_id?: string | null
+          establecimiento?: string
+          estado?: string
+          fecha_limite?: string
+          hasta?: number
+          id?: string
+          punto_emision?: string
+          siguiente?: number
+          sucursal_id?: string
+          tenant_id?: string
+          tipo_doc?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cai_rangos_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_pos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cai_rangos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cai_rangos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      datos_fiscales_emisor: {
+        Row: {
+          correo: string | null
+          created_at: string
+          direccion_fiscal: string | null
+          id: string
+          nombre_comercial: string | null
+          razon_social: string | null
+          rtn: string | null
+          sucursal_id: string | null
+          telefono: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          correo?: string | null
+          created_at?: string
+          direccion_fiscal?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          razon_social?: string | null
+          rtn?: string | null
+          sucursal_id?: string | null
+          telefono?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          correo?: string | null
+          created_at?: string
+          direccion_fiscal?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          razon_social?: string | null
+          rtn?: string | null
+          sucursal_id?: string | null
+          telefono?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "datos_fiscales_emisor_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "datos_fiscales_emisor_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispositivos_pos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          establecimiento: string
+          id: string
+          nombre: string
+          punto_emision: string
+          sucursal_id: string
+          tenant_id: string
+          vinculado_at: string | null
+          vinculo_hash: string | null
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          establecimiento: string
+          id?: string
+          nombre: string
+          punto_emision: string
+          sucursal_id: string
+          tenant_id: string
+          vinculado_at?: string | null
+          vinculo_hash?: string | null
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          establecimiento?: string
+          id?: string
+          nombre?: string
+          punto_emision?: string
+          sucursal_id?: string
+          tenant_id?: string
+          vinculado_at?: string | null
+          vinculo_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispositivos_pos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispositivos_pos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentos_fiscales: {
+        Row: {
+          anulada_at: string | null
+          anulada_motivo: string | null
+          anulada_por: string | null
+          cai: string
+          cargo_servicio: number
+          clase: string
+          cliente_nombre: string
+          cliente_rtn: string | null
+          correlativo: number
+          created_at: string
+          dispositivo_id: string | null
+          documento_referencia_id: string | null
+          emisor_snapshot: Json
+          establecimiento: string
+          estado: string
+          fecha_emision: string
+          fecha_limite: string
+          gravado_15: number
+          gravado_18: number
+          id: string
+          importe_exento: number
+          importe_exonerado: number
+          isv_15: number
+          isv_18: number
+          lineas: Json
+          no_constancia_exonerado: string | null
+          no_orden_compra_exenta: string | null
+          no_registro_sag: string | null
+          numero_completo: string
+          orden_id: string
+          punto_emision: string
+          rango_desde: number
+          rango_hasta: number
+          rango_id: string | null
+          sucursal_id: string
+          tenant_id: string
+          tipo_doc: string
+          total: number
+          total_letras: string
+          usuario_id: string | null
+        }
+        Insert: {
+          anulada_at?: string | null
+          anulada_motivo?: string | null
+          anulada_por?: string | null
+          cai: string
+          cargo_servicio?: number
+          clase?: string
+          cliente_nombre?: string
+          cliente_rtn?: string | null
+          correlativo: number
+          created_at?: string
+          dispositivo_id?: string | null
+          documento_referencia_id?: string | null
+          emisor_snapshot: Json
+          establecimiento: string
+          estado?: string
+          fecha_emision: string
+          fecha_limite: string
+          gravado_15?: number
+          gravado_18?: number
+          id: string
+          importe_exento?: number
+          importe_exonerado?: number
+          isv_15?: number
+          isv_18?: number
+          lineas: Json
+          no_constancia_exonerado?: string | null
+          no_orden_compra_exenta?: string | null
+          no_registro_sag?: string | null
+          numero_completo: string
+          orden_id: string
+          punto_emision: string
+          rango_desde: number
+          rango_hasta: number
+          rango_id?: string | null
+          sucursal_id: string
+          tenant_id: string
+          tipo_doc: string
+          total: number
+          total_letras: string
+          usuario_id?: string | null
+        }
+        Update: {
+          anulada_at?: string | null
+          anulada_motivo?: string | null
+          anulada_por?: string | null
+          cai?: string
+          cargo_servicio?: number
+          clase?: string
+          cliente_nombre?: string
+          cliente_rtn?: string | null
+          correlativo?: number
+          created_at?: string
+          dispositivo_id?: string | null
+          documento_referencia_id?: string | null
+          emisor_snapshot?: Json
+          establecimiento?: string
+          estado?: string
+          fecha_emision?: string
+          fecha_limite?: string
+          gravado_15?: number
+          gravado_18?: number
+          id?: string
+          importe_exento?: number
+          importe_exonerado?: number
+          isv_15?: number
+          isv_18?: number
+          lineas?: Json
+          no_constancia_exonerado?: string | null
+          no_orden_compra_exenta?: string | null
+          no_registro_sag?: string | null
+          numero_completo?: string
+          orden_id?: string
+          punto_emision?: string
+          rango_desde?: number
+          rango_hasta?: number
+          rango_id?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          tipo_doc?: string
+          total?: number
+          total_letras?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_fiscales_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_pos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_fiscales_documento_referencia_id_fkey"
+            columns: ["documento_referencia_id"]
+            isOneToOne: false
+            referencedRelation: "documentos_fiscales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_fiscales_orden_id_fkey"
+            columns: ["orden_id"]
+            isOneToOne: false
+            referencedRelation: "ordenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_fiscales_rango_id_fkey"
+            columns: ["rango_id"]
+            isOneToOne: false
+            referencedRelation: "cai_rangos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_fiscales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_fiscales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidentes_fiscales: {
+        Row: {
+          created_at: string
+          detalle: string
+          dispositivo_id: string | null
+          id: string
+          payload: Json | null
+          resuelto: boolean
+          sucursal_id: string | null
+          tenant_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          detalle: string
+          dispositivo_id?: string | null
+          id?: string
+          payload?: Json | null
+          resuelto?: boolean
+          sucursal_id?: string | null
+          tenant_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          detalle?: string
+          dispositivo_id?: string | null
+          id?: string
+          payload?: Json | null
+          resuelto?: boolean
+          sucursal_id?: string | null
+          tenant_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidentes_fiscales_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_pos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidentes_fiscales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidentes_fiscales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventario_categorias: {
         Row: {
           created_at: string
@@ -300,6 +717,7 @@ export type Database = {
       }
       orden_items: {
         Row: {
+          tasa_isv: string
           cantidad: number
           created_at: string
           id: string
@@ -314,6 +732,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          tasa_isv?: string
           cantidad: number
           created_at?: string
           id?: string
@@ -328,6 +747,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          tasa_isv?: string
           cantidad?: number
           created_at?: string
           id?: string
@@ -527,6 +947,7 @@ export type Database = {
       }
       productos: {
         Row: {
+          tasa_isv: string
           activo: boolean
           categoria_id: string | null
           created_at: string
@@ -540,6 +961,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          tasa_isv?: string
           activo?: boolean
           categoria_id?: string | null
           created_at?: string
@@ -553,6 +975,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          tasa_isv?: string
           activo?: boolean
           categoria_id?: string | null
           created_at?: string
@@ -628,6 +1051,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          facturacion_fiscal_activa: boolean
           activo: boolean
           created_at: string
           direccion: string | null
@@ -648,6 +1072,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          facturacion_fiscal_activa?: boolean
           activo?: boolean
           created_at?: string
           direccion?: string | null
@@ -668,6 +1093,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          facturacion_fiscal_activa?: boolean
           activo?: boolean
           created_at?: string
           direccion?: string | null
@@ -846,6 +1272,20 @@ export type Database = {
       current_sucursal_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      anular_documento_fiscal: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: Database["public"]["Tables"]["documentos_fiscales"]["Row"]
+      }
+      max_correlativo_fiscal: {
+        Args: { p_establecimiento: string; p_punto: string; p_tipo_doc: string }
+        Returns: number
+      }
+      refrescar_estados_cai: { Args: never; Returns: undefined }
+      sincronizar_documento_fiscal: { Args: { p_doc: Json }; Returns: Json }
+      vincular_dispositivo: {
+        Args: { p_id: string; p_token: string }
+        Returns: Database["public"]["Tables"]["dispositivos_pos"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never
