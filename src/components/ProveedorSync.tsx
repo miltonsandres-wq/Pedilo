@@ -13,19 +13,22 @@ export function ProveedorSync({
   sucursalId,
   tenantId,
   puedeCobrar = false,
+  omitirFiscal = false,
 }: {
   sucursalId: string;
   tenantId: string;
   /** Solo el cajero cobra: es quien vincula solo la caja de la sucursal. */
   puedeCobrar?: boolean;
+  /** Cocina no factura ni ve dinero: no se baja nada fiscal. */
+  omitirFiscal?: boolean;
 }) {
   useEffect(() => {
     let limpiar: (() => void) | undefined;
-    iniciarSync(sucursalId, tenantId, puedeCobrar).then((fn) => {
+    iniciarSync(sucursalId, tenantId, puedeCobrar, omitirFiscal).then((fn) => {
       limpiar = fn;
     });
     return () => limpiar?.();
-  }, [sucursalId, tenantId, puedeCobrar]);
+  }, [sucursalId, tenantId, puedeCobrar, omitirFiscal]);
 
   return null;
 }

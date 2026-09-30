@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Tables } from "@/lib/types/helpers";
+import { rutaInicialPorRol } from "./rutas";
 
 export type SesionUsuario = Tables<"usuarios"> & { email: string | null };
 
@@ -84,10 +85,10 @@ async function bloqueadoPorSuscripcion(tenantId: string): Promise<boolean> {
   return false;
 }
 
-/** Exige sesión con rol admin y suscripción al día; si no, manda al POS o a /suspendida. */
+/** Exige sesión con rol admin y suscripción al día; si no, manda a su pantalla (POS/cocina) o a /suspendida. */
 export async function requireAdmin(): Promise<SesionUsuario> {
   const sesion = await requireSesion();
-  if (sesion.rol !== "admin") redirect("/pos");
+  if (sesion.rol !== "admin") redirect(rutaInicialPorRol(sesion.rol));
   if (await bloqueadoPorSuscripcion(sesion.tenant_id)) redirect("/suspendida");
   return sesion;
 }
@@ -98,6 +99,8 @@ export async function requireSucursal(): Promise<
 > {
   const sesion = await requireSesion();
   if (await bloqueadoPorSuscripcion(sesion.tenant_id)) redirect("/suspendida");
+  // Cocina solo usa su pantalla: el POS (mesas, cobro) no es para ese rol
+  if (sesion.rol === "cocina") redirect(rutaInicialPorRol("cocina"));
   // El admin no tiene sucursal fija: si entra al POS, opera la primera activa
   // de su tenant (puede cambiarla desde el selector del layout del POS).
   if (sesion.sucursal_id) {

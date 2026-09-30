@@ -67,10 +67,14 @@ function FormularioLogin() {
           </div>
 
           <h1 className="mb-1 text-lg font-semibold text-ink-900">
-            {rol ? `Panel de ${rol}` : "Bienvenido de nuevo"}
+            {rol === "cocina" ? "Pantalla de cocina" : rol ? `Panel de ${rol}` : "Bienvenido de nuevo"}
           </h1>
           <p className="mb-5 text-sm text-ink-500">
-            {rol ? `Ingresa con tu usuario de ${rol} para abrir el POS` : "Ingresa con tu usuario para continuar"}
+            {rol === "cocina"
+              ? "Ingresa con tu usuario de cocina para ver y despachar los pedidos"
+              : rol
+                ? `Ingresa con tu usuario de ${rol} para abrir el POS`
+                : "Ingresa con tu usuario para continuar"}
           </p>
 
           <form action={formAction}>

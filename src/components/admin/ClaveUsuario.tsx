@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Eye, EyeOff, Loader2 } from "lucide-react";
-import { verClaveUsuario } from "@/app/admin/sucursales/actions";
+import { verClaveUsuario } from "@/app/admin/equipo/actions";
 
 /**
  * «Ver contraseña» de un cajero/mesero/admin. La contraseña se guarda cifrada y

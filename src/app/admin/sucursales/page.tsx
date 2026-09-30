@@ -7,59 +7,54 @@ import {
   UtensilsCrossed,
   LayoutGrid,
   QrCode,
-  KeyRound,
-  UserPlus,
-  ShieldCheck,
   Users,
   MessageCircle,
   Pencil,
 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
-import { Field, SelectField } from "@/components/ui/Field";
+import { Card, PageHeader } from "@/components/ui/Card";
+import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Colapsable } from "@/components/ui/Colapsable";
 import { SucursalLogoUploader } from "@/components/admin/SucursalLogoUploader";
-import { ClaveUsuario } from "@/components/admin/ClaveUsuario";
-import { AbrirPanelPersonal } from "@/components/admin/AbrirPanelPersonal";
-import { rolDeLogin } from "@/lib/auth/enlaces";
 import { linkWhatsapp } from "@/lib/whatsapp";
-import { crearSucursal, actualizarSucursal, desactivarSucursal, crearUsuario, actualizarUsuario } from "./actions";
-
-const ROL_TONE = { admin: "brand", cajero: "warning", mesero: "neutral" } as const;
+import { crearSucursal, actualizarSucursal, desactivarSucursal } from "./actions";
 
 export default async function SucursalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nuevoEmail?: string; nuevoRol?: string; errorClave?: string; errorUsuario?: string; errorPlan?: string }>;
+  searchParams: Promise<{ errorPlan?: string }>;
 }) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
-  const { nuevoEmail, nuevoRol, errorClave, errorUsuario, errorPlan } = await searchParams;
-  const rolNuevo = rolDeLogin(nuevoRol);
+  const { errorPlan } = await searchParams;
 
   const [{ data: sucursales }, { data: mesas }, { data: prodSuc }, { data: usuarios }] =
     await Promise.all([
       supabase.from("sucursales").select("*").eq("tenant_id", sesion.tenant_id).order("created_at"),
       supabase.from("mesas").select("id, sucursal_id").eq("tenant_id", sesion.tenant_id).eq("activa", true),
       supabase.from("producto_sucursales").select("sucursal_id"),
-      supabase.from("usuarios").select("*").eq("tenant_id", sesion.tenant_id).order("created_at"),
+      supabase.from("usuarios").select("id, rol, sucursal_id").eq("tenant_id", sesion.tenant_id),
     ]);
 
-  const contarPor = (filas: { sucursal_id: string }[] | null, sucursalId: string) =>
+  const contarPor = (filas: { sucursal_id: string | null }[] | null, sucursalId: string) =>
     (filas ?? []).filter((f) => f.sucursal_id === sucursalId).length;
-
-  const admins = (usuarios ?? []).filter((u) => u.rol === "admin");
-  const personalPorSucursal = (sucursalId: string) =>
-    (usuarios ?? []).filter((u) => u.rol !== "admin" && u.sucursal_id === sucursalId);
 
   return (
     <div>
       <PageHeader
         title="Sucursales"
-        subtitle="Configura cada local: sus datos, mesas, menú y el personal (cajero/mesero) que trabaja ahí."
+        subtitle="Configura cada local: sus datos, logo, mesas y menú. Las personas que trabajan en ellos están en «Equipo de trabajo»."
+        action={
+          <Link href="/admin/equipo">
+            <Button variant="secondary" size="sm">
+              <Users className="h-3.5 w-3.5" strokeWidth={2} />
+              Equipo de trabajo
+            </Button>
+          </Link>
+        }
       />
 
       {errorPlan && (
@@ -80,340 +75,98 @@ export default async function SucursalesPage({
         </div>
       )}
 
-      {nuevoEmail && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <KeyRound className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-          <p>
-            Usuario <b>{nuevoEmail}</b> creado. Puedes ver su contraseña cuando quieras abriendo su fila y tocando «Ver
-            contraseña».
-          </p>
-          {rolNuevo && (
-            <div className="ml-auto shrink-0">
-              <AbrirPanelPersonal rol={rolNuevo} email={nuevoEmail} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {errorUsuario && (
-        <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <UserPlus className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-          <p>{errorUsuario}</p>
-        </div>
-      )}
-
-      {errorClave && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <KeyRound className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-          <p>{errorClave}</p>
-        </div>
-      )}
-
-      <Card className="mb-8">
-        <CardHeader
-          title="Administradores"
-          subtitle="Tienen acceso a todo el panel, sin estar atados a una sucursal en particular."
-        />
-        <div className="space-y-2 p-5 pb-3">
-          {admins.map((u) => (
-            <Colapsable
-              key={u.id}
-              className="rounded-xl"
-              resumen={
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-ink-900">{u.nombre}</span>
-                  <Badge tone={ROL_TONE.admin}>
-                    <ShieldCheck className="h-3 w-3" strokeWidth={2} />
-                    admin
-                  </Badge>
-                  {!u.activo && <Badge tone="danger">inactivo</Badge>}
-                </div>
-              }
-            >
-              <form action={actualizarUsuario.bind(null, u.id)} className="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="rol" value="admin" />
-                <div className="min-w-32 flex-1">
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
-                  <input
-                    name="nombre"
-                    defaultValue={u.nombre}
-                    className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-                <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
-                  <input
-                    type="checkbox"
-                    name="activo"
-                    defaultChecked={u.activo}
-                    className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                  />
-                  Activo
-                </label>
-                <div className="min-w-32 flex-1">
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Nueva contraseña (opcional)</label>
-                  <input
-                    name="clave"
-                    autoComplete="off"
-                    placeholder="Dejar vacío para no cambiarla"
-                    className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-                <Button size="sm" variant="secondary" className="ml-auto">
-                  Guardar
-                </Button>
-                <div className="w-full">
-                  <ClaveUsuario usuarioId={u.id} />
-                </div>
-              </form>
-            </Colapsable>
-          ))}
-          {admins.length === 0 && (
-            <p className="py-2 text-center text-sm text-ink-400">Todavía no hay otros administradores.</p>
-          )}
-        </div>
-        <div className="border-t border-ink-100 p-5">
-          <Colapsable
-            key={`agregar-admin-${admins.length}`}
-            resumen={
-              <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
-                Agregar administrador
-              </span>
-            }
-          >
-            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input type="hidden" name="rol" value="admin" />
-              <Field label="Nombre" name="nombre" required />
-              <Field label="Correo" name="email" type="email" required />
-              <Field label="Contraseña (vacío = generar)" name="clave" autoComplete="off" />
-              <div className="col-span-full">
-                <Button type="submit" size="sm">
-                  <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
-                  Agregar administrador
-                </Button>
-              </div>
-            </form>
-          </Colapsable>
-        </div>
-      </Card>
-
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {(sucursales ?? []).map((s) => {
-          const personal = personalPorSucursal(s.id);
-          return (
-            <Card key={s.id} className="overflow-hidden">
-              <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                    <Building2 className="h-4 w-4" strokeWidth={2} />
-                  </div>
-                  <p className="text-sm font-semibold text-ink-900">{s.nombre}</p>
+        {(sucursales ?? []).map((s) => (
+          <Card key={s.id} className="overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                  <Building2 className="h-4 w-4" strokeWidth={2} />
                 </div>
-                {!s.activo && <Badge tone="danger">inactiva</Badge>}
+                <p className="text-sm font-semibold text-ink-900">{s.nombre}</p>
               </div>
+              {!s.activo && <Badge tone="danger">inactiva</Badge>}
+            </div>
 
-              <div className="flex flex-wrap gap-2 border-b border-ink-100 bg-ink-50/60 px-5 py-3">
-                <Link href={`/admin/menu?sucursal=${s.id}`}>
-                  <Button variant="secondary" size="sm">
-                    <UtensilsCrossed className="h-3.5 w-3.5" strokeWidth={2} />
-                    Menú ({contarPor(prodSuc, s.id)})
-                  </Button>
-                </Link>
-                <Link href={`/admin/mesas?sucursal=${s.id}`}>
-                  <Button variant="secondary" size="sm">
-                    <LayoutGrid className="h-3.5 w-3.5" strokeWidth={2} />
-                    Mesas / Layout ({contarPor(mesas, s.id)})
-                  </Button>
-                </Link>
-                <Link href={`/admin/mesas?sucursal=${s.id}`}>
-                  <Button variant="secondary" size="sm">
-                    <QrCode className="h-3.5 w-3.5" strokeWidth={2} />
-                    QR de mesas
-                  </Button>
-                </Link>
-              </div>
-
-              <div className="border-b border-ink-100 p-5">
-                <Colapsable
-                  resumen={
-                    <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                      <Pencil className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
-                      Editar datos de la sucursal
-                    </span>
-                  }
-                >
-                  <div className="mb-4">
-                    <SucursalLogoUploader sucursalId={s.id} logoUrl={s.logo_url} />
-                  </div>
-                  <form action={actualizarSucursal.bind(null, s.id)} className="space-y-3">
-                    <Field label="Nombre" name="nombre" defaultValue={s.nombre} />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Teléfono" name="telefono" defaultValue={s.telefono ?? ""} />
-                      <Field label="Dirección" name="direccion" defaultValue={s.direccion ?? ""} />
-                    </div>
-                    <Field
-                      label="URL del agente de impresión"
-                      name="agente_impresion_url"
-                      defaultValue={s.agente_impresion_url ?? ""}
-                      placeholder="https://cocina-xxx.tunnel.example.com/comanda"
-                    />
-                    <div className="flex items-center gap-2 pt-1">
-                      <Button size="sm">Guardar</Button>
-                      <Button
-                        type="submit"
-                        formAction={desactivarSucursal.bind(null, s.id)}
-                        variant="danger"
-                        size="sm"
-                      >
-                        Desactivar
-                      </Button>
-                    </div>
-                  </form>
-                </Colapsable>
-                <div className="mt-3 flex items-center gap-3 text-xs text-ink-400">
-                  {s.telefono && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> {s.telefono}
-                    </span>
-                  )}
-                  {s.agente_impresion_url && (
-                    <span className="flex items-center gap-1" title="Agente de impresión configurado">
-                      <Printer className="h-3 w-3" /> Impresión configurada
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-ink-100 px-5 py-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
+            <div className="flex flex-wrap gap-2 border-b border-ink-100 bg-ink-50/60 px-5 py-3">
+              <Link href={`/admin/menu?sucursal=${s.id}`}>
+                <Button variant="secondary" size="sm">
+                  <UtensilsCrossed className="h-3.5 w-3.5" strokeWidth={2} />
+                  Menú ({contarPor(prodSuc, s.id)})
+                </Button>
+              </Link>
+              <Link href={`/admin/mesas?sucursal=${s.id}`}>
+                <Button variant="secondary" size="sm">
+                  <LayoutGrid className="h-3.5 w-3.5" strokeWidth={2} />
+                  Mesas / Layout ({contarPor(mesas, s.id)})
+                </Button>
+              </Link>
+              <Link href={`/admin/mesas?sucursal=${s.id}`}>
+                <Button variant="secondary" size="sm">
+                  <QrCode className="h-3.5 w-3.5" strokeWidth={2} />
+                  QR de mesas
+                </Button>
+              </Link>
+              <Link href="/admin/equipo">
+                <Button variant="secondary" size="sm">
                   <Users className="h-3.5 w-3.5" strokeWidth={2} />
-                  Personal de esta sucursal
-                </p>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <AbrirPanelPersonal rol="cajero" compacto soloAbrir />
-                  <AbrirPanelPersonal rol="mesero" compacto soloAbrir />
+                  Equipo ({contarPor(usuarios, s.id)})
+                </Button>
+              </Link>
+            </div>
+
+            <div className="p-5">
+              <Colapsable
+                resumen={
+                  <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                    <Pencil className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
+                    Editar datos de la sucursal
+                  </span>
+                }
+              >
+                <div className="mb-4">
+                  <SucursalLogoUploader sucursalId={s.id} logoUrl={s.logo_url} />
                 </div>
-              </div>
-              <div className="space-y-2 p-5 pb-3">
-                {personal.map((u) => (
-                  <Colapsable
-                    key={u.id}
-                    className="rounded-xl"
-                    resumen={
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-ink-900">{u.nombre}</span>
-                        <Badge tone={ROL_TONE[u.rol as "cajero" | "mesero"] ?? "neutral"}>{u.rol}</Badge>
-                        {!u.activo && <Badge tone="danger">inactivo</Badge>}
-                      </div>
-                    }
-                  >
-                    <form
-                      action={actualizarUsuario.bind(null, u.id)}
-                      className="flex flex-wrap items-end gap-3"
+                <form action={actualizarSucursal.bind(null, s.id)} className="space-y-3">
+                  <Field label="Nombre" name="nombre" defaultValue={s.nombre} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Teléfono" name="telefono" defaultValue={s.telefono ?? ""} />
+                    <Field label="Dirección" name="direccion" defaultValue={s.direccion ?? ""} />
+                  </div>
+                  <Field
+                    label="URL del agente de impresión"
+                    name="agente_impresion_url"
+                    defaultValue={s.agente_impresion_url ?? ""}
+                    placeholder="https://cocina-xxx.tunnel.example.com/comanda"
+                  />
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button size="sm">Guardar</Button>
+                    <Button
+                      type="submit"
+                      formAction={desactivarSucursal.bind(null, s.id)}
+                      variant="danger"
+                      size="sm"
                     >
-                      <div className="min-w-28 flex-1">
-                        <label className="mb-1 block text-xs font-medium text-ink-500">Nombre</label>
-                        <input
-                          name="nombre"
-                          defaultValue={u.nombre}
-                          className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm font-medium text-ink-900 focus:border-brand-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-ink-500">Rol</label>
-                        <select
-                          name="rol"
-                          defaultValue={u.rol}
-                          className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
-                        >
-                          <option value="cajero">Cajero</option>
-                          <option value="mesero">Mesero</option>
-                        </select>
-                      </div>
-                      {(sucursales ?? []).length > 1 ? (
-                        <div>
-                          <label className="mb-1 block text-xs font-medium text-ink-500">Sucursal</label>
-                          <select
-                            name="sucursal_id"
-                            defaultValue={s.id}
-                            className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
-                          >
-                            {(sucursales ?? []).map((opt) => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.nombre}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ) : (
-                        <input type="hidden" name="sucursal_id" value={s.id} />
-                      )}
-                      <div className="min-w-32 flex-1">
-                        <label className="mb-1 block text-xs font-medium text-ink-500">Nueva contraseña (opcional)</label>
-                        <input
-                          name="clave"
-                          autoComplete="off"
-                          placeholder="Dejar vacío para no cambiarla"
-                          className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-                        />
-                      </div>
-                      <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
-                        <input
-                          type="checkbox"
-                          name="activo"
-                          defaultChecked={u.activo}
-                          className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                        />
-                        Activo
-                      </label>
-                      <Button size="sm" variant="secondary" className="ml-auto">
-                        Guardar
-                      </Button>
-                      <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                        <ClaveUsuario usuarioId={u.id} />
-                        {(u.rol === "cajero" || u.rol === "mesero") && <AbrirPanelPersonal rol={u.rol} compacto />}
-                      </div>
-                    </form>
-                  </Colapsable>
-                ))}
-                {personal.length === 0 && (
-                  <p className="py-2 text-center text-sm text-ink-400">
-                    Todavía no hay cajeros ni meseros asignados a esta sucursal.
-                  </p>
+                      Desactivar
+                    </Button>
+                  </div>
+                </form>
+              </Colapsable>
+              <div className="mt-3 flex items-center gap-3 text-xs text-ink-400">
+                {s.telefono && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {s.telefono}
+                  </span>
+                )}
+                {s.agente_impresion_url && (
+                  <span className="flex items-center gap-1" title="Agente de impresión configurado">
+                    <Printer className="h-3 w-3" /> Impresión configurada
+                  </span>
                 )}
               </div>
-              <div className="border-t border-ink-100 p-5">
-                <Colapsable
-                  key={`agregar-personal-${s.id}-${personal.length}`}
-                  tour="abrir-personal"
-                  resumen={
-                    <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                      <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
-                      Agregar cajero o mesero
-                    </span>
-                  }
-                >
-                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <input type="hidden" name="sucursal_id" value={s.id} />
-                    <Field label="Nombre" name="nombre" required />
-                    <Field label="Correo" name="email" type="email" required />
-                    <Field label="Contraseña (vacío = generar)" name="clave" autoComplete="off" />
-                    <SelectField label="Rol" name="rol" defaultValue="mesero">
-                      <option value="mesero">Mesero</option>
-                      <option value="cajero">Cajero</option>
-                    </SelectField>
-                    <div className="col-span-full">
-                      <Button type="submit" size="sm">
-                        <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
-                        Agregar
-                      </Button>
-                    </div>
-                  </form>
-                </Colapsable>
-              </div>
-            </Card>
-          );
-        })}
+            </div>
+          </Card>
+        ))}
         {(sucursales ?? []).length === 0 && (
           <p className="text-sm text-ink-500">Todavía no hay sucursales.</p>
         )}

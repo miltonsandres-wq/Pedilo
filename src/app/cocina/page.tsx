@@ -47,7 +47,7 @@ export default async function CocinaPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-ink-950">
-      <ProveedorSync sucursalId={sucursalId} tenantId={sesion.tenant_id} />
+      <ProveedorSync sucursalId={sucursalId} tenantId={sesion.tenant_id} omitirFiscal={sesion.rol === "cocina"} />
 
       <header className="flex flex-wrap items-center gap-3 border-b border-ink-800 px-4 py-3">
         <div className="flex items-center gap-2.5">
@@ -79,9 +79,12 @@ export default async function CocinaPage({
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          <Link href="/pos" className="text-xs text-ink-400 hover:text-white">
-            Ir al POS
-          </Link>
+          {/* El rol de cocina solo usa esta pantalla: no tiene POS al cual ir */}
+          {sesion.rol !== "cocina" && (
+            <Link href="/pos" className="text-xs text-ink-400 hover:text-white">
+              Ir al POS
+            </Link>
+          )}
           <CerrarSesionBoton />
         </div>
       </header>

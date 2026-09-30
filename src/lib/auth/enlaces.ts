@@ -1,4 +1,4 @@
-export type RolPersonal = "cajero" | "mesero";
+export type RolPersonal = "cajero" | "mesero" | "cocina";
 
 /** Ruta del login pensada para un cajero o mesero (opcionalmente con su correo ya escrito). */
 export function urlLoginPersonal(rol: RolPersonal, email?: string): string {
@@ -7,7 +7,7 @@ export function urlLoginPersonal(rol: RolPersonal, email?: string): string {
   return `/login?${params.toString()}`;
 }
 
-/** Interpreta ?rol= del login: solo acepta cajero o mesero. */
+/** Interpreta ?rol= del login: solo acepta cajero, mesero o cocina. */
 export function rolDeLogin(valor: string | null | undefined): RolPersonal | null {
-  return valor === "cajero" || valor === "mesero" ? valor : null;
+  return valor === "cajero" || valor === "mesero" || valor === "cocina" ? valor : null;
 }

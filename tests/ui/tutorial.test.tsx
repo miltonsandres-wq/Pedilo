@@ -69,17 +69,17 @@ describe("calcularFase (qué señalar en cada momento)", () => {
   it("fuera de la pantalla del paso: señala el enlace del menú", () => {
     expect(calcularFase(personal, PROGRESO_VACIO, "/admin", existe([]))).toEqual({
       fase: "ir",
-      selector: '[data-tour="nav-sucursales"]',
+      selector: '[data-tour="nav-equipo"]',
     });
   });
   it("en la pantalla pero con el formulario cerrado: señala el botón que lo abre", () => {
-    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/sucursales", existe([]))).toEqual({
+    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/equipo", existe([]))).toEqual({
       fase: "abrir",
       selector: '[data-tour="abrir-personal"]',
     });
   });
   it("con el formulario abierto: señala el formulario y espera", () => {
-    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/sucursales", existe(['[data-tour="form-personal"]']))).toEqual({
+    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/equipo", existe(['[data-tour="form-personal"]']))).toEqual({
       fase: "llenar",
       selector: '[data-tour="form-personal"]',
     });
@@ -142,31 +142,31 @@ describe("estructura del recorrido", () => {
 });
 
 describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
-  it("al crear el negocio da la bienvenida y al empezar señala «Sucursales» en el menú", async () => {
+  it("al crear el negocio da la bienvenida y al empezar señala «Equipo de trabajo» en el menú", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy();
 
     await empezar(user);
-    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
-    expect(screen.getByText(/Haz clic en/).textContent).toContain("«Sucursales»");
-    await waitFor(() => expect(foco()).toBe('[data-tour="nav-sucursales"]'));
+    expect(screen.getByText(/Crea a tu equipo de trabajo/)).toBeTruthy();
+    expect(screen.getByText(/Haz clic en/).textContent).toContain("«Equipo de trabajo»");
+    await waitFor(() => expect(foco()).toBe('[data-tour="nav-equipo"]'));
   });
 
-  it("sigue el recorrido en vivo: menú → botón «Agregar cajero o mesero» → formulario → hecho → siguiente paso", async () => {
+  it("sigue el recorrido en vivo: menú → botón «Agregar al equipo» → formulario → hecho → siguiente paso", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     montar("nav-menu");
     const vista = render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
-    await waitFor(() => expect(foco()).toBe('[data-tour="nav-sucursales"]'));
+    await waitFor(() => expect(foco()).toBe('[data-tour="nav-equipo"]'));
 
-    // 1) el dueño hace clic en Sucursales -> se señala el botón que abre el formulario
-    pathname = "/admin/sucursales";
+    // 1) el dueño hace clic en Equipo de trabajo -> se señala el botón que abre el formulario
+    pathname = "/admin/equipo";
     montar("abrir-personal");
     vista.rerender(<TutorialOnboarding completado={false} tenantId={T} />);
-    expect((await screen.findByText(/Toca/)).textContent).toContain("«Agregar cajero o mesero»");
+    expect((await screen.findByText(/Toca/)).textContent).toContain("«Agregar al equipo»");
     await waitFor(() => expect(foco()).toBe('[data-tour="abrir-personal"]'));
 
     // 2) abre el formulario -> se señala el formulario con el ejemplo
@@ -177,7 +177,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
     // 3) crea el cajero -> se detecta solo y, tras una pausa, pasa al paso siguiente
     progresoTutorial.mockResolvedValue({ ...PROGRESO_VACIO, personal: 1 });
-    expect(await screen.findByText(/Ya tienes personal registrado/, {}, { timeout: 6000 })).toBeTruthy();
+    expect(await screen.findByText(/Ya tienes equipo registrado/, {}, { timeout: 6000 })).toBeTruthy();
     expect(foco()).toBeNull();
     expect(await screen.findByText(/Crea tu primera categoría/, {}, { timeout: 6000 })).toBeTruthy();
 
@@ -198,7 +198,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("si lo señalado queda fuera de la vista, lo desplaza a la parte alta", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       return this.hasAttribute("data-tour")
         ? ({ top: 900, left: 40, width: 160, height: 36, right: 200, bottom: 936, x: 40, y: 900, toJSON() {} } as DOMRect)
@@ -211,14 +211,14 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("Saltar este paso y Anterior funcionan, y recuerda el paso al recargar sin repetir la bienvenida", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     montar("nav-menu");
     const { unmount } = render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     await user.click(await screen.findByRole("button", { name: "Saltar este paso" }));
     expect(screen.getByText(/Crea tu primera categoría/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Anterior" }));
-    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
+    expect(screen.getByText(/Crea a tu equipo de trabajo/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Saltar este paso" }));
     unmount();
 
@@ -229,7 +229,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("el estado se guarda POR NEGOCIO: otro negocio nuevo en el mismo navegador empieza de cero", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     // el negocio 1 lo dejó a medias y luego pulsó «Más tarde»
     localStorage.setItem(`pedilo_tutorial_paso_${T}`, "3");
     sessionStorage.setItem(`pedilo_tutorial_omitido_${T}`, "1");
@@ -237,7 +237,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     render(<TutorialOnboarding completado={false} tenantId={T2} />);
     expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy(); // negocio 2: bienvenida, no el paso 4
     await empezar(user);
-    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
+    expect(screen.getByText(/Crea a tu equipo de trabajo/)).toBeTruthy();
     expect(localStorage.getItem(`pedilo_tutorial_paso_${T}`)).toBe("3"); // no se pisa el del otro negocio
   });
 
@@ -278,7 +278,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("«Más tarde» y la X cierran solo en esta sesión y NO lo marcan como completado", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     const a = render(<TutorialOnboarding completado={false} tenantId={T} />);
     await user.click(await screen.findByRole("button", { name: "Más tarde" }));
     expect(bienvenida()).toBeNull();
@@ -298,7 +298,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("NO estorba: la guía es una barra en el flujo de la página (no flota sobre botones) y el marco no oscurece ni bloquea clics", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     const barra = await screen.findByRole("complementary", { name: "Guía paso a paso" });
@@ -313,7 +313,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("minimizada también queda en el flujo (una sola línea), sin flotar", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     await user.click(await screen.findByRole("button", { name: "Minimizar guía" }));
@@ -324,7 +324,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
 
   it("se puede minimizar (sin resaltar nada) y volver a abrir en el mismo paso", async () => {
     const user = userEvent.setup();
-    montar("nav-sucursales");
+    montar("nav-equipo");
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     await waitFor(() => expect(foco()).not.toBeNull());
@@ -335,7 +335,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     const pastilla = screen.getByRole("button", { name: "Abrir la guía" });
     expect(pastilla.textContent).toContain("paso 1/9");
     await user.click(pastilla);
-    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
+    expect(screen.getByText(/Crea a tu equipo de trabajo/)).toBeTruthy();
   });
 
   it("«Ver tutorial» lo reabre desde el principio aunque ya esté completado; cerrarlo al final no guarda nada", async () => {
@@ -347,7 +347,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     await act(async () => {
       window.dispatchEvent(new Event(EVENTO_ABRIR_TUTORIAL));
     });
-    expect(await screen.findByText(/Crea a tu personal/)).toBeTruthy();
+    expect(await screen.findByText(/Crea a tu equipo de trabajo/)).toBeTruthy();
 
     // salta al final y cierra
     irAlPaso("reportes");

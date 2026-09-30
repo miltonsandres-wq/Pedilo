@@ -33,9 +33,10 @@ describe("enlaces del login de personal", () => {
     expect(urlLoginPersonal("cajero")).toBe("/login?rol=cajero");
     expect(urlLoginPersonal("mesero", "ana+1@negocio.com")).toBe("/login?rol=mesero&email=ana%2B1%40negocio.com");
   });
-  it("solo acepta cajero o mesero", () => {
+  it("solo acepta cajero, mesero o cocina", () => {
     expect(rolDeLogin("cajero")).toBe("cajero");
     expect(rolDeLogin("mesero")).toBe("mesero");
+    expect(rolDeLogin("cocina")).toBe("cocina");
     expect(rolDeLogin("admin")).toBeNull();
     expect(rolDeLogin("<script>")).toBeNull();
     expect(rolDeLogin(null)).toBeNull();
@@ -72,6 +73,14 @@ describe("AbrirPanelPersonal", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("para cocina dice «Abrir pantalla de cocina» y lleva al login de cocina", async () => {
+    const user = userEvent.setup();
+    render(<AbrirPanelPersonal rol="cocina" email="cocina1@negocio.com" />);
+    await user.click(screen.getByRole("button", { name: "Abrir pantalla de cocina" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?rol=cocina&email=cocina1%40negocio.com"));
+    expect(signOut).toHaveBeenCalled();
+  });
+
   it("la variante del encabezado no muestra el botón de copiar", () => {
     render(<AbrirPanelPersonal rol="mesero" compacto soloAbrir />);
     expect(screen.getByRole("button", { name: "Abrir panel de mesero" })).toBeTruthy();
@@ -92,6 +101,13 @@ describe("login según el enlace", () => {
     expect(screen.getByText(/usuario de cajero para abrir el POS/)).toBeTruthy();
     expect((screen.getByPlaceholderText("tucorreo@negocio.com") as HTMLInputElement).value).toBe("cajero1@negocio.com");
     expect((document.querySelector('input[name="next"]') as HTMLInputElement).value).toBe("/");
+  });
+
+  it("?rol=cocina: «Pantalla de cocina» y explica que es para ver y despachar pedidos", () => {
+    busqueda = new URLSearchParams("rol=cocina");
+    render(<LoginPage />);
+    expect(screen.getByRole("heading", { name: "Pantalla de cocina" })).toBeTruthy();
+    expect(screen.getByText(/usuario de cocina para ver y despachar los pedidos/)).toBeTruthy();
   });
 
   it("un rol inventado en la URL se ignora", () => {

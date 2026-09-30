@@ -12,12 +12,14 @@ import {
   BarChart3,
   Boxes,
   FileText,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
 const NAV = [
   { href: "/admin", label: "Resumen", icon: LayoutDashboard },
   { href: "/admin/sucursales", label: "Sucursales", icon: Building2 },
+  { href: "/admin/equipo", label: "Equipo de trabajo", icon: Users },
   { href: "/admin/menu", label: "Menú digital", icon: UtensilsCrossed },
   { href: "/admin/inventario", label: "Inventario", icon: Boxes },
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },

@@ -23,7 +23,7 @@ src/
     fiscal/                Facturación con CAI: emisión offline, rangos, ISV, libro de ventas
   app/
     login/                 Login
-    admin/                 Panel del dueño (sucursales, menú, inventario, mesas, usuarios, formas de pago, reportes)
+    admin/                 Panel del dueño (sucursales, equipo de trabajo con roles admin/cajero/mesero/cocina, menú, inventario, mesas, formas de pago, fiscal, reportes)
     pos/                   Vista de mesero/cajero (mapa de mesas + detalle de orden)
 print-agent/              Servicio Node standalone que corre EN la sucursal e imprime ESC/POS
 ```

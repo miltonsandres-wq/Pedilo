@@ -51,16 +51,16 @@ export interface PasoGuia {
 export const PASOS_GUIA: PasoGuia[] = [
   {
     id: "personal",
-    titulo: "Crea a tu personal",
-    ruta: "/admin/sucursales",
-    nav: "sucursales",
-    rutaEtiqueta: "Sucursales",
+    titulo: "Crea a tu equipo de trabajo",
+    ruta: "/admin/equipo",
+    nav: "equipo",
+    rutaEtiqueta: "Equipo de trabajo",
     abrir: "abrir-personal",
-    abrirEtiqueta: "Agregar cajero o mesero",
+    abrirEtiqueta: "Agregar al equipo",
     form: "form-personal",
     instrucciones: [
       "Llena el ejemplo y toca «Agregar». Si dejas la contraseña vacía, generamos una.",
-      "Cuando quieras, abre la fila de esa persona y toca «Ver contraseña» para consultarla o cambiarla.",
+      "Roles: cajero (cobra), mesero (toma pedidos) y cocina (solo despacha pedidos). Cuando quieras, abre su fila para ver o cambiar la contraseña.",
     ],
     ejemplo: [
       { etiqueta: "Nombre", valor: "Cajero 1" },
@@ -69,7 +69,7 @@ export const PASOS_GUIA: PasoGuia[] = [
       { etiqueta: "Rol", valor: "Cajero" },
     ],
     hecho: (p) => p.personal >= 1,
-    textoHecho: "Ya tienes personal registrado.",
+    textoHecho: "Ya tienes equipo registrado.",
   },
   {
     id: "categoria",

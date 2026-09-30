@@ -6,10 +6,14 @@ import { Check, Copy, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { urlLoginPersonal, type RolPersonal } from "@/lib/auth/enlaces";
 
-const NOMBRE_ROL: Record<RolPersonal, string> = { cajero: "cajero", mesero: "mesero" };
+const ETIQUETA: Record<RolPersonal, string> = {
+  cajero: "Abrir panel de cajero",
+  mesero: "Abrir panel de mesero",
+  cocina: "Abrir pantalla de cocina",
+};
 
 /**
- * Acceso al panel de un cajero o mesero. «Abrir panel» cierra la sesión del
+ * Acceso al panel de un cajero, mesero o de la pantalla de cocina. «Abrir panel» cierra la sesión del
  * dueño en ESTE navegador y muestra el login de ese rol; «Copiar enlace» da la
  * dirección para que la persona entre desde SU propio dispositivo sin tocar la
  * sesión del dueño.
@@ -59,7 +63,7 @@ export function AbrirPanelPersonal({
         className={clase}
       >
         <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} />
-        Abrir panel de {NOMBRE_ROL[rol]}
+        {ETIQUETA[rol]}
       </button>
       {!soloAbrir && (
       <button
