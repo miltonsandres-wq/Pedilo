@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { EstadoMesa, EstadoOrden } from "@/lib/types/helpers";
-import { db } from "./db";
+import { db, type OrdenLocal } from "./db";
 import { flushOutbox } from "./outbox";
 import { solicitarAlmacenamientoPersistente, sincronizarFiscal } from "@/lib/fiscal/sincronizacion";
 
@@ -148,7 +148,12 @@ async function pullInicial(sucursalId: string, tenantId: string) {
 
   if (ordenes) {
     await db.ordenes.bulkPut(
-      ordenes.map((o) => ({ ...o, estado: o.estado as EstadoOrden, total: Number(o.total) }))
+      ordenes.map((o) => ({
+        ...o,
+        estado: o.estado as EstadoOrden,
+        canal: o.canal as OrdenLocal["canal"],
+        total: Number(o.total),
+      }))
     );
     const ids = ordenes.map((o) => o.id);
     if (ids.length > 0) {

@@ -67,3 +67,23 @@ export async function comoUsuario<T>(pg: PGlite, userId: string, fn: () => Promi
     await pg.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
   }
 }
+
+/**
+ * Ejecuta `fn` como un repartidor (JWT propio: rol authenticated + claim
+ * `repartidor_id`; su `sub` no existe en `usuarios`, así que no es personal).
+ */
+export async function comoRepartidor<T>(pg: PGlite, repartidorId: string, fn: () => Promise<T>): Promise<T> {
+  const claims = JSON.stringify({ sub: repartidorId, role: "authenticated", repartidor_id: repartidorId });
+  await pg.exec(
+    `select set_config('request.jwt.claim.sub', '${repartidorId}', false);
+     select set_config('request.jwt.claims', '${claims}', false);
+     set role authenticated;`
+  );
+  try {
+    return await fn();
+  } finally {
+    await pg.exec(
+      `reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);`
+    );
+  }
+}

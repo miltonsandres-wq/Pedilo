@@ -854,7 +854,8 @@ export type Database = {
           estado: string
           id: string
           lista_cocina: boolean
-          mesa_id: string
+          canal: string
+          mesa_id: string | null
           motivo_cancelacion: string | null
           numero_dia: number | null
           pagada_at: string | null
@@ -872,7 +873,7 @@ export type Database = {
           estado?: string
           id?: string
           lista_cocina?: boolean
-          mesa_id: string
+          mesa_id?: string | null
           motivo_cancelacion?: string | null
           numero_dia?: number | null
           pagada_at?: string | null
@@ -890,7 +891,8 @@ export type Database = {
           estado?: string
           id?: string
           lista_cocina?: boolean
-          mesa_id?: string
+          canal?: string
+          mesa_id?: string | null
           motivo_cancelacion?: string | null
           numero_dia?: number | null
           pagada_at?: string | null
@@ -1289,11 +1291,388 @@ export type Database = {
           },
         ]
       }
+      // --- Delivery (0022-0027). Escrito a mano; se sobreescribe al correr `npm run db:types`.
+      delivery_config: {
+        Row: {
+          sucursal_id: string
+          tenant_id: string
+          activo: boolean
+          pausado: boolean
+          horario: Json
+          monto_minimo: number
+          tiempo_estimado_min: number
+          metodos_pago: string[]
+          cuenta_transferencia: string | null
+          slug: string | null
+          mensaje_bienvenida: string | null
+          tasa_isv_envio: string
+          radio_llegada_m: number
+          velocidad_moto_kmh: number
+          retencion_rastro_dias: number
+          updated_at: string
+        }
+        Insert: {
+          sucursal_id?: string
+          tenant_id?: string
+          activo?: boolean
+          pausado?: boolean
+          horario?: Json
+          monto_minimo?: number
+          tiempo_estimado_min?: number
+          metodos_pago?: string[]
+          cuenta_transferencia?: string | null
+          slug?: string | null
+          mensaje_bienvenida?: string | null
+          tasa_isv_envio?: string
+          radio_llegada_m?: number
+          velocidad_moto_kmh?: number
+          retencion_rastro_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          sucursal_id?: string
+          tenant_id?: string
+          activo?: boolean
+          pausado?: boolean
+          horario?: Json
+          monto_minimo?: number
+          tiempo_estimado_min?: number
+          metodos_pago?: string[]
+          cuenta_transferencia?: string | null
+          slug?: string | null
+          mensaje_bienvenida?: string | null
+          tasa_isv_envio?: string
+          radio_llegada_m?: number
+          velocidad_moto_kmh?: number
+          retencion_rastro_dias?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_zonas: {
+        Row: {
+          id: string
+          tenant_id: string
+          sucursal_id: string
+          nombre: string
+          tarifa: number
+          activa: boolean
+          poligono_geojson: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          nombre?: string
+          tarifa?: number
+          activa?: boolean
+          poligono_geojson?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          nombre?: string
+          tarifa?: number
+          activa?: boolean
+          poligono_geojson?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      repartidores: {
+        Row: {
+          id: string
+          tenant_id: string
+          sucursal_id: string
+          nombre: string
+          telefono: string | null
+          activo: boolean
+          tipo_pago: string
+          monto_por_entrega: number
+          aceptacion_ubicacion_at: string | null
+          turno_inicio: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          nombre?: string
+          telefono?: string | null
+          activo?: boolean
+          tipo_pago?: string
+          monto_por_entrega?: number
+          aceptacion_ubicacion_at?: string | null
+          turno_inicio?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          nombre?: string
+          telefono?: string | null
+          activo?: boolean
+          tipo_pago?: string
+          monto_por_entrega?: number
+          aceptacion_ubicacion_at?: string | null
+          turno_inicio?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      repartidor_credenciales: {
+        Row: {
+          repartidor_id: string
+          pin_hash: string
+          intentos_fallidos: number
+          bloqueado_hasta: string | null
+        }
+        Insert: {
+          repartidor_id?: string
+          pin_hash?: string
+          intentos_fallidos?: number
+          bloqueado_hasta?: string | null
+        }
+        Update: {
+          repartidor_id?: string
+          pin_hash?: string
+          intentos_fallidos?: number
+          bloqueado_hasta?: string | null
+        }
+        Relationships: []
+      }
+      ordenes_delivery: {
+        Row: {
+          orden_id: string
+          tenant_id: string
+          sucursal_id: string
+          cliente_nombre: string
+          cliente_telefono: string
+          direccion_referencia: string
+          ubicacion_lat: number | null
+          ubicacion_lng: number | null
+          zona_id: string | null
+          zona_nombre: string | null
+          tarifa_envio: number
+          metodo_pago: string
+          paga_con: number | null
+          comprobante_transferencia_url: string | null
+          tipo_factura: string
+          factura_nombre: string | null
+          factura_rtn: string | null
+          repartidor_id: string | null
+          tracking_token: string
+          estado_delivery: string
+          recibido_at: string
+          aceptado_at: string | null
+          en_cocina_at: string | null
+          listo_at: string | null
+          en_camino_at: string | null
+          llegado_at: string | null
+          llegada_automatica: boolean
+          entregado_at: string | null
+          cancelado_at: string | null
+          motivo_cancelacion: string | null
+          entrega_lat: number | null
+          entrega_lng: number | null
+          entrega_foto_url: string | null
+          monto_cobrado: number | null
+          liquidacion_id: string | null
+          created_at: string
+        }
+        Insert: {
+          orden_id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          cliente_nombre?: string
+          cliente_telefono?: string
+          direccion_referencia?: string
+          ubicacion_lat?: number | null
+          ubicacion_lng?: number | null
+          zona_id?: string | null
+          zona_nombre?: string | null
+          tarifa_envio?: number
+          metodo_pago?: string
+          paga_con?: number | null
+          comprobante_transferencia_url?: string | null
+          tipo_factura?: string
+          factura_nombre?: string | null
+          factura_rtn?: string | null
+          repartidor_id?: string | null
+          tracking_token?: string
+          estado_delivery?: string
+          recibido_at?: string
+          aceptado_at?: string | null
+          en_cocina_at?: string | null
+          listo_at?: string | null
+          en_camino_at?: string | null
+          llegado_at?: string | null
+          llegada_automatica?: boolean
+          entregado_at?: string | null
+          cancelado_at?: string | null
+          motivo_cancelacion?: string | null
+          entrega_lat?: number | null
+          entrega_lng?: number | null
+          entrega_foto_url?: string | null
+          monto_cobrado?: number | null
+          liquidacion_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          orden_id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          cliente_nombre?: string
+          cliente_telefono?: string
+          direccion_referencia?: string
+          ubicacion_lat?: number | null
+          ubicacion_lng?: number | null
+          zona_id?: string | null
+          zona_nombre?: string | null
+          tarifa_envio?: number
+          metodo_pago?: string
+          paga_con?: number | null
+          comprobante_transferencia_url?: string | null
+          tipo_factura?: string
+          factura_nombre?: string | null
+          factura_rtn?: string | null
+          repartidor_id?: string | null
+          tracking_token?: string
+          estado_delivery?: string
+          recibido_at?: string
+          aceptado_at?: string | null
+          en_cocina_at?: string | null
+          listo_at?: string | null
+          en_camino_at?: string | null
+          llegado_at?: string | null
+          llegada_automatica?: boolean
+          entregado_at?: string | null
+          cancelado_at?: string | null
+          motivo_cancelacion?: string | null
+          entrega_lat?: number | null
+          entrega_lng?: number | null
+          entrega_foto_url?: string | null
+          monto_cobrado?: number | null
+          liquidacion_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      repartidor_rastro: {
+        Row: {
+          id: number
+          tenant_id: string
+          sucursal_id: string
+          orden_id: string
+          repartidor_id: string
+          lat: number
+          lng: number
+          precision_m: number | null
+          velocidad: number | null
+          evento: string
+          registrado_at: string
+        }
+        Insert: {
+          id?: number
+          tenant_id?: string
+          sucursal_id?: string
+          orden_id?: string
+          repartidor_id?: string
+          lat?: number
+          lng?: number
+          precision_m?: number | null
+          velocidad?: number | null
+          evento?: string
+          registrado_at?: string
+        }
+        Update: {
+          id?: number
+          tenant_id?: string
+          sucursal_id?: string
+          orden_id?: string
+          repartidor_id?: string
+          lat?: number
+          lng?: number
+          precision_m?: number | null
+          velocidad?: number | null
+          evento?: string
+          registrado_at?: string
+        }
+        Relationships: []
+      }
+      liquidaciones_repartidor: {
+        Row: {
+          id: string
+          tenant_id: string
+          sucursal_id: string
+          repartidor_id: string
+          turno_fecha: string
+          turno_inicio: string | null
+          pedidos: Json
+          total_pedidos: number
+          total_efectivo_cobrado: number
+          total_entregado_en_caja: number
+          diferencia: number
+          total_pago_envios: number
+          notas: string | null
+          cerrada_por: string | null
+          cerrada_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          repartidor_id?: string
+          turno_fecha?: string
+          turno_inicio?: string | null
+          pedidos?: Json
+          total_pedidos?: number
+          total_efectivo_cobrado?: number
+          total_entregado_en_caja?: number
+          diferencia?: number
+          total_pago_envios?: number
+          notas?: string | null
+          cerrada_por?: string | null
+          cerrada_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          sucursal_id?: string
+          repartidor_id?: string
+          turno_fecha?: string
+          turno_inicio?: string | null
+          pedidos?: Json
+          total_pedidos?: number
+          total_efectivo_cobrado?: number
+          total_entregado_en_caja?: number
+          diferencia?: number
+          total_pago_envios?: number
+          notas?: string | null
+          cerrada_por?: string | null
+          cerrada_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      calcular_liquidacion: { Args: { p_repartidor: string }; Returns: Json }
+      cerrar_liquidacion: { Args: { p_repartidor: string; p_entregado: number; p_notas?: string }; Returns: Json }
+      delivery_abierto: { Args: { p_sucursal: string; p_ahora?: string }; Returns: boolean }
+      delivery_pausar: { Args: { p_sucursal: string; p_pausado: boolean }; Returns: undefined }
+      delivery_rate_limit_hit: { Args: { p_clave: string; p_max: number; p_ventana_seg: number }; Returns: boolean }
+      purgar_rastro_delivery: { Args: never; Returns: number }
+      repartidor_aceptar_ubicacion: { Args: never; Returns: string }
+      repartidor_hash_pin: { Args: { p_pin: string }; Returns: string }
+      repartidor_login: { Args: { p_repartidor: string; p_pin: string }; Returns: Json }
+      seguimiento_pedido: { Args: { p_token: string }; Returns: Json }
       anular_documento_fiscal: {
         Args: { p_id: string; p_motivo: string }
         Returns: {

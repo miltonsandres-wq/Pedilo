@@ -50,7 +50,7 @@ export function PantallaCocina({ sucursalId }: { sucursalId: string }) {
 }
 
 function TarjetaOrden({ orden, ahora }: { orden: OrdenLocal; ahora: number }) {
-  const mesa = useLiveQuery(() => db.mesas.get(orden.mesa_id), [orden.mesa_id]);
+  const mesa = useLiveQuery(() => (orden.mesa_id ? db.mesas.get(orden.mesa_id) : undefined), [orden.mesa_id]);
   const items = useLiveQuery(
     () => db.orden_items.where("orden_id").equals(orden.id).sortBy("created_at"),
     [orden.id],
@@ -90,7 +90,7 @@ function TarjetaOrden({ orden, ahora }: { orden: OrdenLocal; ahora: number }) {
         )}
       >
         <div>
-          <p className="text-lg font-bold leading-tight text-ink-900">{mesa?.nombre ?? "Mesa"}</p>
+          <p className="text-lg font-bold leading-tight text-ink-900">{orden.canal && orden.canal !== "local" ? "Delivery" : (mesa?.nombre ?? "Mesa")}</p>
           {orden.numero_dia != null && (
             <p className="font-mono text-xs text-ink-500">Orden #{orden.numero_dia}</p>
           )}

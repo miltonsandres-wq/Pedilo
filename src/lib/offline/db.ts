@@ -39,7 +39,9 @@ export interface ProductoLocal {
 export interface OrdenLocal {
   id: string;
   sucursal_id: string;
-  mesa_id: string;
+  // null en las ordenes de delivery (no tienen mesa)
+  mesa_id: string | null;
+  canal?: "local" | "delivery_web" | "delivery_telefono"; // ausente en cachés viejas = local
   usuario_id: string | null;
   estado: EstadoOrden;
   total: number;
