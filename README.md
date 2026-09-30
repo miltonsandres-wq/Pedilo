@@ -78,16 +78,20 @@ Está **apagada por defecto** por negocio (`tenants.facturacion_fiscal_activa`).
 
 ### Ponerla en marcha (una vez)
 
-1. Aplicar en Supabase, en orden, `0017_datos_fiscales.sql` y
-   `0018_cai_documentos_fiscales.sql` (SQL Editor). Necesitan las migraciones
-   anteriores ya aplicadas.
+1. Aplicar en Supabase, en orden, `0017_datos_fiscales.sql`,
+   `0018_cai_documentos_fiscales.sql` y `0020_ajustes_onboarding.sql` (SQL Editor).
+   Necesitan las migraciones anteriores ya aplicadas.
 2. **Actualizar el agente de impresión de cada sucursal** (`print-agent/index.js`,
    ver su README): el endpoint nuevo `/imprimir` es el que imprime factura,
    nota de crédito y pre-cuenta con logo.
-3. En `/admin/fiscal`, en este orden: **Emisor** (razón social, RTN, dirección) →
-   **Cajas** (una por dispositivo, con su establecimiento y punto de emisión) →
-   **Rangos CAI** → **Estado** > *Activar*. No deja activar si falta algo.
-4. En el POS de cada caja: aviso rojo → **Vincular esta caja**.
+3. **Negocio nuevo:** al registrarse, un asistente (`/configuracion-inicial`) pide los datos
+   de cada sucursal, el logo y si factura con CAI (datos fiscales + rango por sucursal). Si
+   no factura, queda todo listo y se activa después desde `/admin/fiscal`. Negocio ya
+   existente: `/admin/fiscal` > **Emisor** → **Rangos CAI** → **Estado** > *Activar*
+   (no deja activar si falta algo).
+4. **La caja de cobro es automática:** cada sucursal recibe una (punto de emisión 001;
+   establecimiento 000, 001, 002… por sucursal) y el cajero la vincula solo la primera
+   vez que abre el POS. Si cambias de equipo, **Estado › Caja de cobro › Liberar**.
 5. En **Menú digital**, marcar 18 % en bebidas alcohólicas y tabaco (el resto es
    15 %; hay opción *Exento*). Los precios del menú **incluyen** ISV.
 
