@@ -151,5 +151,5 @@ db.version(1).stores({
 // verdad del "siguiente" (el servidor solo valida al sincronizar).
 db.version(2).stores({
   rangos_cai: "id, sucursal_id, estado, clase",
-  documentos_fiscales: "id, orden_id, sync_estado, numero_completo, fecha_emision",
+  documentos_fiscales: "id, sucursal_id, orden_id, sync_estado, numero_completo, fecha_emision",
 });

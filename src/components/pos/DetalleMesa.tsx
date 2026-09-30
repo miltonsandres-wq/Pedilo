@@ -16,6 +16,9 @@ import {
   Receipt,
   Sparkles,
   Trash2,
+  ShieldAlert,
+  ChevronDown,
+  Printer,
   Users,
   X,
 } from "lucide-react";
@@ -33,6 +36,9 @@ import {
 import type { FormaPago, RolUsuario } from "@/lib/types/helpers";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Field";
+import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
+import { esRtnValido, normalizarRtn } from "@/lib/fiscal/formato";
+import { imprimirPrecuenta } from "@/lib/fiscal/impresion";
 import { cn } from "@/lib/ui";
 
 export function DetalleMesa({
@@ -49,6 +55,11 @@ export function DetalleMesa({
   const router = useRouter();
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [mostrarAnular, setMostrarAnular] = useState(false);
+  const [precuenta, setPrecuenta] = useState<{ imprimiendo: boolean; mensaje: string | null; ok: boolean }>({
+    imprimiendo: false,
+    mensaje: null,
+    ok: false,
+  });
 
   const mesa = useLiveQuery(() => db.mesas.get(mesaId), [mesaId]);
   const orden = useLiveQuery(
@@ -168,6 +179,30 @@ export function DetalleMesa({
         </p>
       )}
 
+      {(items ?? []).length > 0 && (
+        <div className="mb-2 text-center">
+          <button
+            disabled={precuenta.imprimiendo}
+            onClick={async () => {
+              setPrecuenta({ imprimiendo: true, mensaje: null, ok: false });
+              const r = await imprimirPrecuenta(orden.id, mesa?.nombre ?? "");
+              setPrecuenta({
+                imprimiendo: false,
+                ok: r.ok,
+                mensaje: r.ok ? "Pre-cuenta enviada a la impresora." : (r.error ?? "No se pudo imprimir."),
+              });
+            }}
+            className="inline-flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-ink-600 hover:text-ink-900 disabled:opacity-50"
+          >
+            <Printer className="h-3.5 w-3.5" strokeWidth={2} />
+            {precuenta.imprimiendo ? "Imprimiendo…" : "Imprimir pre-cuenta (no es factura)"}
+          </button>
+          {precuenta.mensaje && (
+            <p className={cn("text-xs", precuenta.ok ? "text-libre-text" : "text-red-600")}>{precuenta.mensaje}</p>
+          )}
+        </div>
+      )}
+
       <button
         onClick={() => setMostrarAnular(true)}
         className="mb-4 flex w-full items-center justify-center gap-1.5 py-1 text-xs font-medium text-red-500 hover:text-red-700"
@@ -212,7 +247,7 @@ export function DetalleMesa({
           total={orden.total}
           formasDisponibles={formasPago ?? []}
           onCerrar={() => setMostrarCobro(false)}
-          onCobrado={() => router.push("/pos")}
+          onCobrado={(documentoId) => router.push(documentoId ? `/pos?factura=${documentoId}` : "/pos")}
         />
       )}
 
@@ -512,7 +547,7 @@ function FormularioAgregarItem({
   );
 }
 
-function FormularioCobro({
+export function FormularioCobro({
   ordenId,
   mesaId,
   usuarioId,
@@ -527,28 +562,86 @@ function FormularioCobro({
   total: number;
   formasDisponibles: FormaPago[];
   onCerrar: () => void;
-  onCobrado: () => void;
+  onCobrado: (documentoId: string | null) => void;
 }) {
   const [monto, setMonto] = useState(total);
   const [formaPago, setFormaPago] = useState<FormaPago>(formasDisponibles[0] ?? "efectivo");
   const [referencia, setReferencia] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Facturación fiscal: solo aparece si el negocio la tiene activa
+  const config = useLiveQuery(() => leerConfigFiscal(), [], undefined);
+  const rangos = useLiveQuery(() => db.rangos_cai.toArray(), [], []);
+  const factura = !!config?.activa;
+  const bloqueo = factura ? evaluarFacturacion(config, rangos ?? []) : null;
+  const [conRtn, setConRtn] = useState(false);
+  const [clienteNombre, setClienteNombre] = useState("");
+  const [clienteRtn, setClienteRtn] = useState("");
+  const [verExoneracion, setVerExoneracion] = useState(false);
+  const [ordenCompraExenta, setOrdenCompraExenta] = useState("");
+  const [constanciaExonerado, setConstanciaExonerado] = useState("");
+  const [registroSag, setRegistroSag] = useState("");
+
+  const digitosRtn = normalizarRtn(clienteRtn);
+  const hayExoneracion = !!(ordenCompraExenta.trim() || constanciaExonerado.trim() || registroSag.trim());
+  const pideCliente = factura && (conRtn || hayExoneracion);
+  const esParcial = monto < total;
+
+  // Lo que impide confirmar (además del bloqueo por CAI)
+  let faltante: string | null = null;
+  if (pideCliente) {
+    if (!clienteNombre.trim()) faltante = "Escribe el nombre del cliente.";
+    else if (!esRtnValido(clienteRtn)) faltante = `El RTN debe tener 14 dígitos (lleva ${digitosRtn.length}).`;
+  }
 
   async function confirmar() {
+    setError(null);
     setEnviando(true);
-    await cobrar({ ordenId, mesaId, usuarioId, monto, formaPago, referencia: referencia || undefined });
-    onCobrado();
+    try {
+      const { documentoId } = await cobrar({
+        ordenId,
+        mesaId,
+        usuarioId,
+        monto,
+        formaPago,
+        referencia: referencia || undefined,
+        cliente: pideCliente ? { nombre: clienteNombre, rtn: clienteRtn } : undefined,
+        exoneracion: factura && hayExoneracion
+          ? {
+              noOrdenCompraExenta: ordenCompraExenta,
+              noConstanciaExonerado: constanciaExonerado,
+              noRegistroSag: registroSag,
+            }
+          : undefined,
+      });
+      onCobrado(documentoId);
+    } catch (e) {
+      // Un FiscalError (sin CAI, RTN inválido...) no escribió nada: se puede corregir y reintentar
+      setError(e instanceof Error ? e.message : "No se pudo registrar el cobro.");
+      setEnviando(false);
+    }
   }
+
+  const inputClase =
+    "w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink-950/40 p-0 sm:items-center sm:p-4">
-      <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
+      <div className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink-900">Cobrar orden</h2>
           <button onClick={onCerrar} className="rounded-lg p-1 text-ink-400 hover:bg-ink-100">
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
+
+        {bloqueo && (
+          <p role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+            <span>No se puede cobrar: {bloqueo.message}</span>
+          </p>
+        )}
 
         <label className="mb-1.5 block text-xs font-medium text-ink-500">Monto</label>
         <div className="relative mb-3">
@@ -561,6 +654,11 @@ function FormularioCobro({
             className="w-full rounded-lg border border-ink-200 bg-white py-3 pl-8 pr-3 text-lg font-semibold tabular-nums outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
+        {factura && esParcial && (
+          <p className="mb-3 text-xs text-amber-700">
+            Pago parcial: la factura se emite cuando los pagos cubran el total (L. {total.toFixed(2)}).
+          </p>
+        )}
 
         <SelectField
           label="Forma de pago"
@@ -580,17 +678,102 @@ function FormularioCobro({
         </SelectField>
 
         <label className="mb-1.5 block text-xs font-medium text-ink-500">Referencia (opcional)</label>
-        <input
-          value={referencia}
-          onChange={(e) => setReferencia(e.target.value)}
-          className="mb-5 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        />
+        <input value={referencia} onChange={(e) => setReferencia(e.target.value)} className={cn(inputClase, "mb-4")} />
+
+        {factura && (
+          <div className="mb-4 rounded-xl border border-ink-100 bg-ink-50/60 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-800">
+              <input
+                type="checkbox"
+                checked={conRtn}
+                onChange={(e) => setConRtn(e.target.checked)}
+                className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+              />
+              Factura con RTN
+            </label>
+            {!pideCliente && <p className="mt-1 text-xs text-ink-500">Sin marcar, se factura a «Consumidor Final».</p>}
+
+            {pideCliente && (
+              <div className="mt-3 space-y-2">
+                <input
+                  value={clienteNombre}
+                  onChange={(e) => setClienteNombre(e.target.value)}
+                  placeholder="Nombre del cliente"
+                  className={inputClase}
+                />
+                <input
+                  value={clienteRtn}
+                  onChange={(e) => setClienteRtn(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="RTN (14 dígitos)"
+                  className={cn(
+                    "w-full rounded-lg border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2",
+                    digitosRtn.length === 0 || esRtnValido(clienteRtn)
+                      ? "border-ink-200 focus:border-brand-500 focus:ring-brand-500/20"
+                      : "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                  )}
+                />
+                <p className={cn("text-xs", esRtnValido(clienteRtn) ? "text-libre-text" : "text-ink-500")}>
+                  {esRtnValido(clienteRtn) ? "RTN válido" : `${digitosRtn.length}/14 dígitos`}
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setVerExoneracion((v) => !v)}
+              className="mt-3 flex w-full items-center justify-between text-xs font-medium text-ink-600 hover:text-ink-900"
+            >
+              Datos de exoneración (opcional)
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", verExoneracion && "rotate-180")} strokeWidth={2} />
+            </button>
+            {verExoneracion && (
+              <div className="mt-2 space-y-2">
+                <input
+                  value={ordenCompraExenta}
+                  onChange={(e) => setOrdenCompraExenta(e.target.value)}
+                  placeholder="No. Orden de Compra Exenta"
+                  className={inputClase}
+                />
+                <input
+                  value={constanciaExonerado}
+                  onChange={(e) => setConstanciaExonerado(e.target.value)}
+                  placeholder="No. Constancia Registro Exonerado"
+                  className={inputClase}
+                />
+                <input
+                  value={registroSag}
+                  onChange={(e) => setRegistroSag(e.target.value)}
+                  placeholder="No. Registro SAG"
+                  className={inputClase}
+                />
+                {hayExoneracion && (
+                  <p className="text-xs text-amber-700">
+                    Con datos de exoneración, toda la factura va como importe exonerado (sin ISV) y requiere
+                    nombre y RTN del cliente.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(error || faltante) && (
+          <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error ?? faltante}
+          </p>
+        )}
 
         <div className="flex gap-2">
           <Button variant="secondary" size="lg" className="flex-1" onClick={onCerrar}>
             Cancelar
           </Button>
-          <Button size="lg" className="flex-1" disabled={enviando} onClick={() => void confirmar()}>
+          <Button
+            size="lg"
+            className="flex-1"
+            disabled={enviando || !!bloqueo || !!faltante}
+            onClick={() => void confirmar()}
+          >
             {enviando ? "Cobrando..." : "Confirmar"}
           </Button>
         </div>

@@ -1,5 +1,5 @@
 import Dexie from "dexie";
-import { db, type DocumentoFiscalLocal, type OrdenItemLocal } from "@/lib/offline/db";
+import { db, type DocumentoFiscalLocal, type OrdenItemLocal, type RangoCaiLocal } from "@/lib/offline/db";
 import { encolarSinFlush, flushOutbox } from "@/lib/offline/outbox";
 import { calcularImpuestos, type LineaFiscal, type OpcionesImpuestos, type TasaIsv } from "./impuestos";
 import { esRtnValido, formatearNumeroDocumento, normalizarRtn } from "./formato";
@@ -88,27 +88,41 @@ function requerirConfig(config: ConfigFiscalLocal | null) {
 }
 
 /**
- * Comprueba que se podría facturar AHORA sin escribir nada: lo usa el cobro
- * antes de aceptar cualquier pago. Devuelve el error (o null si todo bien).
- * Si el tenant no tiene facturación activa, nunca bloquea.
+ * Evalúa con los datos ya leídos si se podría facturar AHORA (config + rangos).
+ * Devuelve el FiscalError que bloquearía la emisión, o null si todo bien. Si
+ * el negocio no tiene facturación activa, nunca bloquea. Es síncrona a
+ * propósito: el cobro y el banner del POS la reutilizan.
  */
-export async function verificarPuedeFacturar(
+export function evaluarFacturacion(
+  config: ConfigFiscalLocal | null | undefined,
+  rangos: RangoCaiLocal[],
   clase: ClaseDocumento = "factura",
   ahora = new Date()
-): Promise<FiscalError | null> {
-  const config = await leerConfigFiscal();
+): FiscalError | null {
   if (!config?.activa) return null;
   try {
     const { dispositivo } = requerirConfig(config);
-    const rangos = (await db.rangos_cai.toArray()).filter(
-      (r) => r.establecimiento === dispositivo.establecimiento && r.punto_emision === dispositivo.punto_emision
+    planificarEmision(
+      rangos.filter((r) => r.establecimiento === dispositivo.establecimiento && r.punto_emision === dispositivo.punto_emision),
+      clase,
+      ahora
     );
-    planificarEmision(rangos, clase, ahora);
     return null;
   } catch (e) {
     if (e instanceof FiscalError) return e;
     throw e;
   }
+}
+
+/**
+ * Comprueba que se podría facturar AHORA sin escribir nada: lo usa el cobro
+ * antes de aceptar cualquier pago (lee de Dexie).
+ */
+export async function verificarPuedeFacturar(
+  clase: ClaseDocumento = "factura",
+  ahora = new Date()
+): Promise<FiscalError | null> {
+  return evaluarFacturacion(await leerConfigFiscal(), await db.rangos_cai.toArray(), clase, ahora);
 }
 
 /**
