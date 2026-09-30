@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, Menu, X } from "lucide-react";
+import { ArrowLeftRight, CircleHelp, Menu, X } from "lucide-react";
 import { AdminNav } from "./AdminNav";
 import { BrandMark } from "@/components/BrandMark";
 import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
+import { EVENTO_ABRIR_TUTORIAL } from "./TutorialOnboarding";
 
 /**
  * El sidebar fijo de 256px solo cabe en pantallas grandes. En celular se
@@ -46,6 +47,17 @@ export function AdminShell({
         <ArrowLeftRight className="h-4 w-4" strokeWidth={2} />
         Ir al POS
       </Link>
+      <button
+        type="button"
+        onClick={() => {
+          setAbierto(false);
+          window.dispatchEvent(new Event(EVENTO_ABRIR_TUTORIAL));
+        }}
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white"
+      >
+        <CircleHelp className="h-4 w-4" strokeWidth={2} />
+        Ver tutorial
+      </button>
       <div className="flex items-center justify-between rounded-lg bg-ink-900 px-3 py-2.5">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-white">{usuarioNombre}</p>

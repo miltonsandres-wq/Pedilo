@@ -1171,6 +1171,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          tutorial_completado_at: string | null
           activo: boolean
           created_at: string
           direccion: string | null
@@ -1192,6 +1193,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          tutorial_completado_at?: string | null
           activo?: boolean
           created_at?: string
           direccion?: string | null
@@ -1213,6 +1215,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          tutorial_completado_at?: string | null
           activo?: boolean
           created_at?: string
           direccion?: string | null
