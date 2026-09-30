@@ -57,3 +57,38 @@ POST `/comanda` (ver `src/lib/printing/enviarComanda.ts` en la app principal).
   ]
 }
 ```
+
+## Facturas, notas de crédito y pre-cuentas (POST /imprimir)
+
+Además de la comanda, el agente imprime documentos de 80 mm (48 columnas):
+la factura fiscal (con logo, CAI, rango autorizado, etc.), la nota de crédito
+y la pre-cuenta ("NO ES DOCUMENTO FISCAL").
+
+El formato NO vive aquí: lo arma la app (`src/lib/printing/documentoTexto.ts`)
+y manda una lista de instrucciones que el agente solo ejecuta, así cambiar el
+formato de la factura no obliga a actualizar el agente de cada sucursal.
+
+```json
+{
+  "instrucciones": [
+    { "op": "logo" },
+    { "op": "texto", "texto": "Taquería Doña Rosa", "align": "center", "bold": true, "size": "doble" },
+    { "op": "linea" },
+    { "op": "salto", "n": 3 },
+    { "op": "cortar" }
+  ],
+  "logoPngBase64": "iVBORw0KGgo..."
+}
+```
+
+- `logoPngBase64`: PNG en blanco y negro que prepara el navegador (así el
+  agente no necesita librerías de imagen). Si es `null`, el ticket sale sin logo.
+- La impresora se configura en la página de códigos PC858 (tildes, ñ, ¡, ¿).
+  Si tu térmica imprime caracteres raros en las tildes, revisa que soporte
+  PC858 y que no esté forzada a otra página de códigos.
+- El agente responde a `OPTIONS` (CORS) porque el navegador de la caja lo llama
+  directo. La URL guardada en Admin > Sucursales sigue siendo la de `/comanda`;
+  la app deriva `/imprimir` de ella.
+
+**Actualiza el agente en cada sucursal** para poder imprimir facturas:
+copia el nuevo `index.js` y reinicia el servicio (`npm start` / pm2 / NSSM).

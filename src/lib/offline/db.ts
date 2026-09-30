@@ -119,6 +119,9 @@ export type EstadoSyncDocumento = "pendiente" | "sincronizado" | "conflicto";
 export type DocumentoFiscalLocal = Tables<"documentos_fiscales"> & {
   sync_estado: EstadoSyncDocumento;
   sync_detalle: string | null;
+  // Solo local: cuándo salió la primera impresión CORRECTA (el original). Antes
+  // de eso, reintentar imprimir NO es una reimpresión; después sí.
+  impreso_at?: string | null;
 };
 
 export const db = new Dexie("pos_offline") as Dexie & {

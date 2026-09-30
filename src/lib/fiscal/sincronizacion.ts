@@ -7,6 +7,7 @@ import {
   type DispositivoLocal,
   type EmisorSnapshot,
 } from "./emision";
+import { precargarLogoImpresion } from "@/lib/printing/logo";
 import { fusionarRango } from "./rangos";
 
 const CLAVE_TOKEN = "dispositivo_token";
@@ -114,7 +115,6 @@ export async function sincronizarFiscal(sucursalId: string, tenantId: string) {
           direccion_fiscal: campo("direccion_fiscal"),
           telefono: campo("telefono"),
           correo: campo("correo"),
-          // El logo de la sucursal manda; si no tiene, el del negocio
           logo_url: sucursal?.logo_url ?? tenant.logo_url ?? null,
         }
       : null;
@@ -142,13 +142,18 @@ export async function sincronizarFiscal(sucursalId: string, tenantId: string) {
     }
   }
 
+  // El logo de la sucursal manda; si no tiene, el del negocio
+  const logoUrl = sucursal?.logo_url ?? tenant.logo_url ?? null;
+
   const config: ConfigFiscalLocal = {
     activa: tenant.facturacion_fiscal_activa,
     tenantId,
     emisor,
+    logoUrl,
     dispositivo,
   };
   await db.config.put({ clave: CLAVE_CONFIG_FISCAL, valor: config });
+  await precargarLogoImpresion(logoUrl);
 
   if (config.activa && dispositivo) await sincronizarRangos(dispositivo);
   await bajarDocumentosRecientes(sucursalId);

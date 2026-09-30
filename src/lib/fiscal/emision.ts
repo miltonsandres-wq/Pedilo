@@ -29,6 +29,8 @@ export interface ConfigFiscalLocal {
   activa: boolean;
   tenantId: string;
   emisor: EmisorSnapshot | null;
+  /** Logo para imprimir: el de la sucursal y, si no tiene, el del negocio. */
+  logoUrl?: string | null;
   dispositivo: DispositivoLocal | null;
 }
 
