@@ -146,7 +146,12 @@ export default async function MenuPage({
               className="grid grid-cols-1 gap-3 sm:grid-cols-2"
             >
               <Field label="Nombre" name="nombre" defaultValue={p.nombre} />
-              <Field label="Precio" name="precio" type="number" step="0.01" defaultValue={String(p.precio)} />
+              <Field label="Precio (con ISV incluido)" name="precio" type="number" step="0.01" defaultValue={String(p.precio)} />
+              <SelectField label="ISV" name="tasa_isv" defaultValue={p.tasa_isv}>
+                <option value="15">15 % (general)</option>
+                <option value="18">18 % (alcohol / tabaco)</option>
+                <option value="exento">Exento</option>
+              </SelectField>
               <SelectField label="Categoría" name="categoria_id" defaultValue={p.categoria_id ?? ""}>
                 <option value="">Sin categoría</option>
                 {(categorias ?? []).map((c) => (
@@ -223,8 +228,13 @@ export default async function MenuPage({
         </p>
         <form action={crearProducto} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nombre" name="nombre" required />
-          <Field label="Precio" name="precio" type="number" step="0.01" required />
-          <SelectField label="Categoría" name="categoria_id">
+          <Field label="Precio (con ISV incluido)" name="precio" type="number" step="0.01" required />
+          <SelectField label="ISV" name="tasa_isv" defaultValue="15">
+                <option value="15">15 % (general)</option>
+                <option value="18">18 % (alcohol / tabaco)</option>
+                <option value="exento">Exento</option>
+              </SelectField>
+              <SelectField label="Categoría" name="categoria_id">
             <option value="">Sin categoría</option>
             {(categorias ?? []).map((c) => (
               <option key={c.id} value={c.id}>

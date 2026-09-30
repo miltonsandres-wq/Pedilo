@@ -100,3 +100,19 @@ export function validarRango(r: RangoNumerico): string | null {
 export function rangosTraslapan(a: RangoNumerico, b: RangoNumerico): boolean {
   return a.desde <= b.hasta && b.desde <= a.hasta;
 }
+
+/**
+ * Límites UTC de un periodo de días LOCALES de Honduras (ambos inclusivos):
+ * el día YYYY-MM-DD local empieza a las 06:00 UTC.
+ */
+export function limitesPeriodoHN(desde: string, hasta: string): { inicioIso: string; finIso: string } {
+  const inicio = new Date(`${desde}T06:00:00.000Z`);
+  const fin = new Date(`${hasta}T06:00:00.000Z`);
+  fin.setUTCDate(fin.getUTCDate() + 1);
+  return { inicioIso: inicio.toISOString(), finIso: fin.toISOString() };
+}
+
+/** Primer día del mes de una fecha YYYY-MM-DD. */
+export function primerDiaDelMes(fecha: string): string {
+  return `${fecha.slice(0, 7)}-01`;
+}

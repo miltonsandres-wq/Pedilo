@@ -11,6 +11,7 @@ import {
   Wallet,
   BarChart3,
   Boxes,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },
   { href: "/cocina", label: "Pantalla de cocina", icon: ChefHat },
   { href: "/admin/formas-pago", label: "Formas de pago", icon: Wallet },
+  { href: "/admin/fiscal", label: "Facturación fiscal", icon: FileText },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
