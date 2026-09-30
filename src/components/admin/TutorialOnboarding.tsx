@@ -1,143 +1,82 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
+  ArrowRight,
   BarChart3,
   Boxes,
-  Building2,
   Check,
   ChefHat,
+  ChevronDown,
+  ChevronUp,
+  CircleHelp,
   FileText,
   LayoutGrid,
   Loader2,
   Monitor,
   PartyPopper,
+  UserPlus,
   Wallet,
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import { completarTutorial } from "@/app/admin/tutorial/actions";
+import { completarTutorial, progresoTutorial } from "@/app/admin/tutorial/actions";
+import { PASOS_GUIA, PROGRESO_VACIO, type ProgresoTutorial } from "@/lib/tutorial/pasos";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/ui";
 
 export const EVENTO_ABRIR_TUTORIAL = "pedilo:abrir-tutorial";
 const CLAVE_OMITIDO = "pedilo_tutorial_omitido";
+const CLAVE_PASO = "pedilo_tutorial_paso";
+const INTERVALO_MS = 4000;
 
-interface Paso {
-  icono: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  titulo: string;
-  donde: string;
-  puntos: string[];
+const ICONOS: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
+  personal: UserPlus,
+  categoria: UtensilsCrossed,
+  producto: UtensilsCrossed,
+  mesas: LayoutGrid,
+  pagos: Wallet,
+  inventario: Boxes,
+  pos: Monitor,
+  cocina: ChefHat,
+  fiscal: FileText,
+  reportes: BarChart3,
+};
+
+function leerPaso(): number | null {
+  try {
+    const v = localStorage.getItem(CLAVE_PASO);
+    if (v === null) return null;
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 && n < PASOS_GUIA.length ? n : null;
+  } catch {
+    return null;
+  }
 }
 
-export const PASOS: Paso[] = [
-  {
-    icono: PartyPopper,
-    titulo: "¡Bienvenido a Pedilo!",
-    donde: "Este es el panel del dueño",
-    puntos: [
-      "Desde aquí configuras tu negocio una sola vez; tu personal trabaja en el POS (mesero, cajero y cocina).",
-      "Te guiamos por todo en menos de 2 minutos. Puedes volver a verlo cuando quieras con «Ver tutorial» en el menú lateral.",
-    ],
-  },
-  {
-    icono: Building2,
-    titulo: "1. Sucursales y personal",
-    donde: "Menú › Sucursales",
-    puntos: [
-      "Revisa los datos de cada local y sube su logo: sale en la carta y en los tickets impresos.",
-      "Crea los usuarios de cada sucursal: Cajero (abre mesas y cobra) y Mesero (toma pedidos y los envía a cocina).",
-      "Aquí también registras la URL del agente de impresión si usas impresora térmica.",
-    ],
-  },
-  {
-    icono: UtensilsCrossed,
-    titulo: "2. Menú digital",
-    donde: "Menú › Menú digital",
-    puntos: [
-      "Crea tus categorías y luego tus productos con precio, foto y descripción. Los precios incluyen ISV.",
-      "Marca cada producto para las sucursales donde se vende. ¿Tienes el menú en PDF? Usa «Importar desde PDF».",
-      "Bebidas alcohólicas y tabaco llevan ISV de 18 %; el resto, 15 % (o exento).",
-    ],
-  },
-  {
-    icono: Boxes,
-    titulo: "3. Inventario",
-    donde: "Menú › Inventario",
-    puntos: [
-      "Lleva el control de botellas, alimentos e insumos: crea categorías y artículos.",
-      "Anota las existencias por sucursal y un stock mínimo: verás una alerta de «stock bajo».",
-    ],
-  },
-  {
-    icono: LayoutGrid,
-    titulo: "4. Mesas y plano",
-    donde: "Menú › Mesas / Layout",
-    puntos: [
-      "Crea las mesas de cada sucursal y arrástralas para armar el plano de tu local.",
-      "Cada mesa tiene un código QR: el cliente escanea y ve tu carta digital desde su celular.",
-    ],
-  },
-  {
-    icono: Wallet,
-    titulo: "5. Formas de pago",
-    donde: "Menú › Formas de pago",
-    puntos: [
-      "Elige qué aceptas en cada sucursal: efectivo, tarjeta o transferencia.",
-      "El cajero verá solo las que actives al cobrar.",
-    ],
-  },
-  {
-    icono: Monitor,
-    titulo: "6. Así se trabaja en el POS",
-    donde: "Botón «Ir al POS»",
-    puntos: [
-      "El cajero toca una mesa libre, anota el nombre del cliente y abre la orden.",
-      "El mesero agrega los productos y toca «Enviar a cocina»: la comanda se imprime y aparece en la pantalla de cocina.",
-      "Al terminar, el cajero cobra. También puede imprimir la pre-cuenta (no es factura).",
-      "Funciona aunque se caiga el internet: todo se guarda y se sincroniza solo al volver.",
-    ],
-  },
-  {
-    icono: ChefHat,
-    titulo: "7. Pantalla de cocina",
-    donde: "Menú › Pantalla de cocina",
-    puntos: [
-      "Muestra en vivo las órdenes que llegan. Cocina toca «Listo» cuando termina y la orden desaparece de la pantalla.",
-      "Ábrela en una tablet o TV dentro de la cocina.",
-    ],
-  },
-  {
-    icono: FileText,
-    titulo: "8. Facturación fiscal (opcional)",
-    donde: "Menú › Facturación fiscal",
-    puntos: [
-      "Si facturas con CAI del SAR: carga los datos del emisor, crea una caja por dispositivo y registra tu rango autorizado.",
-      "Al activarla, cada cobro emite su factura con RTN opcional, y te avisamos cuando el rango esté por agotarse o vencer.",
-    ],
-  },
-  {
-    icono: BarChart3,
-    titulo: "9. Reportes y cierre del día",
-    donde: "Menú › Reportes y Resumen",
-    puntos: [
-      "En Resumen ves lo cobrado hoy y las órdenes por sucursal.",
-      "En Reportes consultas el cierre diario por forma de pago y tus productos más vendidos.",
-      "¡Listo! Ya conoces todo Pedilo. Toca «Tutorial completado» y empieza a vender.",
-    ],
-  },
-];
+function guardarPaso(n: number | null) {
+  try {
+    if (n === null) localStorage.removeItem(CLAVE_PASO);
+    else localStorage.setItem(CLAVE_PASO, String(n));
+  } catch {
+    /* sin almacenamiento: la guía sigue, solo no recuerda el paso */
+  }
+}
 
 /**
- * Tutorial de bienvenida para negocios nuevos. Se muestra mientras el negocio
- * no lo haya completado; «Tutorial completado» lo guarda en la base y no
- * vuelve a salir solo. «Saltar por ahora» solo lo cierra en esta sesión.
- * Cuando ya está completado, sigue montado para poder reabrirlo a mano
- * (botón «Ver tutorial»), sin volver a marcar nada.
+ * Guía interactiva de bienvenida para negocios nuevos. Un panel flotante
+ * acompaña al dueño por las pantallas reales (menú, mesas, inventario…), le da
+ * un ejemplo para llenar y detecta solo cuándo lo hizo. «Tutorial completado»
+ * (último paso) lo guarda en la base y no vuelve a salir; cerrarlo antes solo
+ * lo oculta en esta sesión. «Ver tutorial» lo reabre aunque ya esté completado.
  */
 export function TutorialOnboarding({ completado }: { completado: boolean }) {
-  const [abierto, setAbierto] = useState(false);
+  const pathname = usePathname();
+  const [vista, setVista] = useState<"oculto" | "bienvenida" | "guia">("oculto");
   const [paso, setPaso] = useState(0);
+  const [minimizado, setMinimizado] = useState(false);
+  const [progreso, setProgreso] = useState<ProgresoTutorial>(PROGRESO_VACIO);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [yaCompletado, setYaCompletado] = useState(completado);
@@ -148,31 +87,62 @@ export function TutorialOnboarding({ completado }: { completado: boolean }) {
       try {
         omitido = sessionStorage.getItem(CLAVE_OMITIDO) === "1";
       } catch {
-        /* sin sessionStorage: se muestra igual */
+        /* se muestra igual */
       }
-      if (!omitido) setAbierto(true);
+      if (!omitido) {
+        const guardado = leerPaso();
+        if (guardado === null) {
+          setVista("bienvenida");
+        } else {
+          setPaso(guardado);
+          setVista("guia");
+        }
+      }
     }
     const abrir = () => {
       setPaso(0);
+      guardarPaso(0);
       setError(null);
-      setAbierto(true);
+      setMinimizado(false);
+      setVista("guia");
     };
     window.addEventListener(EVENTO_ABRIR_TUTORIAL, abrir);
     return () => window.removeEventListener(EVENTO_ABRIR_TUTORIAL, abrir);
   }, [completado]);
 
-  const saltar = useCallback(() => {
+  const refrescar = useCallback(async () => {
+    const p = await progresoTutorial().catch(() => null);
+    if (p) setProgreso(p);
+  }, []);
+
+  // Detecta lo que el dueño va creando: al abrir, al cambiar de pantalla y cada pocos segundos
+  useEffect(() => {
+    if (vista !== "guia") return;
+    void refrescar();
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refrescar();
+    }, INTERVALO_MS);
+    return () => window.clearInterval(t);
+  }, [vista, pathname, refrescar]);
+
+  const omitirEstaSesion = useCallback(() => {
     try {
       sessionStorage.setItem(CLAVE_OMITIDO, "1");
     } catch {
       /* ignorar */
     }
-    setAbierto(false);
+    setVista("oculto");
   }, []);
+
+  function irAPaso(n: number) {
+    setPaso(n);
+    guardarPaso(n);
+    setError(null);
+  }
 
   async function terminar() {
     if (yaCompletado) {
-      setAbierto(false);
+      setVista("oculto");
       return;
     }
     setGuardando(true);
@@ -183,98 +153,186 @@ export function TutorialOnboarding({ completado }: { completado: boolean }) {
       setError("No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.");
       return;
     }
+    guardarPaso(null);
     setYaCompletado(true);
-    setAbierto(false);
+    setVista("oculto");
   }
 
-  if (!abierto) return null;
+  if (vista === "oculto") return null;
 
-  const actual = PASOS[paso];
-  const Icono = actual.icono;
-  const esUltimo = paso === PASOS.length - 1;
+  if (vista === "bienvenida") {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-0 sm:items-center sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Bienvenida a Pedilo"
+      >
+        <div className="w-full max-w-md rounded-t-2xl bg-white p-6 text-center shadow-popover sm:rounded-2xl">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+            <PartyPopper className="h-7 w-7" strokeWidth={2} />
+          </div>
+          <h2 className="text-lg font-semibold text-ink-900">¡Bienvenido a Pedilo!</h2>
+          <p className="mt-2 text-sm text-ink-600">
+            Te guiamos paso a paso por tu panel y dejamos tu negocio listo con un ejemplo real: crearás una
+            categoría, un producto, una mesa y harás una venta de prueba. Toma unos 10 minutos.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={() => {
+                irAPaso(0);
+                setVista("guia");
+              }}
+            >
+              Empezar la guía
+              <ArrowRight className="h-4 w-4" strokeWidth={2} />
+            </Button>
+            <Button variant="secondary" size="lg" className="flex-1" onClick={omitirEstaSesion}>
+              Más tarde
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const actual = PASOS_GUIA[paso];
+  const Icono = ICONOS[actual.id] ?? CircleHelp;
+  const esUltimo = paso === PASOS_GUIA.length - 1;
+  const detectable = actual.hecho !== null;
+  const hecho = detectable ? actual.hecho!(progreso) : false;
+  const enPantalla = pathname === actual.ruta || (actual.ruta !== "/admin" && !!pathname?.startsWith(actual.ruta + "/"));
+
+  if (minimizado) {
+    return (
+      <button
+        onClick={() => setMinimizado(false)}
+        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-popover hover:bg-brand-700"
+        aria-label="Abrir la guía"
+      >
+        <CircleHelp className="h-4 w-4" strokeWidth={2} />
+        Guía · paso {paso + 1}/{PASOS_GUIA.length}
+        <ChevronUp className="h-4 w-4" strokeWidth={2} />
+      </button>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Tutorial de bienvenida"
+    <aside
+      className="fixed inset-x-3 bottom-3 z-40 flex max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-popover sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-[24rem]"
+      aria-label="Guía paso a paso"
     >
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-popover sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
-          <p className="text-xs font-medium text-ink-500">
-            Paso {paso + 1} de {PASOS.length}
-          </p>
-          <button
-            onClick={saltar}
-            aria-label="Cerrar tutorial"
-            className="rounded-lg p-1 text-ink-400 hover:bg-ink-100"
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+      <div className="flex items-center gap-2 bg-ink-950 px-4 py-2.5 text-white">
+        <CircleHelp className="h-4 w-4 shrink-0 text-brand-200" strokeWidth={2} />
+        <p className="flex-1 text-xs font-medium">
+          Guía · paso {paso + 1} de {PASOS_GUIA.length}
+        </p>
+        <button onClick={() => setMinimizado(true)} aria-label="Minimizar guía" className="rounded p-1 hover:bg-ink-800">
+          <ChevronDown className="h-4 w-4" strokeWidth={2} />
+        </button>
+        <button onClick={omitirEstaSesion} aria-label="Cerrar tutorial" className="rounded p-1 hover:bg-ink-800">
+          <X className="h-4 w-4" strokeWidth={2} />
+        </button>
+      </div>
+      <div className="h-1 bg-ink-100" aria-hidden>
+        <div className="h-full bg-brand-600 transition-all" style={{ width: `${((paso + 1) / PASOS_GUIA.length) * 100}%` }} />
+      </div>
+
+      <div className="overflow-y-auto px-4 py-4">
+        <div className="mb-3 flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <Icono className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <h2 className="text-base font-semibold leading-tight text-ink-900">{actual.titulo}</h2>
         </div>
 
-        <div className="overflow-y-auto px-6 py-5">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-              <Icono className="h-5 w-5" strokeWidth={2} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-ink-900">{actual.titulo}</h2>
-              <p className="text-xs text-ink-500">{actual.donde}</p>
-            </div>
+        <ol className="space-y-2">
+          {actual.instrucciones.map((t, i) => (
+            <li key={t} className="flex gap-2.5 text-sm text-ink-700">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink-100 text-[11px] font-semibold text-ink-600">
+                {i + 1}
+              </span>
+              <span>{t}</span>
+            </li>
+          ))}
+        </ol>
+
+        {actual.ejemplo && (
+          <div className="mt-3 rounded-xl border border-brand-100 bg-brand-50/60 p-3">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700">Ejemplo</p>
+            <dl className="space-y-1">
+              {actual.ejemplo.map((e) => (
+                <div key={e.etiqueta} className="flex items-baseline justify-between gap-3 text-sm">
+                  <dt className="text-ink-500">{e.etiqueta}</dt>
+                  <dd className="font-mono text-xs font-medium text-ink-900">{e.valor}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <ul className="space-y-2.5">
-            {actual.puntos.map((p) => (
-              <li key={p} className="flex items-start gap-2.5 text-sm text-ink-700">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" strokeWidth={2.5} />
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
+        )}
+
+        <div className="mt-3 min-h-9">
+          {detectable && hecho && (
+            <p role="status" className="flex items-center gap-2 rounded-lg bg-libre-bg px-3 py-2 text-sm font-medium text-libre-text">
+              <Check className="h-4 w-4" strokeWidth={2.5} />
+              {actual.textoHecho ?? "¡Hecho!"}
+            </p>
+          )}
+          {detectable && !hecho && (
+            <p className="flex items-center gap-2 text-xs text-ink-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+              Esperando a que lo hagas… lo detectamos solos.
+            </p>
+          )}
           {error && (
-            <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </p>
           )}
         </div>
+      </div>
 
-        <div className="border-t border-ink-100 px-5 py-4">
-          <div className="mb-3 flex justify-center gap-1.5" aria-hidden>
-            {PASOS.map((_, i) => (
-              <span
-                key={i}
-                className={cn("h-1.5 rounded-full transition-all", i === paso ? "w-5 bg-brand-600" : "w-1.5 bg-ink-200")}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            {!yaCompletado && !esUltimo && (
-              <button onClick={saltar} className="mr-auto text-xs font-medium text-ink-500 hover:text-ink-800">
-                Saltar por ahora
-              </button>
-            )}
-            {(yaCompletado || esUltimo) && <span className="mr-auto" />}
-            {paso > 0 && (
-              <Button variant="secondary" onClick={() => setPaso((p) => p - 1)} disabled={guardando}>
-                Anterior
-              </Button>
-            )}
-            {!esUltimo ? (
-              <Button onClick={() => setPaso((p) => p + 1)}>Siguiente</Button>
-            ) : (
-              <Button onClick={() => void terminar()} disabled={guardando}>
-                {guardando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
-                ) : (
-                  <Check className="h-4 w-4" strokeWidth={2.5} />
-                )}
-                {yaCompletado ? "Cerrar" : "Tutorial completado"}
-              </Button>
-            )}
-          </div>
+      <div className="space-y-2 border-t border-ink-100 px-4 py-3">
+        {enPantalla ? (
+          <p className="text-center text-xs font-medium text-brand-700">Estás en la pantalla correcta: {actual.rutaEtiqueta}</p>
+        ) : (
+          <Link
+            href={actual.ruta}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-ink-900 px-4 py-2 text-sm font-medium text-white hover:bg-ink-800"
+          >
+            Ir a {actual.rutaEtiqueta}
+            <ArrowRight className="h-4 w-4" strokeWidth={2} />
+          </Link>
+        )}
+        <div className="flex items-center gap-2">
+          {paso > 0 && (
+            <Button variant="secondary" size="sm" onClick={() => irAPaso(paso - 1)} disabled={guardando}>
+              Anterior
+            </Button>
+          )}
+          <span className="flex-1" />
+          {!esUltimo ? (
+            <Button
+              size="sm"
+              variant={!detectable || hecho ? "primary" : "secondary"}
+              onClick={() => irAPaso(paso + 1)}
+            >
+              {!detectable || hecho ? "Siguiente paso" : "Saltar este paso"}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => void terminar()} disabled={guardando}>
+              {guardando ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+              ) : (
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+              )}
+              {yaCompletado ? "Cerrar" : "Tutorial completado"}
+            </Button>
+          )}
         </div>
       </div>
-    </div>
+    </aside>
   );
 }
