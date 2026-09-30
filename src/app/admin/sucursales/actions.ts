@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { RolUsuario } from "@/lib/types/helpers";
 import { cifrarClave, descifrarClave, generarClaveTemporal, validarClave } from "@/lib/auth/clave";
+import { mensajeErrorUsuario } from "@/lib/auth/errores";
 
 export async function crearSucursal(formData: FormData) {
   const sesion = await requireAdmin();
@@ -79,6 +80,8 @@ export async function actualizarLogoSucursal(sucursalId: string, logoUrl: string
  * service_role key porque crear usuarios de Auth no es algo que un usuario
  * común pueda hacer (se salta RLS a propósito, solo aquí).
  */
+const irConError = (mensaje: string) => redirect(`/admin/sucursales?errorUsuario=${encodeURIComponent(mensaje)}`);
+
 export async function crearUsuario(formData: FormData) {
   const sesion = await requireAdmin();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -87,9 +90,8 @@ export async function crearUsuario(formData: FormData) {
   const sucursalId = String(formData.get("sucursal_id") ?? "") || null;
   const claveEscrita = String(formData.get("clave") ?? "");
 
-  if (rol !== "admin" && !sucursalId) {
-    throw new Error("Cajero/mesero necesita una sucursal asignada.");
-  }
+  if (!email || !nombre.trim()) irConError("Escribe el nombre y el correo de la persona.");
+  if (rol !== "admin" && !sucursalId) irConError("Cajero/mesero necesita una sucursal asignada.");
   if (claveEscrita) {
     const problema = validarClave(claveEscrita);
     if (problema) redirect(`/admin/sucursales?errorClave=${encodeURIComponent(problema)}`);
@@ -104,8 +106,9 @@ export async function crearUsuario(formData: FormData) {
     email_confirm: true,
   });
 
-  if (error || !authUser.user) {
-    throw new Error(error?.message ?? "No se pudo crear el usuario de acceso.");
+  if (error || !authUser?.user) {
+    irConError(mensajeErrorUsuario(error?.message, (error as { code?: string } | null)?.code));
+    return;
   }
 
   const supabase = await createClient();
@@ -120,7 +123,7 @@ export async function crearUsuario(formData: FormData) {
 
   if (errorPerfil) {
     await admin.auth.admin.deleteUser(authUser.user.id);
-    throw new Error(errorPerfil.message);
+    irConError("No se pudo guardar al usuario. Intenta de nuevo.");
   }
 
   revalidatePath("/admin/sucursales");

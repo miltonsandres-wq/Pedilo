@@ -31,11 +31,11 @@ const ROL_TONE = { admin: "brand", cajero: "warning", mesero: "neutral" } as con
 export default async function SucursalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nuevoEmail?: string; errorClave?: string; errorPlan?: string }>;
+  searchParams: Promise<{ nuevoEmail?: string; errorClave?: string; errorUsuario?: string; errorPlan?: string }>;
 }) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
-  const { nuevoEmail, errorClave, errorPlan } = await searchParams;
+  const { nuevoEmail, errorClave, errorUsuario, errorPlan } = await searchParams;
 
   const [{ data: sucursales }, { data: mesas }, { data: prodSuc }, { data: usuarios }] =
     await Promise.all([
@@ -84,6 +84,13 @@ export default async function SucursalesPage({
             Usuario <b>{nuevoEmail}</b> creado. Puedes ver su contraseña cuando quieras abriendo su fila y tocando «Ver
             contraseña».
           </p>
+        </div>
+      )}
+
+      {errorUsuario && (
+        <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <UserPlus className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <p>{errorUsuario}</p>
         </div>
       )}
 
@@ -166,13 +173,13 @@ export default async function SucursalesPage({
               </span>
             }
           >
-            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input type="hidden" name="rol" value="admin" />
               <Field label="Nombre" name="nombre" required />
               <Field label="Correo" name="email" type="email" required />
               <Field label="Contraseña (vacío = generar)" name="clave" autoComplete="off" />
-              <div className="flex items-end">
-                <Button type="submit" size="sm" className="w-full">
+              <div className="col-span-full">
+                <Button type="submit" size="sm">
                   <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
                   Agregar administrador
                 </Button>
@@ -373,7 +380,7 @@ export default async function SucursalesPage({
                     </span>
                   }
                 >
-                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <input type="hidden" name="sucursal_id" value={s.id} />
                     <Field label="Nombre" name="nombre" required />
                     <Field label="Correo" name="email" type="email" required />
@@ -382,8 +389,8 @@ export default async function SucursalesPage({
                       <option value="mesero">Mesero</option>
                       <option value="cajero">Cajero</option>
                     </SelectField>
-                    <div className="flex items-end">
-                      <Button type="submit" size="sm" className="w-full">
+                    <div className="col-span-full">
+                      <Button type="submit" size="sm">
                         <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
                         Agregar
                       </Button>
