@@ -52,7 +52,6 @@ export function AdminShell({
           y se muestra el login para entrar con esa cuenta. */}
       <button
         type="button"
-        data-tour="ir-pos"
         title="Cierra tu sesión y abre el login para entrar con un cajero o mesero"
         onClick={async () => {
           setAbierto(false);

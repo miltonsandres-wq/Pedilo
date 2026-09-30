@@ -32,16 +32,15 @@ export async function progresoTutorial(): Promise<ProgresoTutorial | null> {
   const contar = (q: PromiseLike<{ count: number | null }>) => q.then((r) => r.count ?? 0);
 
   try {
-    const [personal, categorias, productos, mesas, inventarioCategorias, inventarioItems, ordenes] = await Promise.all([
+    const [personal, categorias, productos, mesas, inventarioCategorias, inventarioItems] = await Promise.all([
       contar(supabase.from("usuarios").select("id", { count: "exact", head: true }).eq("tenant_id", t).in("rol", ["cajero", "mesero"])),
       contar(supabase.from("categorias").select("id", { count: "exact", head: true }).eq("tenant_id", t)),
       contar(supabase.from("productos").select("id", { count: "exact", head: true }).eq("tenant_id", t).eq("activo", true)),
       contar(supabase.from("mesas").select("id", { count: "exact", head: true }).eq("tenant_id", t).eq("activa", true)),
       contar(supabase.from("inventario_categorias").select("id", { count: "exact", head: true }).eq("tenant_id", t)),
       contar(supabase.from("inventario_items").select("id", { count: "exact", head: true }).eq("tenant_id", t).eq("activo", true)),
-      contar(supabase.from("ordenes").select("id", { count: "exact", head: true }).eq("tenant_id", t)),
     ]);
-    return { personal, categorias, productos, mesas, inventarioCategorias, inventarioItems, ordenes };
+    return { personal, categorias, productos, mesas, inventarioCategorias, inventarioItems };
   } catch {
     return null;
   }

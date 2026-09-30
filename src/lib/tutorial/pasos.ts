@@ -15,7 +15,6 @@ export interface ProgresoTutorial {
   mesas: number;
   inventarioCategorias: number;
   inventarioItems: number;
-  ordenes: number;
 }
 
 export const PROGRESO_VACIO: ProgresoTutorial = {
@@ -25,7 +24,6 @@ export const PROGRESO_VACIO: ProgresoTutorial = {
   mesas: 0,
   inventarioCategorias: 0,
   inventarioItems: 0,
-  ordenes: 0,
 };
 
 export interface PasoGuia {
@@ -41,8 +39,6 @@ export interface PasoGuia {
   abrirEtiqueta?: string;
   /** Formulario donde se hace el paso (data-tour): se señala mientras se llena. */
   form?: string;
-  /** Elemento a señalar en pasos informativos sin formulario (data-tour). */
-  destacar?: string;
   /** Qué hacer, en orden. */
   instrucciones: string[];
   /** Valores de ejemplo para copiar. */
@@ -183,31 +179,6 @@ export const PASOS_GUIA: PasoGuia[] = [
     textoHecho: "Artículo de inventario creado.",
   },
   {
-    id: "pos",
-    titulo: "Haz una venta de prueba",
-    rutaEtiqueta: "el POS",
-    destacar: "ir-pos",
-    instrucciones: [
-      "Toca «Ir al POS» (resaltado): cierra tu sesión y abre el login para entrar con el usuario Cajero que creaste, y abre «Mesa 1».",
-      "El mesero agrega la Coca-Cola y toca «Enviar a cocina»; después el cajero toca «Cobrar».",
-      "Regresa al panel: detectamos tu primera orden. Si prefieres hacerlo después, salta este paso.",
-    ],
-    ejemplo: [{ etiqueta: "Cliente", valor: "Cliente de prueba" }],
-    hecho: (p) => p.ordenes >= 1,
-    textoHecho: "¡Ya hiciste tu primera orden!",
-  },
-  {
-    id: "cocina",
-    titulo: "Conoce la pantalla de cocina",
-    rutaEtiqueta: "Pantalla de cocina",
-    destacar: "nav-cocina",
-    instrucciones: [
-      "Muestra en vivo las órdenes que envían los meseros; cocina toca «Listo» y la orden desaparece.",
-      "Ábrela en una tablet o TV dentro de la cocina (opción resaltada en el menú).",
-    ],
-    hecho: null,
-  },
-  {
     id: "fiscal",
     titulo: "Facturación fiscal (opcional)",
     ruta: "/admin/fiscal",
@@ -227,7 +198,8 @@ export const PASOS_GUIA: PasoGuia[] = [
     rutaEtiqueta: "Reportes",
     instrucciones: [
       "Aquí ves el cierre diario por forma de pago y tus productos más vendidos.",
-      "En «Resumen» tienes lo cobrado hoy. ¡Listo! Ya conoces Pedilo: toca «Tutorial completado».",
+      "En «Resumen» tienes lo cobrado hoy.",
+      "¡Listo, tu negocio quedó configurado! Tus cajeros y meseros entran al POS con su usuario desde «Ir al POS» (te lleva al login). Toca «Tutorial completado».",
     ],
     hecho: null,
   },
@@ -243,7 +215,7 @@ export type FaseGuia = "ir" | "abrir" | "llenar" | "info" | "hecho";
  *  - ir:     no está en la pantalla del paso        -> señala su enlace del menú
  *  - abrir:  falta abrir el formulario              -> señala el botón que lo abre
  *  - llenar: está el formulario y falta crear algo  -> señala el formulario
- *  - info:   paso informativo                       -> señala `destacar` (si hay)
+ *  - info:   paso informativo                       -> señala su formulario (si tiene)
  */
 export function calcularFase(
   paso: PasoGuia,
@@ -260,6 +232,5 @@ export function calcularFase(
     return { fase: "abrir", selector: `[data-tour="${paso.abrir}"]` };
   }
 
-  const destino = paso.form ?? paso.destacar;
-  return { fase: paso.hecho ? "llenar" : "info", selector: destino ? `[data-tour="${destino}"]` : null };
+  return { fase: paso.hecho ? "llenar" : "info", selector: paso.form ? `[data-tour="${paso.form}"]` : null };
 }

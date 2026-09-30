@@ -87,9 +87,9 @@ describe("calcularFase (qué señalar en cada momento)", () => {
   it("ya creado: hecho, sin señalar nada (aunque esté en otra pantalla)", () => {
     expect(calcularFase(personal, { ...PROGRESO_VACIO, personal: 1 }, "/admin", existe([]))).toEqual({ fase: "hecho", selector: null });
   });
-  it("pasos informativos: señalan su destacado y no esperan nada", () => {
-    const cocina = PASOS_GUIA.find((p) => p.id === "cocina")!;
-    expect(calcularFase(cocina, PROGRESO_VACIO, "/admin", existe([]))).toEqual({ fase: "info", selector: '[data-tour="nav-cocina"]' });
+  it("pasos informativos: señalan su formulario (si lo tienen) y no esperan nada", () => {
+    const pagos = PASOS_GUIA.find((p) => p.id === "pagos")!;
+    expect(calcularFase(pagos, PROGRESO_VACIO, "/admin/formas-pago", existe([]))).toEqual({ fase: "info", selector: '[data-tour="form-pagos"]' });
     const reportes = PASOS_GUIA.find((p) => p.id === "reportes")!;
     expect(calcularFase(reportes, PROGRESO_VACIO, "/admin", existe([])).fase).toBe("ir");
     expect(calcularFase(reportes, PROGRESO_VACIO, "/admin/reportes", existe([]))).toEqual({ fase: "info", selector: null });
@@ -102,7 +102,7 @@ describe("calcularFase (qué señalar en cada momento)", () => {
 describe("estructura del recorrido", () => {
   it("cubre toda la app y cada paso de «crear algo» trae un ejemplo", () => {
     expect(PASOS_GUIA.map((p) => p.id)).toEqual([
-      "personal", "categoria", "producto", "mesas", "pagos", "inv-categoria", "inv-item", "pos", "cocina", "fiscal", "reportes",
+      "personal", "categoria", "producto", "mesas", "pagos", "inv-categoria", "inv-item", "fiscal", "reportes",
     ]);
     for (const id of ["personal", "categoria", "producto", "mesas", "inv-categoria", "inv-item"]) {
       expect(PASOS_GUIA.find((p) => p.id === id)?.ejemplo?.length).toBeGreaterThan(0);
@@ -119,7 +119,25 @@ describe("estructura del recorrido", () => {
     expect(prueba("mesas", "mesas")).toEqual([false, true]);
     expect(prueba("inv-categoria", "inventarioCategorias")).toEqual([false, true]);
     expect(prueba("inv-item", "inventarioItems")).toEqual([false, true]);
-    expect(prueba("pos", "ordenes")).toEqual([false, true]);
+  });
+
+  it("son SOLO pasos de configuración del administrador: ninguno lo saca del panel (ni al POS ni a cocina)", () => {
+    for (const p of PASOS_GUIA) {
+      if (p.ruta) expect(p.ruta.startsWith("/admin"), `${p.id}: ${p.ruta}`).toBe(true);
+      expect(p.ruta ?? "").not.toMatch(/^\/(pos|cocina)/);
+      expect(p.titulo.toLowerCase()).not.toMatch(/venta de prueba|pantalla de cocina/);
+    }
+    expect(PASOS_GUIA.some((p) => p.id === "pos" || p.id === "cocina")).toBe(false);
+    // ni una sola pista apunta a los enlaces que salen del panel
+    const texto = JSON.stringify(PASOS_GUIA);
+    expect(texto).not.toContain("ir-pos");
+    expect(texto).not.toContain("nav-cocina");
+  });
+
+  it("el último paso explica que los cajeros/meseros entran al POS con su usuario, sin mandar al admin allá", () => {
+    const ultimo = PASOS_GUIA[PASOS_GUIA.length - 1];
+    expect(ultimo.id).toBe("reportes");
+    expect(ultimo.instrucciones.join(" ")).toMatch(/cajeros y meseros entran al POS con su usuario/);
   });
 });
 
@@ -315,7 +333,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     expect(guia()).toBeNull();
     expect(foco()).toBeNull();
     const pastilla = screen.getByRole("button", { name: "Abrir la guía" });
-    expect(pastilla.textContent).toContain("paso 1/11");
+    expect(pastilla.textContent).toContain("paso 1/9");
     await user.click(pastilla);
     expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
   });
