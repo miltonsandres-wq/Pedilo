@@ -1,12 +1,16 @@
 import { createClient } from "@/lib/supabase/client";
 import { servicioImpresion } from "@/lib/printing/enviarComanda";
 import type { Comanda } from "@/lib/printing/types";
-import { db, type OutboxOperacion, type OutboxTabla } from "./db";
+import { db, type OutboxEntry, type OutboxOperacion, type OutboxTabla } from "./db";
 
 let flushing = false;
 
-/** Encola una escritura pendiente y de inmediato intenta enviarla si hay red. */
-export async function encolar(
+/**
+ * Encola sin intentar enviar. Se usa DENTRO de una transacción Dexie más grande
+ * (ej. cobrar + emitir factura): el flush arrancaría a mitad de la transacción
+ * y leería la cola sin esas escrituras. Quien llama hace flushOutbox() al terminar.
+ */
+export async function encolarSinFlush(
   tabla: OutboxTabla,
   operacion: OutboxOperacion,
   registro_id: string,
@@ -22,6 +26,16 @@ export async function encolar(
     intentos: 0,
     ultimo_error: null,
   });
+}
+
+/** Encola una escritura pendiente y de inmediato intenta enviarla si hay red. */
+export async function encolar(
+  tabla: OutboxTabla,
+  operacion: OutboxOperacion,
+  registro_id: string,
+  payload: Record<string, unknown>
+) {
+  await encolarSinFlush(tabla, operacion, registro_id, payload);
   void flushOutbox();
 }
 
@@ -81,6 +95,12 @@ export async function flushOutbox() {
         continue;
       }
 
+      if (tabla === "documentos_fiscales") {
+        const continuar = await sincronizarDocumentoFiscal(supabase, entry);
+        if (!continuar) break;
+        continue;
+      }
+
       const query =
         operacion === "insert"
           ? supabase.from(tabla).insert(payload as never)
@@ -106,6 +126,51 @@ export async function flushOutbox() {
   } finally {
     flushing = false;
   }
+}
+
+/**
+ * Sube un documento fiscal por la RPC del servidor, que lo VALIDA (rango,
+ * fecha, duplicado). Devuelve true si la cola puede seguir con lo demás.
+ *  - ok            -> queda "sincronizado".
+ *  - rechazo de negocio (duplicado, fuera de rango, fecha vencida...) -> el
+ *    servidor ya registró un incidente; el documento queda marcado
+ *    "conflicto" (visible en el POS, NUNCA se descarta en silencio) y la cola
+ *    sigue: un conflicto no debe frenar todos los cobros que vienen detrás.
+ *  - error de red/transitorio -> se reintenta luego y se frena la cola.
+ */
+async function sincronizarDocumentoFiscal(
+  supabase: ReturnType<typeof createClient>,
+  entry: OutboxEntry
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("sincronizar_documento_fiscal", {
+    p_doc: entry.payload as never,
+  });
+
+  if (error) {
+    const rechazoPermanente = error.message.includes("FISCAL_") && !error.message.includes("FISCAL_SIN_SESION");
+    if (!rechazoPermanente) {
+      await db.outbox.update(entry.id, { intentos: entry.intentos + 1, ultimo_error: error.message });
+      return false;
+    }
+    await db.documentos_fiscales.update(entry.registro_id, {
+      sync_estado: "conflicto",
+      sync_detalle: error.message,
+    });
+    await db.outbox.delete(entry.id);
+    return true;
+  }
+
+  const res = data as { ok: boolean; tipo?: string; detalle?: string } | null;
+  if (res?.ok) {
+    await db.documentos_fiscales.update(entry.registro_id, { sync_estado: "sincronizado", sync_detalle: null });
+  } else {
+    await db.documentos_fiscales.update(entry.registro_id, {
+      sync_estado: "conflicto",
+      sync_detalle: `${res?.tipo ?? "rechazado"}: ${res?.detalle ?? "el servidor rechazó el documento"}`,
+    });
+  }
+  await db.outbox.delete(entry.id);
+  return true;
 }
 
 export function cantidadPendiente(): Promise<number> {

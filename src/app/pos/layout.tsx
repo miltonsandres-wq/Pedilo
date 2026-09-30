@@ -5,6 +5,8 @@ import { ProveedorSync } from "@/components/ProveedorSync";
 import { SyncIndicator } from "@/components/SyncIndicator";
 import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
 import { BrandMark } from "@/components/BrandMark";
+import { AvisosFiscales } from "@/components/pos/AvisosFiscales";
+import { EnlaceFacturas } from "@/components/pos/EnlaceFacturas";
 
 export default async function PosLayout({ children }: { children: React.ReactNode }) {
   const sesion = await requireSucursal();
@@ -30,10 +32,12 @@ export default async function PosLayout({ children }: { children: React.ReactNod
           >
             <ChefHat className="h-4 w-4" strokeWidth={2} />
           </Link>
+          <EnlaceFacturas />
           <SyncIndicator />
           <CerrarSesionBoton />
         </div>
       </header>
+      <AvisosFiscales />
       <main className="p-4">{children}</main>
     </div>
   );

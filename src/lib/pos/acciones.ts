@@ -1,7 +1,15 @@
 "use client";
 
 import { db } from "@/lib/offline/db";
-import { encolar, encolarComanda } from "@/lib/offline/outbox";
+import { encolar, encolarComanda, encolarSinFlush, flushOutbox } from "@/lib/offline/outbox";
+import {
+  emitirDocumentoFiscal,
+  leerConfigFiscal,
+  lineasDesdeItems,
+  verificarPuedeFacturar,
+  type DatosCliente,
+  type DatosExoneracion,
+} from "@/lib/fiscal/emision";
 import type { Comanda } from "@/lib/printing/types";
 import type { FormaPago } from "@/lib/types/helpers";
 
@@ -76,6 +84,9 @@ export async function agregarItem(params: {
 }) {
   const id = crypto.randomUUID();
   const ahora = new Date().toISOString();
+  // La tasa de ISV se captura ahora (como el precio): si el admin la cambia
+  // después, las órdenes ya tomadas no se mueven.
+  const tasaIsv = (await db.productos.get(params.productoId))?.tasa_isv ?? "15";
 
   await db.orden_items.add({
     id,
@@ -87,6 +98,7 @@ export async function agregarItem(params: {
     nota: params.nota ?? null,
     impreso: false,
     origen_cliente: false,
+    tasa_isv: tasaIsv,
     created_at: ahora,
   });
   await recalcularTotalLocal(params.ordenId);
@@ -99,6 +111,7 @@ export async function agregarItem(params: {
     cantidad: params.cantidad,
     precio_unitario: params.precioUnitario,
     nota: params.nota ?? null,
+    tasa_isv: tasaIsv,
   });
 
   return id;
@@ -162,7 +175,16 @@ export async function enviarACocina(ordenId: string, mesaNombre: string) {
   }
 }
 
-/** 4. Registra el pago; el trigger en BD marca la orden 'pagada' y libera la mesa. */
+/**
+ * 4. Registra el pago; el trigger en BD marca la orden 'pagada' y libera la mesa.
+ *
+ * Con facturación fiscal activa, esto es TODO O NADA en una sola transacción
+ * Dexie: (a) antes de aceptar CUALQUIER pago se verifica que hay CAI vigente
+ * (si no, lanza FiscalError y no se escribe nada — no hay modo permisivo), y
+ * (b) al completarse el pago de la orden se emite la factura con su
+ * correlativo, ahí mismo en el dispositivo. Devuelve el id del documento
+ * emitido (null si el pago fue parcial o el negocio no factura).
+ */
 export async function cobrar(params: {
   ordenId: string;
   mesaId: string;
@@ -170,40 +192,74 @@ export async function cobrar(params: {
   monto: number;
   formaPago: FormaPago;
   referencia?: string;
-}) {
+  cliente?: DatosCliente;
+  exoneracion?: DatosExoneracion;
+}): Promise<{ documentoId: string | null }> {
   const id = crypto.randomUUID();
   const ahora = new Date().toISOString();
+  let documentoId: string | null = null;
 
-  await db.pagos.add({
-    id,
-    orden_id: params.ordenId,
-    usuario_id: params.usuarioId,
-    monto: params.monto,
-    forma_pago: params.formaPago,
-    referencia: params.referencia ?? null,
-    created_at: ahora,
-  });
+  await db.transaction(
+    "rw",
+    [db.pagos, db.ordenes, db.mesas, db.orden_items, db.rangos_cai, db.documentos_fiscales, db.config, db.outbox],
+    async () => {
+      const config = await leerConfigFiscal();
+      const facturar = !!config?.activa;
 
-  const orden = await db.ordenes.get(params.ordenId);
-  const pagos = await db.pagos.where("orden_id").equals(params.ordenId).toArray();
-  const totalPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
+      if (facturar) {
+        const bloqueo = await verificarPuedeFacturar();
+        if (bloqueo) throw bloqueo;
+      }
 
-  if (orden && totalPagado >= orden.total) {
-    await db.ordenes.update(params.ordenId, { estado: "pagada", pagada_at: ahora });
-    await db.mesas.update(params.mesaId, { estado: "libre" });
-  }
+      await db.pagos.add({
+        id,
+        orden_id: params.ordenId,
+        usuario_id: params.usuarioId,
+        monto: params.monto,
+        forma_pago: params.formaPago,
+        referencia: params.referencia ?? null,
+        created_at: ahora,
+      });
 
-  await encolar("pagos", "insert", id, {
-    id,
-    orden_id: params.ordenId,
-    usuario_id: params.usuarioId,
-    monto: params.monto,
-    forma_pago: params.formaPago,
-    referencia: params.referencia ?? null,
-  });
+      const orden = await db.ordenes.get(params.ordenId);
+      const pagos = await db.pagos.where("orden_id").equals(params.ordenId).toArray();
+      const totalPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
+      const completa = !!orden && totalPagado >= orden.total;
+
+      if (orden && completa) {
+        await db.ordenes.update(params.ordenId, { estado: "pagada", pagada_at: ahora });
+        await db.mesas.update(params.mesaId, { estado: "libre" });
+      }
+
+      await encolarSinFlush("pagos", "insert", id, {
+        id,
+        orden_id: params.ordenId,
+        usuario_id: params.usuarioId,
+        monto: params.monto,
+        forma_pago: params.formaPago,
+        referencia: params.referencia ?? null,
+      });
+
+      if (facturar && orden && completa) {
+        const items = await db.orden_items.where("orden_id").equals(params.ordenId).toArray();
+        const doc = await emitirDocumentoFiscal({
+          ordenId: params.ordenId,
+          sucursalId: orden.sucursal_id,
+          usuarioId: params.usuarioId,
+          lineas: lineasDesdeItems(items),
+          cliente: params.cliente,
+          exoneracion: params.exoneracion,
+        });
+        documentoId = doc.id;
+      }
+    }
+  );
+
+  void flushOutbox();
   // El trigger fn_pagos_after_insert en Supabase hace el mismo cierre
   // (orden -> pagada, mesa -> libre) del lado del servidor cuando este pago
   // llegue, así que no hace falta encolar esos updates aparte.
+  return { documentoId };
 }
 
 /**

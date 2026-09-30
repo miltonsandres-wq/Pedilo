@@ -1,4 +1,4 @@
-import type { Comanda, ResultadoImpresion } from "./types";
+import type { Comanda, PeticionImpresion, ResultadoImpresion } from "./types";
 
 /**
  * Interfaz desacoplada de impresión. El navegador NUNCA habla directo con la
@@ -11,6 +11,17 @@ import type { Comanda, ResultadoImpresion } from "./types";
  */
 export interface ServicioImpresion {
   enviarComanda(comanda: Comanda, agenteUrl: string): Promise<ResultadoImpresion>;
+  /** Factura, nota de crédito o pre-cuenta ya armadas (ver documentoTexto.ts). */
+  enviarImpresion(peticion: PeticionImpresion, agenteUrl: string): Promise<ResultadoImpresion>;
+}
+
+/**
+ * La URL guardada en la sucursal apunta al endpoint de comandas
+ * (…/comanda). Los demás endpoints del agente cuelgan de la misma base.
+ */
+export function urlEndpointAgente(agenteUrl: string, endpoint: string): string {
+  const base = agenteUrl.trim().replace(/\/+$/, "").replace(/\/comanda$/i, "");
+  return `${base}/${endpoint}`;
 }
 
 /**
@@ -33,6 +44,21 @@ class HttpServicioImpresion implements ServicioImpresion {
       if (!res.ok) {
         return { ok: false, error: `Agente respondió ${res.status}` };
       }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "error desconocido" };
+    }
+  }
+
+  async enviarImpresion(peticion: PeticionImpresion, agenteUrl: string): Promise<ResultadoImpresion> {
+    try {
+      const res = await fetch(urlEndpointAgente(agenteUrl, "imprimir"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(peticion),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return { ok: false, error: `Agente respondió ${res.status}` };
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "error desconocido" };

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { EstadoMesa, EstadoOrden } from "@/lib/types/helpers";
 import { db } from "./db";
 import { flushOutbox } from "./outbox";
+import { solicitarAlmacenamientoPersistente, sincronizarFiscal } from "@/lib/fiscal/sincronizacion";
 
 let iniciado = false;
 
@@ -21,7 +22,9 @@ export async function iniciarSync(sucursalId: string, tenantId: string) {
 
   const supabase = createClient();
 
+  void solicitarAlmacenamientoPersistente();
   await pullInicial(sucursalId, tenantId);
+  await refrescarFiscal(sucursalId, tenantId);
   await flushOutbox();
 
   const canal = supabase
@@ -51,13 +54,29 @@ export async function iniciarSync(sucursalId: string, tenantId: string) {
   const onOnline = () => void flushOutbox();
   window.addEventListener("online", onOnline);
   const intervalo = window.setInterval(() => void flushOutbox(), 15_000);
+  // Rangos CAI, config y documentos: cada 5 min (y al reconectar) para que las
+  // alertas de consumo/vencimiento y el correlativo del servidor estén al día.
+  const intervaloFiscal = window.setInterval(() => void refrescarFiscal(sucursalId, tenantId), 300_000);
+  const onOnlineFiscal = () => void refrescarFiscal(sucursalId, tenantId);
+  window.addEventListener("online", onOnlineFiscal);
 
   return () => {
     iniciado = false;
     supabase.removeChannel(canal);
     window.removeEventListener("online", onOnline);
     window.clearInterval(intervalo);
+    window.clearInterval(intervaloFiscal);
+    window.removeEventListener("online", onOnlineFiscal);
   };
+}
+
+/** Nunca debe tumbar el arranque del POS: sin red se queda con lo cacheado. */
+async function refrescarFiscal(sucursalId: string, tenantId: string) {
+  try {
+    await sincronizarFiscal(sucursalId, tenantId);
+  } catch (e) {
+    console.warn("No se pudo sincronizar la facturación fiscal:", e);
+  }
 }
 
 async function pullInicial(sucursalId: string, tenantId: string) {
@@ -116,6 +135,7 @@ async function pullInicial(sucursalId: string, tenantId: string) {
         precio: Number(r.productos!.precio),
         foto_url: r.productos!.foto_url,
         disponible: r.productos!.disponible,
+        tasa_isv: r.productos!.tasa_isv,
       }));
     await db.productos.bulkPut(productos);
   }

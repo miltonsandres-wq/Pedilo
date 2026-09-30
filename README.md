@@ -9,6 +9,7 @@ de impresión ESC/POS separado por sucursal.
 ```
 supabase/migrations/     Esquema SQL + políticas RLS (fuente de verdad de la BD)
 scripts/                 seed-tenant.mjs (bootstrap) y gen-types.mjs (regenerar tipos)
+tests/                   vitest: fiscal/ (lógica), sql/ (migraciones + RLS), ui/ (componentes)
 src/
   middleware.ts          Refresca la sesión de Supabase en cada request
   lib/
@@ -19,6 +20,7 @@ src/
     pos/acciones.ts       Flujo de la orden (abrir, agregar ítem, enviar a cocina, cobrar)
     printing/              Interfaz enviarComanda() desacoplada de ESC/POS
     reportes/              Cierre diario (consulta, no tabla)
+    fiscal/                Facturación con CAI: emisión offline, rangos, ISV, libro de ventas
   app/
     login/                 Login
     admin/                 Panel del dueño (sucursales, menú, inventario, mesas, usuarios, formas de pago, reportes)
@@ -66,6 +68,74 @@ pública (recomendado: un Cloudflare Tunnel) se registra en
 ```bash
 SUPABASE_ACCESS_TOKEN=sbp_xxx SUPABASE_PROJECT_REF=xxxxxxxx npm run db:types
 ```
+
+## Facturación fiscal (CAI / SAR Honduras)
+
+Emisión de facturas con CAI conforme al Reglamento del Régimen de Facturación
+(Acuerdo 481-2017), modalidad "autoimpresor por sistema computarizado". Cada
+negocio tramita su CAI ante el SAR; Pedilo solo carga y respeta esos rangos.
+Está **apagada por defecto** por negocio (`tenants.facturacion_fiscal_activa`).
+
+### Ponerla en marcha (una vez)
+
+1. Aplicar en Supabase, en orden, `0017_datos_fiscales.sql` y
+   `0018_cai_documentos_fiscales.sql` (SQL Editor). Necesitan las migraciones
+   anteriores ya aplicadas.
+2. **Actualizar el agente de impresión de cada sucursal** (`print-agent/index.js`,
+   ver su README): el endpoint nuevo `/imprimir` es el que imprime factura,
+   nota de crédito y pre-cuenta con logo.
+3. En `/admin/fiscal`, en este orden: **Emisor** (razón social, RTN, dirección) →
+   **Cajas** (una por dispositivo, con su establecimiento y punto de emisión) →
+   **Rangos CAI** → **Estado** > *Activar*. No deja activar si falta algo.
+4. En el POS de cada caja: aviso rojo → **Vincular esta caja**.
+5. En **Menú digital**, marcar 18 % en bebidas alcohólicas y tabaco (el resto es
+   15 %; hay opción *Exento*). Los precios del menú **incluyen** ISV.
+
+### Cómo funciona
+
+- **El correlativo lo asigna el dispositivo**, dentro de una transacción Dexie
+  atómica, al cobrar (`src/lib/fiscal/emision.ts`); nunca al sincronizar. Sin
+  rango vigente (agotado, vencido o ausente) el cobro se bloquea con un mensaje
+  claro: no hay modo permisivo. El cobro + la factura son todo o nada.
+- **El servidor valida** cada documento al sincronizar (rango, fecha límite,
+  duplicado, total = base + ISV) en la RPC `sincronizar_documento_fiscal`. Si lo
+  rechaza queda un **incidente** (Admin > Estado) y el documento se marca
+  *conflicto* en el POS; nunca se descarta en silencio y no frena la cola.
+- **Reuso imposible**: al vincular o reinstalar, la caja arranca en
+  `max(local, servidor) + 1`; el navegador pide almacenamiento persistente.
+- `documentos_fiscales` es inmutable (sin DELETE; solo `emitida → anulada` por la
+  RPC `anular_documento_fiscal`, únicamente admin). Cada documento guarda un
+  *snapshot* del emisor y del rango.
+- La **pre-cuenta** y la comanda no son documentos fiscales ni consumen número.
+  Reimprimir sale marcado *REIMPRESIÓN* y no consume número.
+- Lógica en `src/lib/fiscal/` (ISV en centavos enteros, total en letras, rangos,
+  emisión, notas, libro) y formato de 80 mm / 48 columnas en
+  `src/lib/printing/documentoTexto.ts`.
+
+### Límites conocidos
+
+- Notas de crédito **totales** (una por factura); no hay notas parciales ni de
+  débito desde la UI (el modelo ya las soporta). La factura debe estar en la caja
+  (se guardan los últimos 7 días).
+- La propina / cargo por servicio está soportada en el cálculo (fuera de la base
+  gravable) pero el POS todavía no tiene dónde capturarla. Pendiente de confirmar
+  con el contador.
+- Los descuentos son ediciones de precio unitario; la factura sale con el precio
+  final. El cálculo ya prorratea un descuento explícito si se agrega.
+- Con la caja sin conexión desde su primer arranque tras actualizar, aún no
+  conoce la configuración fiscal: se sincroniza sola al primer contacto con el servidor.
+- La fecha del dispositivo decide la fecha de emisión; el servidor valida contra la
+  fecha límite del rango pero no detecta un reloj atrasado a propósito.
+
+### Pruebas
+
+```bash
+npm test          # vitest: ISV, letras, rangos, emisión, sync, impresión, SQL y UI
+```
+
+Las pruebas SQL aplican las migraciones reales sobre Postgres en memoria (PGlite)
+y prueban triggers, RPCs y la RLS entre negocios; las de sincronización corren la
+cola offline contra esa misma base.
 
 ## Notas de arquitectura
 

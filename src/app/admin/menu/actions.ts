@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
+const TASAS_ISV = ["exento", "15", "18"] as const;
+
+/** ISV del producto: por defecto 15 %; bebidas alcohólicas y tabaco = 18 %. */
+function tasaIsv(valor: FormDataEntryValue | null): (typeof TASAS_ISV)[number] {
+  const v = String(valor ?? "");
+  return (TASAS_ISV as readonly string[]).includes(v) ? (v as (typeof TASAS_ISV)[number]) : "15";
+}
+
 export async function crearCategoria(formData: FormData) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
@@ -30,6 +38,7 @@ export async function crearProducto(formData: FormData) {
       descripcion: String(formData.get("descripcion") ?? "") || null,
       precio: Number(formData.get("precio") ?? 0),
       foto_url: String(formData.get("foto_url") ?? "") || null,
+      tasa_isv: tasaIsv(formData.get("tasa_isv")),
     })
     .select("id")
     .single();
@@ -57,6 +66,7 @@ export async function actualizarProducto(id: string, formData: FormData) {
       precio: Number(formData.get("precio") ?? 0),
       foto_url: String(formData.get("foto_url") ?? "") || null,
       disponible: formData.get("disponible") === "on",
+      tasa_isv: tasaIsv(formData.get("tasa_isv")),
     })
     .eq("id", id);
 
