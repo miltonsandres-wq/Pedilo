@@ -190,6 +190,7 @@ export async function crearRango(_prev: EstadoAccion | null, formData: FormData)
     cai: v.valor.cai,
     desde: v.valor.desde,
     hasta: v.valor.hasta,
+    siguiente: v.valor.desde,
     fecha_limite: v.valor.fechaLimite,
     dispositivo_id: caja.id,
   });
