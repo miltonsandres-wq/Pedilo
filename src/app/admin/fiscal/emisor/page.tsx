@@ -27,7 +27,7 @@ export default async function FiscalEmisorPage() {
         </div>
       </Card>
 
-      {(sucursales ?? []).length > 0 && (
+      {(sucursales ?? []).length > 1 && (
         <div>
           <h2 className="mb-1 text-sm font-semibold text-ink-900">Datos propios por sucursal (opcional)</h2>
           <p className="mb-3 text-xs text-ink-500">

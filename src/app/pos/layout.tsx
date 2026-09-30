@@ -13,7 +13,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-ink-50">
-      <ProveedorSync sucursalId={sesion.sucursal_id} tenantId={sesion.tenant_id} />
+      <ProveedorSync sucursalId={sesion.sucursal_id} tenantId={sesion.tenant_id} puedeCobrar={sesion.rol === "cajero"} />
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-100 bg-white/90 px-4 py-3 backdrop-blur">
         <Link href="/pos" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600">

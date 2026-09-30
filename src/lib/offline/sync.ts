@@ -16,7 +16,7 @@ let iniciado = false;
  *
  * Se llama una sola vez por sesión de POS (ver ProveedorSync).
  */
-export async function iniciarSync(sucursalId: string, tenantId: string) {
+export async function iniciarSync(sucursalId: string, tenantId: string, puedeCobrar = false) {
   if (iniciado) return () => {};
   iniciado = true;
 
@@ -24,7 +24,7 @@ export async function iniciarSync(sucursalId: string, tenantId: string) {
 
   void solicitarAlmacenamientoPersistente();
   await pullInicial(sucursalId, tenantId);
-  await refrescarFiscal(sucursalId, tenantId);
+  await refrescarFiscal(sucursalId, tenantId, puedeCobrar);
   await flushOutbox();
 
   const canal = supabase
@@ -56,8 +56,8 @@ export async function iniciarSync(sucursalId: string, tenantId: string) {
   const intervalo = window.setInterval(() => void flushOutbox(), 15_000);
   // Rangos CAI, config y documentos: cada 5 min (y al reconectar) para que las
   // alertas de consumo/vencimiento y el correlativo del servidor estén al día.
-  const intervaloFiscal = window.setInterval(() => void refrescarFiscal(sucursalId, tenantId), 300_000);
-  const onOnlineFiscal = () => void refrescarFiscal(sucursalId, tenantId);
+  const intervaloFiscal = window.setInterval(() => void refrescarFiscal(sucursalId, tenantId, puedeCobrar), 300_000);
+  const onOnlineFiscal = () => void refrescarFiscal(sucursalId, tenantId, puedeCobrar);
   window.addEventListener("online", onOnlineFiscal);
 
   return () => {
@@ -71,9 +71,9 @@ export async function iniciarSync(sucursalId: string, tenantId: string) {
 }
 
 /** Nunca debe tumbar el arranque del POS: sin red se queda con lo cacheado. */
-async function refrescarFiscal(sucursalId: string, tenantId: string) {
+async function refrescarFiscal(sucursalId: string, tenantId: string, puedeCobrar: boolean) {
   try {
-    await sincronizarFiscal(sucursalId, tenantId);
+    await sincronizarFiscal(sucursalId, tenantId, { autoVincular: puedeCobrar });
   } catch (e) {
     console.warn("No se pudo sincronizar la facturación fiscal:", e);
   }

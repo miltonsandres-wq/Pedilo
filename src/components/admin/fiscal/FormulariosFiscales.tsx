@@ -3,17 +3,16 @@
 import { useActionState, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Ban, Check, Plus, Power, Trash2 } from "lucide-react";
+import { Ban, Check, Power, Trash2 } from "lucide-react";
 import {
   activarFacturacion,
   anularDocumento,
-  crearDispositivo,
   eliminarRango,
   guardarEmisor,
   type EstadoAccion,
 } from "@/app/admin/fiscal/actions";
 import { Button } from "@/components/ui/Button";
-import { Field, SelectField } from "@/components/ui/Field";
+import { Field } from "@/components/ui/Field";
 import { normalizarRtn } from "@/lib/fiscal/formato";
 import type { RequisitoFiscal } from "@/lib/fiscal/requisitos";
 import { cn } from "@/lib/ui";
@@ -24,7 +23,6 @@ import { ErrorCampo, ResultadoAccion } from "./ResultadoAccion";
 const TABS = [
   { href: "/admin/fiscal", label: "Estado" },
   { href: "/admin/fiscal/emisor", label: "Emisor" },
-  { href: "/admin/fiscal/cajas", label: "Cajas" },
   { href: "/admin/fiscal/rangos", label: "Rangos CAI" },
   { href: "/admin/fiscal/libro", label: "Libro de ventas" },
 ];
@@ -159,44 +157,6 @@ export function FormularioEmisor({
       <div className="col-span-full space-y-2">
         <ResultadoAccion estado={estado} />
         <Button type="submit" disabled={pendiente}>Guardar</Button>
-      </div>
-    </form>
-  );
-}
-
-// --- Caja -----------------------------------------------------------------------
-
-export function FormularioCaja({ sucursales }: { sucursales: { id: string; nombre: string }[] }) {
-  const [estado, accion, pendiente] = useActionState<EstadoAccion | null, FormData>(crearDispositivo, null);
-  return (
-    <form action={accion} className="grid grid-cols-1 gap-3 sm:grid-cols-2" noValidate>
-      <div>
-        <Field label="Nombre de la caja" name="nombre" placeholder="Caja 1" />
-        <ErrorCampo texto={estado?.errores?.nombre} />
-      </div>
-      <div>
-        <SelectField label="Sucursal" name="sucursal_id" defaultValue="">
-          <option value="">Elige…</option>
-          {sucursales.map((s) => (
-            <option key={s.id} value={s.id}>{s.nombre}</option>
-          ))}
-        </SelectField>
-        <ErrorCampo texto={estado?.errores?.sucursalId} />
-      </div>
-      <div>
-        <Field label="Establecimiento (000 = casa matriz)" name="establecimiento" inputMode="numeric" maxLength={3} placeholder="000" className="font-mono" />
-        <ErrorCampo texto={estado?.errores?.establecimiento} />
-      </div>
-      <div>
-        <Field label="Punto de emisión" name="punto_emision" inputMode="numeric" maxLength={3} placeholder="001" className="font-mono" />
-        <ErrorCampo texto={estado?.errores?.puntoEmision} />
-      </div>
-      <div className="col-span-full space-y-2">
-        <ResultadoAccion estado={estado} />
-        <Button type="submit" disabled={pendiente}>
-          <Plus className="h-4 w-4" strokeWidth={2} />
-          Crear caja
-        </Button>
       </div>
     </form>
   );

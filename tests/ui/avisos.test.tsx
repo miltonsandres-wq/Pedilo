@@ -64,7 +64,7 @@ describe("AvisosFiscales", () => {
   it("caja sin vincular: aviso rojo con botón para vincular", async () => {
     await sembrarFiscal(configFiscal({ dispositivo: null }));
     render(<AvisosFiscales />);
-    expect(await screen.findByText(/no está vinculada a un punto de emisión/)).toBeTruthy();
+    expect(await screen.findByText(/todavía no está vinculada a la sucursal/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Vincular esta caja/ })).toBeTruthy();
   });
 
@@ -115,7 +115,7 @@ describe("AvisosFiscales", () => {
     const user = userEvent.setup();
     render(<AvisosFiscales />);
     await user.click(await screen.findByRole("button", { name: /Vincular esta caja/ }));
-    expect(await screen.findByText(/No hay puntos de emisión libres/)).toBeTruthy();
+    expect(await screen.findByText(/ya está vinculada a otro equipo/)).toBeTruthy();
   });
 
   it("rango agotado o vencido: bloqueo rojo visible", async () => {

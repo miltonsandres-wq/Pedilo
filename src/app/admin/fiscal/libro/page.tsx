@@ -50,15 +50,17 @@ export default async function FiscalLibroPage({
             <label className={labelClass} htmlFor="libro-hasta">Hasta</label>
             <input id="libro-hasta" type="date" name="hasta" defaultValue={hasta} className={inputClass} />
           </div>
-          <div>
-            <label className={labelClass} htmlFor="libro-sucursal">Sucursal</label>
-            <select id="libro-sucursal" name="sucursal" defaultValue={sucursalId ?? ""} className={inputClass}>
-              <option value="">Todas</option>
-              {(sucursales ?? []).map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
-          </div>
+          {(sucursales ?? []).length > 1 && (
+            <div>
+              <label className={labelClass} htmlFor="libro-sucursal">Sucursal</label>
+              <select id="libro-sucursal" name="sucursal" defaultValue={sucursalId ?? ""} className={inputClass}>
+                <option value="">Todas</option>
+                {(sucursales ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button type="submit" variant="dark">Ver periodo</Button>
           <Link
             href={`/admin/fiscal/libro/csv?${parametros}`}

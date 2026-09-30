@@ -39,7 +39,7 @@ export function AvisosFiscales() {
     avisos.push({
       clave: "sin-dispositivo",
       tono: "rojo",
-      texto: "Esta caja no está vinculada a un punto de emisión: no se puede cobrar hasta vincularla.",
+      texto: "Esta caja todavía no está vinculada a la sucursal: no se puede cobrar hasta vincularla. Si otra caja ya cobra aquí, pídele al administrador que la libere en Facturación fiscal.",
       accion: (
         <Button size="sm" variant="dark" onClick={() => setVinculando(true)}>
           <Link2 className="h-3.5 w-3.5" strokeWidth={2} />
@@ -177,8 +177,8 @@ function VincularCajaModal({ onCerrar }: { onCerrar: () => void }) {
         )}
         {libres?.length === 0 && (
           <p className="text-sm text-ink-600">
-            No hay puntos de emisión libres. El administrador debe crear uno (o liberar el de una caja
-            anterior) en Admin › Facturación fiscal › Cajas.
+            La caja de esta sucursal ya está vinculada a otro equipo. El administrador puede liberarla en
+            Admin › Facturación fiscal › Estado › Caja de cobro.
           </p>
         )}
         <div className="space-y-2">

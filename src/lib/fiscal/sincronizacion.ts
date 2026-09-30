@@ -90,7 +90,11 @@ export async function vincularDispositivoLocal(dispositivoId: string): Promise<D
  * del punto de emisión de esta caja y los documentos de los últimos días.
  * Sin red no hace nada: el POS sigue con lo cacheado.
  */
-export async function sincronizarFiscal(sucursalId: string, tenantId: string) {
+export async function sincronizarFiscal(
+  sucursalId: string,
+  tenantId: string,
+  opciones: { autoVincular?: boolean } = {}
+) {
   const supabase = createClient();
 
   const [{ data: tenant }, { data: emisores }, { data: sucursal }] = await Promise.all([
@@ -155,8 +159,30 @@ export async function sincronizarFiscal(sucursalId: string, tenantId: string) {
   await db.config.put({ clave: CLAVE_CONFIG_FISCAL, valor: config });
   await precargarLogoImpresion(logoUrl);
 
+  // Cada sucursal tiene UNA caja de cobro: el cajero la vincula solo la primera vez que abre
+  // el POS (los meseros no, para no quitarle la caja al cajero). Si ya la usa otra caja o no hay
+  // conexión, queda el aviso para vincularla a mano o pedir al admin que la libere.
+  if (config.activa && !dispositivo && opciones.autoVincular) {
+    if (await autoVincularCaja(sucursalId)) return; // vincular ya sincronizó rangos y documentos
+  }
+
   if (config.activa && dispositivo) await sincronizarRangos(dispositivo);
   await bajarDocumentosRecientes(sucursalId);
+}
+
+async function autoVincularCaja(sucursalId: string): Promise<boolean> {
+  const { data: cajas, error } = await createClient()
+    .from("dispositivos_pos")
+    .select("id")
+    .eq("sucursal_id", sucursalId)
+    .eq("activo", true);
+  if (error || !cajas || cajas.length !== 1) return false; // varias cajas (caso antiguo): se elige a mano
+  try {
+    await vincularDispositivoLocal(cajas[0].id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

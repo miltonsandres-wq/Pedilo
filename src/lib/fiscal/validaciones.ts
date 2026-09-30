@@ -25,7 +25,7 @@ export interface EntradaRango {
   desde: string;
   hasta: string;
   fechaLimite: string;
-  dispositivoId: string;
+  sucursalId: string;
 }
 
 export interface RangoValidado {
@@ -35,7 +35,7 @@ export interface RangoValidado {
   desde: number;
   hasta: number;
   fechaLimite: string;
-  dispositivoId: string;
+  sucursalId: string;
 }
 
 export type CampoRango = keyof EntradaRango;
@@ -47,7 +47,7 @@ export function validarEntradaRango(
 ): ResultadoValidacion<RangoValidado, CampoRango> {
   const errores: Errores<CampoRango> = {};
 
-  if (!e.dispositivoId) errores.dispositivoId = "Elige la caja (punto de emisión) a la que pertenece este rango.";
+  if (!e.sucursalId) errores.sucursalId = "Elige la sucursal a la que pertenece este rango.";
 
   if (!["factura", "nota_credito", "nota_debito"].includes(e.clase)) errores.clase = "Elige el tipo de documento.";
 
@@ -84,7 +84,7 @@ export function validarEntradaRango(
       desde,
       hasta,
       fechaLimite: e.fechaLimite,
-      dispositivoId: e.dispositivoId,
+      sucursalId: e.sucursalId,
     },
   };
 }
@@ -129,38 +129,6 @@ export function validarEmisor(
       direccionFiscal: vacio(e.direccionFiscal),
       telefono: vacio(e.telefono),
       correo: vacio(e.correo),
-    },
-  };
-}
-
-// --- Caja / dispositivo -------------------------------------------------------
-
-export interface EntradaDispositivo {
-  nombre: string;
-  sucursalId: string;
-  establecimiento: string;
-  puntoEmision: string;
-}
-
-export type CampoDispositivo = keyof EntradaDispositivo;
-
-export function validarDispositivo(
-  e: EntradaDispositivo
-): ResultadoValidacion<{ nombre: string; sucursalId: string; establecimiento: string; puntoEmision: string }, CampoDispositivo> {
-  const errores: Errores<CampoDispositivo> = {};
-  if (!e.nombre.trim()) errores.nombre = "Ponle un nombre a la caja (ej. Caja 1).";
-  if (!e.sucursalId) errores.sucursalId = "Elige la sucursal.";
-  if (!/^\d{1,3}$/.test(e.establecimiento.trim())) errores.establecimiento = "El establecimiento son hasta 3 dígitos (000 = casa matriz).";
-  if (!/^\d{1,3}$/.test(e.puntoEmision.trim())) errores.puntoEmision = "El punto de emisión son hasta 3 dígitos (ej. 001).";
-  if (Object.keys(errores).length > 0) return { ok: false, errores };
-  return {
-    ok: true,
-    errores,
-    valor: {
-      nombre: e.nombre.trim(),
-      sucursalId: e.sucursalId,
-      establecimiento: e.establecimiento.trim().padStart(3, "0"),
-      puntoEmision: e.puntoEmision.trim().padStart(3, "0"),
     },
   };
 }

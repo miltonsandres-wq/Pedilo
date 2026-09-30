@@ -5,11 +5,8 @@ import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { fechaLocalHN } from "@/lib/fiscal/formato";
 import { calcularRequisitos } from "@/lib/fiscal/requisitos";
-import {
-  validarDispositivo,
-  validarEmisor,
-  validarEntradaRango,
-} from "@/lib/fiscal/validaciones";
+import { obtenerOCrearCaja } from "@/lib/fiscal/cajaPorDefecto";
+import { validarEmisor, validarEntradaRango } from "@/lib/fiscal/validaciones";
 
 /** Resultado que las pantallas muestran debajo del formulario. */
 export interface EstadoAccion {
@@ -46,14 +43,13 @@ export async function activarFacturacion(_prev: EstadoAccion | null, formData: F
       return { ok: false, error: "Marca la casilla para confirmar que dejarás de emitir facturas fiscales." };
     }
   } else {
-    const [{ data: sucursales }, { data: emisores }, { data: dispositivos }, { data: rangos }] = await Promise.all([
+    const [{ data: sucursales }, { data: emisores }, { data: rangos }] = await Promise.all([
       supabase.from("sucursales").select("id, nombre").eq("tenant_id", sesion.tenant_id).eq("activo", true),
       supabase.from("datos_fiscales_emisor").select("sucursal_id, razon_social, rtn, direccion_fiscal").eq("tenant_id", sesion.tenant_id),
-      supabase.from("dispositivos_pos").select("sucursal_id, activo").eq("tenant_id", sesion.tenant_id),
       supabase.from("cai_rangos").select("sucursal_id, clase, estado, siguiente, hasta, fecha_limite").eq("tenant_id", sesion.tenant_id),
     ]);
     const pendientes = calcularRequisitos(
-      { sucursales: sucursales ?? [], emisores: emisores ?? [], dispositivos: dispositivos ?? [], rangos: rangos ?? [] },
+      { sucursales: sucursales ?? [], emisores: emisores ?? [], rangos: rangos ?? [] },
       fechaLocalHN(new Date())
     ).filter((r) => !r.cumple);
     if (pendientes.length > 0) {
@@ -110,45 +106,13 @@ export async function guardarEmisor(_prev: EstadoAccion | null, formData: FormDa
   return { ok: true, mensaje: "Datos fiscales guardados." };
 }
 
-// --- Cajas (dispositivos) --------------------------------------------------------
-
-export async function crearDispositivo(_prev: EstadoAccion | null, formData: FormData): Promise<EstadoAccion> {
-  const sesion = await requireAdmin();
-  const supabase = await createClient();
-
-  const v = validarDispositivo({
-    nombre: texto(formData, "nombre"),
-    sucursalId: texto(formData, "sucursal_id"),
-    establecimiento: texto(formData, "establecimiento"),
-    puntoEmision: texto(formData, "punto_emision"),
-  });
-  if (!v.ok || !v.valor) return { ok: false, error: "Revisa los campos marcados.", errores: v.errores };
-
-  const { error } = await supabase.from("dispositivos_pos").insert({
-    tenant_id: sesion.tenant_id,
-    sucursal_id: v.valor.sucursalId,
-    nombre: v.valor.nombre,
-    establecimiento: v.valor.establecimiento,
-    punto_emision: v.valor.puntoEmision,
-  });
-  if (error) return { ok: false, error: mensajeDeError(error, "No se pudo crear la caja.") };
-
-  revalidatePath(RUTA, "layout");
-  return { ok: true, mensaje: "Caja creada. Ábrela en el POS de ese dispositivo y vincúlala desde el aviso rojo." };
-}
+// --- Caja de cobro de cada sucursal (se crea sola) ---------------------------------
 
 /** Desvincula la caja física: la próxima vez que se abra el POS deberá vincularse de nuevo. */
 export async function liberarDispositivo(id: string): Promise<void> {
   await requireAdmin();
   const supabase = await createClient();
   await supabase.from("dispositivos_pos").update({ vinculo_hash: null, vinculado_at: null }).eq("id", id);
-  revalidatePath(RUTA, "layout");
-}
-
-export async function alternarDispositivo(id: string, activo: boolean): Promise<void> {
-  await requireAdmin();
-  const supabase = await createClient();
-  await supabase.from("dispositivos_pos").update({ activo }).eq("id", id);
   revalidatePath(RUTA, "layout");
 }
 
@@ -166,19 +130,21 @@ export async function crearRango(_prev: EstadoAccion | null, formData: FormData)
       desde: texto(formData, "desde"),
       hasta: texto(formData, "hasta"),
       fechaLimite: texto(formData, "fecha_limite"),
-      dispositivoId: texto(formData, "dispositivo_id"),
+      sucursalId: texto(formData, "sucursal_id"),
     },
     fechaLocalHN(new Date())
   );
   if (!v.ok || !v.valor) return { ok: false, error: "Revisa los campos marcados.", errores: v.errores };
 
-  const { data: caja } = await supabase
-    .from("dispositivos_pos")
-    .select("id, sucursal_id, establecimiento, punto_emision")
-    .eq("id", v.valor.dispositivoId)
+  // La caja de cobro de la sucursal se crea sola; aquí solo se obtiene
+  const { data: sucursal } = await supabase
+    .from("sucursales")
+    .select("id")
+    .eq("id", v.valor.sucursalId)
     .eq("tenant_id", sesion.tenant_id)
     .maybeSingle();
-  if (!caja) return { ok: false, error: "La caja elegida no existe.", errores: { dispositivoId: "Elige una caja válida." } };
+  const caja = sucursal ? await obtenerOCrearCaja(supabase, sesion.tenant_id, sucursal.id) : null;
+  if (!caja) return { ok: false, error: "La sucursal elegida no existe.", errores: { sucursalId: "Elige una sucursal válida." } };
 
   const { error } = await supabase.from("cai_rangos").insert({
     tenant_id: sesion.tenant_id,

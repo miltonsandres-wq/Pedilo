@@ -9,78 +9,80 @@ import { formatearNumeroDocumento, normalizarCai, rangosTraslapan } from "@/lib/
 import { validarEntradaRango, type CampoRango } from "@/lib/fiscal/validaciones";
 import { ErrorCampo, ResultadoAccion } from "./ResultadoAccion";
 
-export interface CajaOpcion {
+export interface SucursalOpcion {
   id: string;
   nombre: string;
-  sucursalNombre: string;
+  /** Caja de cobro de la sucursal (se crea sola): sirve para mostrar cómo quedan los números. */
   establecimiento: string;
   puntoEmision: string;
 }
 
 /** Rango ya cargado: sirve para avisar de traslapes antes de guardar. */
 export interface RangoExistente {
-  establecimiento: string;
-  puntoEmision: string;
+  sucursalId: string;
   tipoDoc: string;
   desde: number;
   hasta: number;
 }
 
-const VACIO = { dispositivoId: "", clase: "factura", tipoDoc: "01", cai: "", desde: "", hasta: "", fechaLimite: "" };
+const base = { clase: "factura", tipoDoc: "01", cai: "", desde: "", hasta: "", fechaLimite: "" };
 
 /**
  * Carga de un rango CAI autorizado por el SAR. Valida en vivo (formato del CAI,
  * desde/hasta, fecha límite, código de documento) y muestra cómo quedarán el
  * primer y el último número antes de guardar; el servidor repite las
- * validaciones y la base impide traslapes.
+ * validaciones y la base impide traslapes. Si el negocio tiene UNA sola
+ * sucursal no se pregunta cuál: es esa.
  */
 export function FormularioRango({
-  cajas,
+  sucursales,
   hoyHN,
   existentes = [],
 }: {
-  cajas: CajaOpcion[];
+  sucursales: SucursalOpcion[];
   hoyHN: string;
   existentes?: RangoExistente[];
 }) {
+  const unica = sucursales.length === 1 ? sucursales[0].id : "";
+  const inicial = { ...base, sucursalId: unica };
   const [estado, accion, pendiente] = useActionState<EstadoAccion | null, FormData>(crearRango, null);
-  const [v, setV] = useState(VACIO);
+  const [v, setV] = useState(inicial);
   const [tocados, setTocados] = useState<Partial<Record<CampoRango, boolean>>>({});
 
   useEffect(() => {
     if (estado?.ok) {
-      setV(VACIO);
+      setV({ ...base, sucursalId: unica });
       setTocados({});
     }
-  }, [estado]);
+  }, [estado, unica]);
 
   const validacion = validarEntradaRango(v, hoyHN);
-  const cajaElegida = cajas.find((c) => c.id === v.dispositivoId);
+  const sucursal = sucursales.find((s) => s.id === v.sucursalId);
 
-  // Traslape con un rango ya cargado para la misma caja y el mismo tipo de documento
+  // Traslape con un rango ya cargado para la misma sucursal y el mismo tipo de documento
   let traslape: string | undefined;
-  if (cajaElegida && validacion.ok && validacion.valor) {
+  if (sucursal && validacion.ok && validacion.valor) {
     const choque = existentes.find(
-      (r) =>
-        r.establecimiento === cajaElegida.establecimiento &&
-        r.puntoEmision === cajaElegida.puntoEmision &&
-        r.tipoDoc === validacion.valor!.tipoDoc &&
-        rangosTraslapan(r, validacion.valor!)
+      (r) => r.sucursalId === sucursal.id && r.tipoDoc === validacion.valor!.tipoDoc && rangosTraslapan(r, validacion.valor!)
     );
-    if (choque) traslape = `Se traslapa con el rango ${choque.desde}–${choque.hasta} que ya cargaste para esta caja.`;
+    if (choque) traslape = `Se traslapa con el rango ${choque.desde}–${choque.hasta} que ya cargaste.`;
   }
 
   const errorDe = (c: CampoRango) =>
     (tocados[c] ? validacion.errores[c] : undefined) ?? (c === "hasta" ? traslape : undefined) ?? estado?.errores?.[c];
   const tocar = (c: CampoRango) => setTocados((t) => ({ ...t, [c]: true }));
-  const cambiar = <K extends keyof typeof VACIO>(campo: K, valor: string) => setV((x) => ({ ...x, [campo]: valor }));
+  const cambiar = <K extends keyof typeof inicial>(campo: K, valor: string) => setV((x) => ({ ...x, [campo]: valor }));
 
-  const caja = cajaElegida;
   let vista: string | null = null;
-  if (caja && validacion.ok && validacion.valor) {
+  if (sucursal && validacion.ok && validacion.valor) {
     try {
       const num = (n: number) =>
-        formatearNumeroDocumento({ establecimiento: caja.establecimiento, puntoEmision: caja.puntoEmision, tipoDoc: validacion.valor!.tipoDoc, correlativo: n });
+        formatearNumeroDocumento({
+          establecimiento: sucursal.establecimiento,
+          puntoEmision: sucursal.puntoEmision,
+          tipoDoc: validacion.valor!.tipoDoc,
+          correlativo: n,
+        });
       vista = `${num(validacion.valor.desde)}  →  ${num(validacion.valor.hasta)}  (${(validacion.valor.hasta - validacion.valor.desde + 1).toLocaleString("es-HN")} documentos)`;
     } catch {
       vista = null;
@@ -91,28 +93,29 @@ export function FormularioRango({
 
   return (
     <form action={accion} className="grid grid-cols-1 gap-3 sm:grid-cols-2" noValidate>
-      <div className="col-span-full">
-        <label className={labelClass} htmlFor="rango-caja">Caja (punto de emisión)</label>
-        <select
-          id="rango-caja"
-          name="dispositivo_id"
-          value={v.dispositivoId}
-          onChange={(e) => cambiar("dispositivoId", e.target.value)}
-          onBlur={() => tocar("dispositivoId")}
-          className={inputClass}
-        >
-          <option value="">Elige una caja…</option>
-          {cajas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.sucursalNombre} · {c.nombre} ({c.establecimiento}-{c.puntoEmision})
-            </option>
-          ))}
-        </select>
-        <ErrorCampo texto={errorDe("dispositivoId")} />
-        {cajas.length === 0 && (
-          <p className="mt-1 text-xs text-amber-700">Primero crea una caja en la pestaña «Cajas».</p>
-        )}
-      </div>
+      {sucursales.length > 1 ? (
+        <div className="col-span-full">
+          <label className={labelClass} htmlFor="rango-sucursal">Sucursal</label>
+          <select
+            id="rango-sucursal"
+            name="sucursal_id"
+            value={v.sucursalId}
+            onChange={(e) => cambiar("sucursalId", e.target.value)}
+            onBlur={() => tocar("sucursalId")}
+            className={inputClass}
+          >
+            <option value="">Elige una sucursal…</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
+          <ErrorCampo texto={errorDe("sucursalId")} />
+        </div>
+      ) : (
+        <input type="hidden" name="sucursal_id" value={unica} />
+      )}
 
       <div>
         <label className={labelClass} htmlFor="rango-clase">Documento</label>

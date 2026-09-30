@@ -19,19 +19,22 @@ export default async function FiscalRangosPage() {
   const hoy = fechaLocalHN(new Date());
 
   const [{ data: sucursales }, { data: cajas }, { data: rangos }] = await Promise.all([
-    supabase.from("sucursales").select("id, nombre").eq("tenant_id", sesion.tenant_id),
-    supabase.from("dispositivos_pos").select("id, nombre, sucursal_id, establecimiento, punto_emision").eq("tenant_id", sesion.tenant_id).eq("activo", true).order("nombre"),
+    supabase.from("sucursales").select("id, nombre").eq("tenant_id", sesion.tenant_id).eq("activo", true).order("created_at"),
+    supabase.from("dispositivos_pos").select("sucursal_id, establecimiento, punto_emision").eq("tenant_id", sesion.tenant_id).eq("activo", true).order("created_at"),
     supabase.from("cai_rangos").select("*").eq("tenant_id", sesion.tenant_id).order("establecimiento").order("punto_emision").order("desde"),
   ]);
   const nombreSucursal = new Map((sucursales ?? []).map((s) => [s.id, s.nombre]));
 
-  const opciones = (cajas ?? []).map((c) => ({
-    id: c.id,
-    nombre: c.nombre,
-    sucursalNombre: nombreSucursal.get(c.sucursal_id) ?? "Sucursal",
-    establecimiento: c.establecimiento,
-    puntoEmision: c.punto_emision,
-  }));
+  // Cada sucursal tiene su caja de cobro (se crea sola): de ahí salen los números del ejemplo
+  const opciones = (sucursales ?? []).map((sc) => {
+    const caja = (cajas ?? []).find((c) => c.sucursal_id === sc.id);
+    return {
+      id: sc.id,
+      nombre: sc.nombre,
+      establecimiento: caja?.establecimiento ?? "000",
+      puntoEmision: caja?.punto_emision ?? "001",
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -49,7 +52,7 @@ export default async function FiscalRangosPage() {
               <div key={r.id} className="flex flex-wrap items-start gap-3 p-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-ink-900">{nombreSucursal.get(r.sucursal_id) ?? "Sucursal"}</span>
+                    {(sucursales ?? []).length > 1 && <span className="text-sm font-medium text-ink-900">{nombreSucursal.get(r.sucursal_id) ?? "Sucursal"}</span>}
                     <Badge tone="neutral">{CLASE[r.clase] ?? r.clase}</Badge>
                     <Badge tone={TONO[r.estado] ?? "neutral"}>{r.estado}</Badge>
                     {r.estado === "activo" && NIVEL_TEXTO[res.nivel] && <Badge tone="warning">{NIVEL_TEXTO[res.nivel]}</Badge>}
@@ -71,11 +74,10 @@ export default async function FiscalRangosPage() {
         <CardHeader title="Cargar un rango" subtitle="Copia los datos exactos de la resolución del SAR." />
         <div className="p-5">
           <FormularioRango
-            cajas={opciones}
+            sucursales={opciones}
             hoyHN={hoy}
             existentes={(rangos ?? []).map((r) => ({
-              establecimiento: r.establecimiento,
-              puntoEmision: r.punto_emision,
+              sucursalId: r.sucursal_id,
               tipoDoc: r.tipo_doc,
               desde: r.desde,
               hasta: r.hasta,

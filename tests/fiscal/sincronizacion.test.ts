@@ -296,3 +296,54 @@ describe("documentos bajados del servidor", () => {
     expect((await db.documentos_fiscales.get(propio.id))?.impreso_at).toBeFalsy(); // el propio nunca imprimió aquí
   });
 });
+
+describe("la caja de cobro se vincula sola (una caja por sucursal)", () => {
+  async function unaSolaCaja() {
+    await pg.query("delete from public.dispositivos_pos where id <> $1", [DISP]);
+    await pg.query("update public.dispositivos_pos set vinculo_hash = null, vinculado_at = null");
+  }
+
+  it("el cajero abre el POS y su caja queda vinculada sin tocar nada", async () => {
+    await unaSolaCaja();
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+
+    await sincronizarFiscal(S, T, { autoVincular: true });
+
+    expect((await leerConfigFiscal())?.dispositivo).toMatchObject({ id: DISP });
+    expect(await db.rangos_cai.count()).toBe(1); // y ya bajó el CAI
+    // ya puede facturar
+    const [doc] = await emitir(1);
+    expect(doc.numero_completo).toBe("001-001-01-00000001");
+  });
+
+  it("un mesero NO la vincula: no le quita la caja al cajero", async () => {
+    await unaSolaCaja();
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+    await sincronizarFiscal(S, T); // sin autoVincular
+    expect((await leerConfigFiscal())?.dispositivo).toBeNull();
+    const hash = await pg.query<{ v: string | null }>("select vinculo_hash as v from public.dispositivos_pos where id=$1", [DISP]);
+    expect(hash.rows[0].v).toBeNull();
+  });
+
+  it("si otro equipo ya tiene la caja, no la roba y no falla (queda el aviso para pedir que la liberen)", async () => {
+    await unaSolaCaja();
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+    await pg.query("update public.dispositivos_pos set vinculo_hash = 'otro-equipo', vinculado_at = now() where id = $1", [DISP]);
+
+    await expect(sincronizarFiscal(S, T, { autoVincular: true })).resolves.toBeUndefined();
+    expect((await leerConfigFiscal())?.dispositivo).toBeNull();
+    const hash = await pg.query<{ v: string }>("select vinculo_hash as v from public.dispositivos_pos where id=$1", [DISP]);
+    expect(hash.rows[0].v).toBe("otro-equipo");
+  });
+
+  it("si la sucursal tiene varias cajas (caso antiguo) no elige una por su cuenta", async () => {
+    await pg.query(
+      "insert into public.dispositivos_pos (tenant_id, sucursal_id, nombre, establecimiento, punto_emision) values ($1,$2,'Extra','009','009') on conflict do nothing",
+      [T, S]
+    );
+    await pg.query("update public.dispositivos_pos set vinculo_hash = null, vinculado_at = null");
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+    await sincronizarFiscal(S, T, { autoVincular: true });
+    expect((await leerConfigFiscal())?.dispositivo).toBeNull();
+  });
+});

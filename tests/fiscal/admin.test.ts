@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  validarEntradaRango, validarEmisor, validarDispositivo, type EntradaRango,
+  validarEntradaRango, validarEmisor, type EntradaRango,
 } from "@/lib/fiscal/validaciones";
 import { armarLibro, libroACsv, type DocumentoLibro } from "@/lib/fiscal/libro";
 import { alertasPorPunto, type RangoParaAlerta } from "@/lib/fiscal/alertas";
@@ -10,14 +10,14 @@ const HOY = "2030-06-15";
 const CAI = "A1B2C3-D4E5F6-A1B2C3-D4E5F6-A1B2C3-D4";
 
 function entrada(over: Partial<EntradaRango> = {}): EntradaRango {
-  return { clase: "factura", tipoDoc: "01", cai: CAI, desde: "1", hasta: "500", fechaLimite: "2030-12-31", dispositivoId: "D1", ...over };
+  return { clase: "factura", tipoDoc: "01", cai: CAI, desde: "1", hasta: "500", fechaLimite: "2030-12-31", sucursalId: "S1", ...over };
 }
 
 describe("validarEntradaRango", () => {
   it("acepta un rango válido y normaliza (CAI en mayúsculas, números)", () => {
     const r = validarEntradaRango(entrada({ cai: CAI.toLowerCase() }), HOY);
     expect(r.ok).toBe(true);
-    expect(r.valor).toEqual({ clase: "factura", tipoDoc: "01", cai: CAI, desde: 1, hasta: 500, fechaLimite: "2030-12-31", dispositivoId: "D1" });
+    expect(r.valor).toEqual({ clase: "factura", tipoDoc: "01", cai: CAI, desde: 1, hasta: 500, fechaLimite: "2030-12-31", sucursalId: "S1" });
   });
 
   it("valida el formato del CAI en vivo", () => {
@@ -49,8 +49,8 @@ describe("validarEntradaRango", () => {
     expect(validarEntradaRango(entrada({ tipoDoc: "1" }), HOY).errores.tipoDoc).toMatch(/2 dígitos/);
   });
 
-  it("exige la caja", () => {
-    expect(validarEntradaRango(entrada({ dispositivoId: "" }), HOY).errores.dispositivoId).toBeTruthy();
+  it("exige la sucursal", () => {
+    expect(validarEntradaRango(entrada({ sucursalId: "" }), HOY).errores.sucursalId).toBeTruthy();
   });
 });
 
@@ -69,16 +69,6 @@ describe("validarEmisor", () => {
     const vacio = { razonSocial: "", nombreComercial: "", rtn: "", direccionFiscal: "", telefono: "", correo: "" };
     expect(validarEmisor(vacio, { esOverrideDeSucursal: true }).ok).toBe(true);
     expect(validarEmisor({ ...vacio, rtn: "12" }, { esOverrideDeSucursal: true }).errores.rtn).toBeTruthy();
-  });
-});
-
-describe("validarDispositivo", () => {
-  it("rellena a 3 dígitos y exige nombre y sucursal", () => {
-    const r = validarDispositivo({ nombre: " Caja 1 ", sucursalId: "S1", establecimiento: "1", puntoEmision: "2" });
-    expect(r.valor).toEqual({ nombre: "Caja 1", sucursalId: "S1", establecimiento: "001", puntoEmision: "002" });
-    expect(validarDispositivo({ nombre: "", sucursalId: "", establecimiento: "abc", puntoEmision: "1234" }).errores).toMatchObject({
-      nombre: expect.any(String), sucursalId: expect.any(String), establecimiento: expect.any(String), puntoEmision: expect.any(String),
-    });
   });
 });
 
@@ -182,35 +172,36 @@ import { limitesPeriodoHN, primerDiaDelMes } from "@/lib/fiscal/formato";
 describe("calcularRequisitos (activar la facturación)", () => {
   const sucursales = [{ id: "S1", nombre: "Centro" }, { id: "S2", nombre: "Norte" }];
   const emisorBase = { sucursal_id: null, razon_social: "Rosa S.A.", rtn: "08019999123456", direccion_fiscal: "Col. Palmira" };
-  const caja = (s: string) => ({ sucursal_id: s, activo: true });
   const rango = (s: string, over = {}) => ({ sucursal_id: s, clase: "factura", estado: "activo", siguiente: 1, hasta: 100, fecha_limite: "2030-12-31", ...over });
   const cumple = (r: ReturnType<typeof calcularRequisitos>) => r.every((x) => x.cumple);
 
   it("todo listo en todas las sucursales activas", () => {
-    const r = calcularRequisitos({ sucursales, emisores: [emisorBase], dispositivos: [caja("S1"), caja("S2")], rangos: [rango("S1"), rango("S2")] }, "2030-06-15");
+    const r = calcularRequisitos({ sucursales, emisores: [emisorBase], rangos: [rango("S1"), rango("S2")] }, "2030-06-15");
     expect(cumple(r)).toBe(true);
   });
 
   it("señala qué falta y en qué sucursal", () => {
-    const r = calcularRequisitos({ sucursales, emisores: [], dispositivos: [caja("S1")], rangos: [rango("S1", { estado: "agotado" })] }, "2030-06-15");
+    const r = calcularRequisitos({ sucursales, emisores: [], rangos: [rango("S1", { estado: "agotado" })] }, "2030-06-15");
     const faltan = r.filter((x) => !x.cumple).map((x) => x.texto);
     expect(faltan).toEqual(expect.arrayContaining([
       expect.stringMatching(/Centro: faltan datos fiscales.*razón social, RTN, dirección fiscal/),
       expect.stringMatching(/Centro: carga un CAI vigente/),
-      expect.stringMatching(/Norte: crea al menos una caja/),
+      expect.stringMatching(/Norte: faltan datos fiscales/),
+      expect.stringMatching(/Norte: carga un CAI vigente/),
     ]));
+    expect(faltan.join(" ")).not.toMatch(/caja/i); // la caja se crea sola: ya no se le pide al dueño
   });
 
   it("los datos propios de una sucursal heredan lo que dejan vacío del negocio", () => {
     const r = calcularRequisitos(
-      { sucursales: [sucursales[0]], emisores: [emisorBase, { sucursal_id: "S1", razon_social: "Otra S.A.", rtn: null, direccion_fiscal: null }], dispositivos: [caja("S1")], rangos: [rango("S1")] },
+      { sucursales: [sucursales[0]], emisores: [emisorBase, { sucursal_id: "S1", razon_social: "Otra S.A.", rtn: null, direccion_fiscal: null }], rangos: [rango("S1")] },
       "2030-06-15"
     );
     expect(cumple(r)).toBe(true);
   });
 
   it("un CAI vencido, agotado o de otro tipo de documento no cuenta", () => {
-    const base = { sucursales: [sucursales[0]], emisores: [emisorBase], dispositivos: [caja("S1")] };
+    const base = { sucursales: [sucursales[0]], emisores: [emisorBase] };
     expect(cumple(calcularRequisitos({ ...base, rangos: [rango("S1", { fecha_limite: "2030-06-14" })] }, "2030-06-15"))).toBe(false);
     expect(cumple(calcularRequisitos({ ...base, rangos: [rango("S1", { siguiente: 101 })] }, "2030-06-15"))).toBe(false);
     expect(cumple(calcularRequisitos({ ...base, rangos: [rango("S1", { clase: "nota_credito" })] }, "2030-06-15"))).toBe(false);
@@ -218,7 +209,7 @@ describe("calcularRequisitos (activar la facturación)", () => {
   });
 
   it("sin sucursales no se puede activar", () => {
-    expect(cumple(calcularRequisitos({ sucursales: [], emisores: [], dispositivos: [], rangos: [] }, "2030-06-15"))).toBe(false);
+    expect(cumple(calcularRequisitos({ sucursales: [], emisores: [], rangos: [] }, "2030-06-15"))).toBe(false);
   });
 });
 

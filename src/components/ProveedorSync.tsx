@@ -12,17 +12,20 @@ import { iniciarSync } from "@/lib/offline/sync";
 export function ProveedorSync({
   sucursalId,
   tenantId,
+  puedeCobrar = false,
 }: {
   sucursalId: string;
   tenantId: string;
+  /** Solo el cajero cobra: es quien vincula solo la caja de la sucursal. */
+  puedeCobrar?: boolean;
 }) {
   useEffect(() => {
     let limpiar: (() => void) | undefined;
-    iniciarSync(sucursalId, tenantId).then((fn) => {
+    iniciarSync(sucursalId, tenantId, puedeCobrar).then((fn) => {
       limpiar = fn;
     });
     return () => limpiar?.();
-  }, [sucursalId, tenantId]);
+  }, [sucursalId, tenantId, puedeCobrar]);
 
   return null;
 }

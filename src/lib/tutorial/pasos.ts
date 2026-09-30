@@ -213,7 +213,7 @@ export const PASOS_GUIA: PasoGuia[] = [
     nav: "fiscal",
     rutaEtiqueta: "Facturación fiscal",
     instrucciones: [
-      "Si facturas con CAI del SAR: completa el emisor, crea una caja y carga tu rango autorizado.",
+      "Si facturas con CAI del SAR: completa los datos del emisor y carga tu rango autorizado.",
       "Si todavía no tienes CAI, sigue adelante: puedes hacerlo cuando quieras.",
     ],
     hecho: null,

@@ -16,11 +16,6 @@ export interface EmisorReq {
   direccion_fiscal: string | null;
 }
 
-export interface DispositivoReq {
-  sucursal_id: string;
-  activo: boolean;
-}
-
 export interface RangoReq {
   sucursal_id: string;
   clase: string;
@@ -37,7 +32,7 @@ export interface RequisitoFiscal {
 }
 
 export function calcularRequisitos(
-  datos: { sucursales: SucursalReq[]; emisores: EmisorReq[]; dispositivos: DispositivoReq[]; rangos: RangoReq[] },
+  datos: { sucursales: SucursalReq[]; emisores: EmisorReq[]; rangos: RangoReq[] },
   hoyHN: string
 ): RequisitoFiscal[] {
   const requisitos: RequisitoFiscal[] = [];
@@ -61,13 +56,6 @@ export function calcularRequisitos(
         faltan.length === 0
           ? `${s.nombre}: datos fiscales del emisor completos.`
           : `${s.nombre}: faltan datos fiscales del emisor (${faltan.join(", ")}).`,
-    });
-
-    const tieneCaja = datos.dispositivos.some((d) => d.sucursal_id === s.id && d.activo);
-    requisitos.push({
-      clave: `caja-${s.id}`,
-      cumple: tieneCaja,
-      texto: tieneCaja ? `${s.nombre}: tiene una caja (punto de emisión).` : `${s.nombre}: crea al menos una caja con su punto de emisión.`,
     });
 
     const tieneCai = datos.rangos.some(
