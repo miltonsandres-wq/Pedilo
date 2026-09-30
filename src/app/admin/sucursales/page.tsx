@@ -329,6 +329,7 @@ export default async function SucursalesPage({
               <div className="border-t border-ink-100 p-5">
                 <Colapsable
                   key={`agregar-personal-${s.id}-${personal.length}`}
+                  tour="abrir-personal"
                   resumen={
                     <span className="flex items-center gap-2 text-sm font-medium text-ink-900">
                       <UserPlus className="h-3.5 w-3.5 text-brand-600" strokeWidth={2} />
@@ -336,7 +337,7 @@ export default async function SucursalesPage({
                     </span>
                   }
                 >
-                  <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <input type="hidden" name="sucursal_id" value={s.id} />
                     <Field label="Nombre" name="nombre" required />
                     <Field label="Correo" name="email" type="email" required />

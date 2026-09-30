@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, CircleHelp, Menu, X } from "lucide-react";
 import { AdminNav } from "./AdminNav";
 import { BrandMark } from "@/components/BrandMark";
 import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
-import { EVENTO_ABRIR_TUTORIAL } from "./TutorialOnboarding";
+import { EVENTO_ABRIR_MENU, EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
 
 /**
  * El sidebar fijo de 256px solo cabe en pantallas grandes. En celular se
@@ -25,6 +25,13 @@ export function AdminShell({
 }) {
   const [abierto, setAbierto] = useState(false);
 
+  // El recorrido guiado pide abrir el menú lateral en móvil para poder señalar un enlace
+  useEffect(() => {
+    const abrir = () => setAbierto(true);
+    window.addEventListener(EVENTO_ABRIR_MENU, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_MENU, abrir);
+  }, []);
+
   const marca = (
     <div className="mb-6 flex items-center gap-2.5 px-1">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600">
@@ -41,6 +48,7 @@ export function AdminShell({
     <div className="mt-auto space-y-3 pt-4">
       <Link
         href="/pos"
+        data-tour="ir-pos"
         onClick={() => setAbierto(false)}
         className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white"
       >

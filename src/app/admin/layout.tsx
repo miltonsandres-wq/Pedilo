@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email}>
-      <TutorialOnboarding completado={tutorialCompletado} />
+      <TutorialOnboarding completado={tutorialCompletado} tenantId={sesion.tenant_id} />
       <AlertasFiscalesAdmin tenantId={sesion.tenant_id} />
       {children}
     </AdminShell>

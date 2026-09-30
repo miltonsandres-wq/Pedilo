@@ -81,6 +81,7 @@ export default async function MesasPage({
             // tratarlo como una instancia nueva (vuelve a "cerrado") en vez
             // de conservar el estado abierto de después de crear una mesa.
             key={`nueva-mesa-${mesas?.length ?? 0}`}
+            tour="abrir-mesa"
             className="mb-6 rounded-2xl"
             resumen={
               <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
@@ -89,7 +90,7 @@ export default async function MesasPage({
               </span>
             }
           >
-            <form action={crearMesa} className="flex flex-wrap items-end gap-3">
+            <form action={crearMesa} data-tour="form-mesa" className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="sucursal_id" value={sucursalId} />
               <Field label="Nombre" name="nombre" required placeholder="Mesa 1" />
               <Field

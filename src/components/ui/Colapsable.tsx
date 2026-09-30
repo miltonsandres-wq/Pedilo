@@ -17,12 +17,15 @@ export function Colapsable({
   className,
   contenidoClassName,
   abiertoPorDefecto = false,
+  tour,
 }: {
   resumen: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   contenidoClassName?: string;
   abiertoPorDefecto?: boolean;
+  /** Ancla para el recorrido guiado (data-tour del botón que abre/cierra). */
+  tour?: string;
 }) {
   const [abierto, setAbierto] = useState(abiertoPorDefecto);
 
@@ -30,6 +33,7 @@ export function Colapsable({
     <div className={cn("overflow-hidden rounded-xl border border-ink-100 bg-white shadow-card", className)}>
       <button
         type="button"
+        data-tour={tour}
         onClick={() => setAbierto((a) => !a)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >

@@ -36,7 +36,7 @@ export default async function FormasPagoPage() {
         {(sucursales ?? []).map((s) => (
           <Card key={s.id}>
             <CardHeader title={s.nombre} />
-            <form action={actualizarFormasPago.bind(null, s.id)} className="p-5 pt-4">
+            <form action={actualizarFormasPago.bind(null, s.id)} data-tour="form-pagos" className="p-5 pt-4">
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {TODAS.map((f) => {
                   const activa = activasPorSucursal.get(s.id)?.has(f.valor);

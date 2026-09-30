@@ -101,7 +101,7 @@ export default async function MenuPage({
               <p className="text-sm text-ink-400">Todavía no hay categorías.</p>
             )}
           </div>
-          <form action={crearCategoria} className="flex gap-2">
+          <form action={crearCategoria} data-tour="form-categoria" className="flex gap-2">
             <input
               name="nombre"
               required
@@ -213,6 +213,7 @@ export default async function MenuPage({
         // key cambia con la cantidad de productos: vuelve a "cerrado" en vez
         // de quedarse abierto después de crear uno.
         key={`nuevo-producto-${productos?.length ?? 0}`}
+        tour="abrir-producto"
         className="rounded-2xl"
         resumen={
           <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
@@ -226,7 +227,7 @@ export default async function MenuPage({
             ? "Se marcará para esta sucursal — puedes agregar más abajo."
             : "Aparece en el menú del mesero apenas lo asignes a una sucursal."}
         </p>
-        <form action={crearProducto} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form action={crearProducto} data-tour="form-producto" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nombre" name="nombre" required />
           <Field label="Precio (con ISV incluido)" name="precio" type="number" step="0.01" required />
           <SelectField label="ISV" name="tasa_isv" defaultValue="15">

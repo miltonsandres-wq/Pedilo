@@ -13,10 +13,23 @@ vi.mock("@/app/admin/tutorial/actions", () => ({
 let pathname = "/admin";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
-import { EVENTO_ABRIR_TUTORIAL, TutorialOnboarding } from "@/components/admin/TutorialOnboarding";
-import { PASOS_GUIA, PROGRESO_VACIO } from "@/lib/tutorial/pasos";
+import { TutorialOnboarding } from "@/components/admin/TutorialOnboarding";
+import { EVENTO_ABRIR_MENU, EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
+import { PASOS_GUIA, PROGRESO_VACIO, calcularFase } from "@/lib/tutorial/pasos";
 
-afterEach(cleanup);
+const T = "negocio-1";
+const T2 = "negocio-2";
+
+/** Elementos «de la interfaz» que el recorrido señala (en jsdom nada tiene tamaño, así que se lo damos). */
+let montados: HTMLElement[] = [];
+function montar(dataTour: string) {
+  const el = document.createElement("div");
+  el.setAttribute("data-tour", dataTour);
+  document.body.appendChild(el);
+  montados.push(el);
+  return el;
+}
+
 beforeEach(() => {
   completarTutorial.mockReset();
   completarTutorial.mockResolvedValue({ ok: true });
@@ -25,160 +38,221 @@ beforeEach(() => {
   pathname = "/admin";
   sessionStorage.clear();
   localStorage.clear();
+  montados = [];
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return this.hasAttribute("data-tour")
+      ? ({ top: 100, left: 40, width: 160, height: 36, right: 200, bottom: 136, x: 40, y: 100, toJSON() {} } as DOMRect)
+      : ({ top: 0, left: 0, width: 0, height: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON() {} } as DOMRect);
+  });
+});
+afterEach(() => {
+  cleanup();
+  montados.forEach((el) => el.remove());
+  vi.restoreAllMocks();
 });
 
 const guia = () => screen.queryByRole("complementary", { name: "Guía paso a paso" });
 const bienvenida = () => screen.queryByRole("dialog", { name: "Bienvenida a Pedilo" });
+const foco = () => screen.queryByTestId("foco-guia")?.getAttribute("data-foco") ?? null;
 
 async function empezar(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: /Empezar la guía/ }));
 }
 
-async function avanzarHasta(user: ReturnType<typeof userEvent.setup>, id: string) {
-  const destino = PASOS_GUIA.findIndex((p) => p.id === id);
-  for (let i = 0; i < destino; i++) {
-    await user.click(screen.getByRole("button", { name: /Siguiente paso|Saltar este paso/ }));
-  }
-}
+const irAlPaso = (id: string) => localStorage.setItem(`pedilo_tutorial_paso_${T}`, String(PASOS_GUIA.findIndex((p) => p.id === id)));
 
-describe("guía interactiva: estructura de los pasos", () => {
-  it("recorre la app real con ejemplo: personal, categoría, producto, mesas, pagos, inventario, POS, cocina, fiscal y reportes", () => {
-    expect(PASOS_GUIA.map((p) => p.id)).toEqual([
-      "personal", "categoria", "producto", "mesas", "pagos", "inventario", "pos", "cocina", "fiscal", "reportes",
-    ]);
-    expect(new Set(PASOS_GUIA.map((p) => p.ruta)).size).toBeGreaterThanOrEqual(8);
-    for (const p of PASOS_GUIA) expect(p.instrucciones.length).toBeGreaterThan(0);
-    // los pasos de «crear algo» traen un ejemplo para seguir
-    for (const id of ["personal", "categoria", "producto", "mesas", "inventario"]) {
-      expect(PASOS_GUIA.find((p) => p.id === id)?.ejemplo?.length).toBeGreaterThan(0);
-    }
+describe("calcularFase (qué señalar en cada momento)", () => {
+  const personal = PASOS_GUIA.find((p) => p.id === "personal")!;
+  const existe = (presentes: string[]) => (s: string) => presentes.includes(s);
+
+  it("fuera de la pantalla del paso: señala el enlace del menú", () => {
+    expect(calcularFase(personal, PROGRESO_VACIO, "/admin", existe([]))).toEqual({
+      fase: "ir",
+      selector: '[data-tour="nav-sucursales"]',
+    });
   });
-
-  it("cada paso se da por hecho con lo que corresponde en la base", () => {
-    const hecho = (id: string, campo: keyof typeof PROGRESO_VACIO) => {
-      const p = PASOS_GUIA.find((x) => x.id === id)!;
-      return [p.hecho!(PROGRESO_VACIO), p.hecho!({ ...PROGRESO_VACIO, [campo]: 1 })];
-    };
-    expect(hecho("personal", "personal")).toEqual([false, true]);
-    expect(hecho("categoria", "categorias")).toEqual([false, true]);
-    expect(hecho("producto", "productos")).toEqual([false, true]);
-    expect(hecho("mesas", "mesas")).toEqual([false, true]);
-    expect(hecho("inventario", "inventarioItems")).toEqual([false, true]);
-    expect(hecho("pos", "ordenes")).toEqual([false, true]);
-    // los informativos se avanzan a mano
-    for (const id of ["pagos", "cocina", "fiscal", "reportes"]) expect(PASOS_GUIA.find((p) => p.id === id)?.hecho).toBeNull();
+  it("en la pantalla pero con el formulario cerrado: señala el botón que lo abre", () => {
+    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/sucursales", existe([]))).toEqual({
+      fase: "abrir",
+      selector: '[data-tour="abrir-personal"]',
+    });
+  });
+  it("con el formulario abierto: señala el formulario y espera", () => {
+    expect(calcularFase(personal, PROGRESO_VACIO, "/admin/sucursales", existe(['[data-tour="form-personal"]']))).toEqual({
+      fase: "llenar",
+      selector: '[data-tour="form-personal"]',
+    });
+  });
+  it("ya creado: hecho, sin señalar nada (aunque esté en otra pantalla)", () => {
+    expect(calcularFase(personal, { ...PROGRESO_VACIO, personal: 1 }, "/admin", existe([]))).toEqual({ fase: "hecho", selector: null });
+  });
+  it("pasos informativos: señalan su destacado y no esperan nada", () => {
+    const cocina = PASOS_GUIA.find((p) => p.id === "cocina")!;
+    expect(calcularFase(cocina, PROGRESO_VACIO, "/admin", existe([]))).toEqual({ fase: "info", selector: '[data-tour="nav-cocina"]' });
+    const reportes = PASOS_GUIA.find((p) => p.id === "reportes")!;
+    expect(calcularFase(reportes, PROGRESO_VACIO, "/admin", existe([])).fase).toBe("ir");
+    expect(calcularFase(reportes, PROGRESO_VACIO, "/admin/reportes", existe([]))).toEqual({ fase: "info", selector: null });
+  });
+  it("una subruta cuenta como estar en la pantalla", () => {
+    expect(calcularFase(PASOS_GUIA.find((p) => p.id === "categoria")!, PROGRESO_VACIO, "/admin/menu/importar", existe([])).fase).toBe("llenar");
   });
 });
 
-describe("TutorialOnboarding (guía paso a paso)", () => {
-  it("a un negocio nuevo le da la bienvenida y al empezar lo lleva al paso 1 con su ejemplo y el enlace a la pantalla", async () => {
+describe("estructura del recorrido", () => {
+  it("cubre toda la app y cada paso de «crear algo» trae un ejemplo", () => {
+    expect(PASOS_GUIA.map((p) => p.id)).toEqual([
+      "personal", "categoria", "producto", "mesas", "pagos", "inv-categoria", "inv-item", "pos", "cocina", "fiscal", "reportes",
+    ]);
+    for (const id of ["personal", "categoria", "producto", "mesas", "inv-categoria", "inv-item"]) {
+      expect(PASOS_GUIA.find((p) => p.id === id)?.ejemplo?.length).toBeGreaterThan(0);
+    }
+  });
+  it("cada paso se da por hecho con lo que corresponde en la base", () => {
+    const prueba = (id: string, campo: keyof typeof PROGRESO_VACIO) => {
+      const p = PASOS_GUIA.find((x) => x.id === id)!;
+      return [p.hecho!(PROGRESO_VACIO), p.hecho!({ ...PROGRESO_VACIO, [campo]: 1 })];
+    };
+    expect(prueba("personal", "personal")).toEqual([false, true]);
+    expect(prueba("categoria", "categorias")).toEqual([false, true]);
+    expect(prueba("producto", "productos")).toEqual([false, true]);
+    expect(prueba("mesas", "mesas")).toEqual([false, true]);
+    expect(prueba("inv-categoria", "inventarioCategorias")).toEqual([false, true]);
+    expect(prueba("inv-item", "inventarioItems")).toEqual([false, true]);
+    expect(prueba("pos", "ordenes")).toEqual([false, true]);
+  });
+});
+
+describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
+  it("al crear el negocio da la bienvenida y al empezar señala «Sucursales» en el menú", async () => {
     const user = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
+    montar("nav-sucursales");
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
     expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy();
-    expect(guia()).toBeNull();
 
     await empezar(user);
-    expect(bienvenida()).toBeNull();
-    expect(screen.getByText("Guía · paso 1 de 10")).toBeTruthy();
     expect(screen.getByText("Crea a tu personal")).toBeTruthy();
-    expect(screen.getByText("Cajero 1")).toBeTruthy(); // ejemplo
-    expect(screen.getByText("cajero1@minegocio.com")).toBeTruthy();
-    const enlace = screen.getByRole("link", { name: /Ir a Sucursales/ });
-    expect(enlace.getAttribute("href")).toBe("/admin/sucursales");
+    expect(screen.getByText(/Haz clic en/).textContent).toContain("«Sucursales»");
+    await waitFor(() => expect(foco()).toBe('[data-tour="nav-sucursales"]'));
   });
 
-  it("si ya estás en la pantalla del paso, en vez del enlace te lo dice", async () => {
+  it("sigue el recorrido en vivo: menú → botón «Agregar cajero o mesero» → formulario → hecho → siguiente paso", async () => {
     const user = userEvent.setup();
+    montar("nav-sucursales");
+    montar("nav-menu");
+    const vista = render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await empezar(user);
+    await waitFor(() => expect(foco()).toBe('[data-tour="nav-sucursales"]'));
+
+    // 1) el dueño hace clic en Sucursales -> se señala el botón que abre el formulario
     pathname = "/admin/sucursales";
-    render(<TutorialOnboarding completado={false} />);
+    montar("abrir-personal");
+    vista.rerender(<TutorialOnboarding completado={false} tenantId={T} />);
+    expect((await screen.findByText(/Toca/)).textContent).toContain("«Agregar cajero o mesero»");
+    await waitFor(() => expect(foco()).toBe('[data-tour="abrir-personal"]'));
+
+    // 2) abre el formulario -> se señala el formulario con el ejemplo
+    montar("form-personal");
+    expect(await screen.findByText("cajero1@minegocio.com")).toBeTruthy();
+    await waitFor(() => expect(foco()).toBe('[data-tour="form-personal"]'));
+    expect(screen.getByText(/Esperando a que lo hagas/)).toBeTruthy();
+
+    // 3) crea el cajero -> se detecta solo y, tras una pausa, pasa al paso siguiente
+    progresoTutorial.mockResolvedValue({ ...PROGRESO_VACIO, personal: 1 });
+    expect(await screen.findByText(/Ya tienes personal registrado/, {}, { timeout: 6000 })).toBeTruthy();
+    expect(foco()).toBeNull();
+    expect(await screen.findByText("Crea tu primera categoría", {}, { timeout: 6000 })).toBeTruthy();
+
+    // 4) y el siguiente paso arranca señalando el menú «Menú digital»
+    await waitFor(() => expect(foco()).toBe('[data-tour="nav-menu"]'));
+    expect(screen.getByText(/Haz clic en/).textContent).toContain("«Menú digital»");
+  }, 25000);
+
+  it("en móvil, si el enlace del menú no se ve, pide abrir el cajón del menú", async () => {
+    const user = userEvent.setup();
+    const abrirMenu = vi.fn();
+    window.addEventListener(EVENTO_ABRIR_MENU, abrirMenu);
+    render(<TutorialOnboarding completado={false} tenantId={T} />); // sin enlace en el DOM = menú cerrado
     await empezar(user);
-    expect(screen.getByText(/Estás en la pantalla correcta: Sucursales/)).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /Ir a Sucursales/ })).toBeNull();
+    await waitFor(() => expect(abrirMenu).toHaveBeenCalled());
+    window.removeEventListener(EVENTO_ABRIR_MENU, abrirMenu);
   });
 
-  it("detecta solo que creaste lo del paso: pasa de «Esperando…» a «hecho» y destaca «Siguiente paso»", async () => {
+  it("si lo señalado queda fuera de la vista, lo desplaza a la parte alta", async () => {
     const user = userEvent.setup();
-    const vista = render(<TutorialOnboarding completado={false} />);
+    montar("nav-sucursales");
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("data-tour")
+        ? ({ top: 900, left: 40, width: 160, height: 36, right: 200, bottom: 936, x: 40, y: 900, toJSON() {} } as DOMRect)
+        : ({ top: 0, left: 0, width: 0, height: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON() {} } as DOMRect);
+    });
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
-    await avanzarHasta(user, "categoria");
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalled());
+  });
 
+  it("Saltar este paso y Anterior funcionan, y recuerda el paso al recargar sin repetir la bienvenida", async () => {
+    const user = userEvent.setup();
+    montar("nav-sucursales");
+    montar("nav-menu");
+    const { unmount } = render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await empezar(user);
+    await user.click(await screen.findByRole("button", { name: "Saltar este paso" }));
     expect(screen.getByText("Crea tu primera categoría")).toBeTruthy();
-    expect(await screen.findByText(/Esperando a que lo hagas/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Saltar este paso" })).toBeTruthy();
-
-    // el dueño crea la categoría en /admin/menu y la guía lo nota al cambiar de pantalla
-    progresoTutorial.mockResolvedValue({ ...PROGRESO_VACIO, categorias: 1 });
-    pathname = "/admin/menu";
-    vista.rerender(<TutorialOnboarding completado={false} />);
-
-    expect(await screen.findByText("Categoría creada.")).toBeTruthy();
-    expect(screen.queryByText(/Esperando a que lo hagas/)).toBeNull();
-    expect(screen.getByRole("button", { name: "Siguiente paso" })).toBeTruthy();
-    expect(screen.getByText(/Estás en la pantalla correcta: Menú digital/)).toBeTruthy();
-  });
-
-  it("también lo detecta por consulta periódica sin cambiar de pantalla", async () => {
-    const user = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
-    await empezar(user);
-    await avanzarHasta(user, "mesas");
-    expect(await screen.findByText(/Esperando a que lo hagas/)).toBeTruthy();
-
-    progresoTutorial.mockResolvedValue({ ...PROGRESO_VACIO, mesas: 2 });
-    expect(await screen.findByText("Mesa creada.", {}, { timeout: 7000 })).toBeTruthy();
-  }, 15000);
-
-  it("recuerda el paso: si recargas o vuelves del POS, sigue donde ibas y no repite la bienvenida", async () => {
-    const user = userEvent.setup();
-    const { unmount } = render(<TutorialOnboarding completado={false} />);
-    await empezar(user);
-    await avanzarHasta(user, "producto");
-    expect(screen.getByText("Crea tu primer producto")).toBeTruthy();
-    expect(screen.getByText("Coca-Cola")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Anterior" }));
+    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Saltar este paso" }));
     unmount();
 
-    render(<TutorialOnboarding completado={false} />);
-    expect(await screen.findByText("Crea tu primer producto")).toBeTruthy();
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
+    expect(await screen.findByText("Crea tu primera categoría")).toBeTruthy();
     expect(bienvenida()).toBeNull();
   });
 
-  it("Anterior regresa; en el último paso aparece «Tutorial completado» y se guarda UNA vez", async () => {
+  it("el estado se guarda POR NEGOCIO: otro negocio nuevo en el mismo navegador empieza de cero", async () => {
     const user = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
+    montar("nav-sucursales");
+    // el negocio 1 lo dejó a medias y luego pulsó «Más tarde»
+    localStorage.setItem(`pedilo_tutorial_paso_${T}`, "3");
+    sessionStorage.setItem(`pedilo_tutorial_omitido_${T}`, "1");
+
+    render(<TutorialOnboarding completado={false} tenantId={T2} />);
+    expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy(); // negocio 2: bienvenida, no el paso 4
     await empezar(user);
-    await avanzarHasta(user, "reportes");
-    expect(screen.getByText("Reportes y cierre del día")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Siguiente paso|Saltar este paso/ })).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Anterior" }));
-    expect(screen.getByText("Facturación fiscal (opcional)")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Siguiente paso" })); // fiscal -> reportes
-    await user.click(screen.getByRole("button", { name: "Tutorial completado" }));
-
-    await waitFor(() => expect(guia()).toBeNull());
-    expect(completarTutorial).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("pedilo_tutorial_paso")).toBeNull(); // ya no hay nada que recordar
+    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    expect(localStorage.getItem(`pedilo_tutorial_paso_${T}`)).toBe("3"); // no se pisa el del otro negocio
   });
 
-  it("una vez completado no vuelve a aparecer al recargar", async () => {
-    render(<TutorialOnboarding completado={true} />);
+  it("en el último paso aparece «Tutorial completado»: se guarda UNA vez y no vuelve a salir", async () => {
+    irAlPaso("reportes");
+    pathname = "/admin/reportes";
+    const user = userEvent.setup();
+    const { unmount } = render(<TutorialOnboarding completado={false} tenantId={T} />);
+    expect(await screen.findByText("Reportes y cierre del día")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Siguiente paso|Saltar este paso/ })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Tutorial completado" }));
+    await waitFor(() => expect(guia()).toBeNull());
+    expect(completarTutorial).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(`pedilo_tutorial_paso_${T}`)).toBeNull();
+    unmount();
+
+    // al recargar el panel, el servidor ya lo da por completado
+    render(<TutorialOnboarding completado={true} tenantId={T} />);
     await act(async () => {});
     expect(guia()).toBeNull();
     expect(bienvenida()).toBeNull();
-    expect(progresoTutorial).not.toHaveBeenCalled();
   });
 
   it("si no se pudo guardar avisa, sigue abierto y permite reintentar", async () => {
     completarTutorial.mockResolvedValueOnce({ ok: false });
+    irAlPaso("reportes");
+    pathname = "/admin/reportes";
     const user = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
-    await empezar(user);
-    await avanzarHasta(user, "reportes");
-
-    await user.click(screen.getByRole("button", { name: "Tutorial completado" }));
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await user.click(await screen.findByRole("button", { name: "Tutorial completado" }));
     expect(await screen.findByText(/No se pudo guardar/)).toBeTruthy();
     expect(guia()).toBeTruthy();
-
     await user.click(screen.getByRole("button", { name: "Tutorial completado" }));
     await waitFor(() => expect(guia()).toBeNull());
     expect(completarTutorial).toHaveBeenCalledTimes(2);
@@ -186,51 +260,65 @@ describe("TutorialOnboarding (guía paso a paso)", () => {
 
   it("«Más tarde» y la X cierran solo en esta sesión y NO lo marcan como completado", async () => {
     const user = userEvent.setup();
-    const a = render(<TutorialOnboarding completado={false} />);
+    montar("nav-sucursales");
+    const a = render(<TutorialOnboarding completado={false} tenantId={T} />);
     await user.click(await screen.findByRole("button", { name: "Más tarde" }));
     expect(bienvenida()).toBeNull();
     a.unmount();
-    render(<TutorialOnboarding completado={false} />);
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
     await act(async () => {});
     expect(bienvenida()).toBeNull(); // misma sesión: no molesta
-    expect(completarTutorial).not.toHaveBeenCalled();
     cleanup();
 
     sessionStorage.clear(); // sesión nueva: como no lo completó, vuelve a salir
-    const user2 = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
-    await empezar(user2);
-    await user2.click(screen.getByRole("button", { name: "Cerrar tutorial" }));
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await empezar(user);
+    await user.click(screen.getByRole("button", { name: "Cerrar tutorial" }));
     expect(guia()).toBeNull();
     expect(completarTutorial).not.toHaveBeenCalled();
   });
 
-  it("se puede minimizar a una pastilla y volver a abrir en el mismo paso", async () => {
+  it("se puede minimizar (sin resaltar nada) y volver a abrir en el mismo paso", async () => {
     const user = userEvent.setup();
-    render(<TutorialOnboarding completado={false} />);
+    montar("nav-sucursales");
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
-    await avanzarHasta(user, "mesas");
+    await waitFor(() => expect(foco()).not.toBeNull());
 
     await user.click(screen.getByRole("button", { name: "Minimizar guía" }));
     expect(guia()).toBeNull();
+    expect(foco()).toBeNull();
     const pastilla = screen.getByRole("button", { name: "Abrir la guía" });
-    expect(pastilla.textContent).toContain("paso 4/10");
+    expect(pastilla.textContent).toContain("paso 1/11");
     await user.click(pastilla);
-    expect(screen.getByText("Crea tu primera mesa")).toBeTruthy();
+    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
   });
 
-  it("«Ver tutorial» lo reabre desde el paso 1 aunque ya esté completado; cerrarlo al final no guarda nada", async () => {
+  it("«Ver tutorial» lo reabre desde el principio aunque ya esté completado; cerrarlo al final no guarda nada", async () => {
     const user = userEvent.setup();
-    render(<TutorialOnboarding completado={true} />);
+    render(<TutorialOnboarding completado={true} tenantId={T} />);
     await act(async () => {});
+    expect(guia()).toBeNull();
+
     await act(async () => {
       window.dispatchEvent(new Event(EVENTO_ABRIR_TUTORIAL));
     });
     expect(await screen.findByText("Crea a tu personal")).toBeTruthy();
 
-    await avanzarHasta(user, "reportes");
+    // salta al final y cierra
+    irAlPaso("reportes");
+    pathname = "/admin/reportes";
+    cleanup();
+    localStorage.setItem(`pedilo_tutorial_paso_${T}`, String(PASOS_GUIA.length - 1));
+    render(<TutorialOnboarding completado={true} tenantId={T} />);
+    await act(async () => {
+      window.dispatchEvent(new Event(EVENTO_ABRIR_TUTORIAL));
+    });
+    for (let i = 0; i < PASOS_GUIA.length - 1; i++) {
+      await user.click(await screen.findByRole("button", { name: /Siguiente paso|Saltar este paso/ }));
+    }
     await user.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(guia()).toBeNull();
     expect(completarTutorial).not.toHaveBeenCalled();
-  });
+  }, 20000);
 });

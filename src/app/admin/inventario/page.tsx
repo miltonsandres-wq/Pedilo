@@ -59,7 +59,7 @@ export default async function InventarioPage() {
               <p className="text-sm text-ink-400">Todavía no hay categorías.</p>
             )}
           </div>
-          <form action={crearCategoriaInventario} className="flex gap-2">
+          <form action={crearCategoriaInventario} data-tour="form-inv-categoria" className="flex gap-2">
             <input
               name="nombre"
               required
@@ -179,6 +179,7 @@ export default async function InventarioPage() {
 
       <Colapsable
         key={`nuevo-item-${items?.length ?? 0}`}
+        tour="abrir-item"
         className="rounded-2xl"
         resumen={
           <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
@@ -187,7 +188,7 @@ export default async function InventarioPage() {
           </span>
         }
       >
-        <form action={crearItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form action={crearItem} data-tour="form-item" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nombre" name="nombre" required />
           <SelectField label="Categoría" name="categoria_id">
             <option value="">Sin categoría</option>
