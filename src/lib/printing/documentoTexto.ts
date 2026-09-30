@@ -55,6 +55,7 @@ export interface DocumentoImprimible {
   total: number;
   total_letras: string;
   lineas: LineaImprimible[];
+  motivo_nota?: string | null;
 }
 
 export interface OpcionesFactura {
@@ -180,6 +181,7 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
     out.push(...campo("No.:", opciones.referencia.numero_completo));
     out.push(texto("CAI:"), texto(opciones.referencia.cai));
     out.push(...campo("Fecha:", formatearFechaHora(new Date(opciones.referencia.fecha_emision))));
+    if (doc.motivo_nota) out.push(...campo("Motivo:", doc.motivo_nota));
   }
 
   out.push({ op: "linea" });

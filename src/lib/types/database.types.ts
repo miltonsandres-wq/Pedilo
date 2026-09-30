@@ -323,6 +323,7 @@ export type Database = {
           importe_exonerado: number
           isv_15: number
           isv_18: number
+          motivo_nota: string | null
           lineas: Json
           no_constancia_exonerado: string | null
           no_orden_compra_exenta: string | null
@@ -365,6 +366,7 @@ export type Database = {
           importe_exonerado?: number
           isv_15?: number
           isv_18?: number
+          motivo_nota?: string | null
           lineas: Json
           no_constancia_exonerado?: string | null
           no_orden_compra_exenta?: string | null
@@ -407,6 +409,7 @@ export type Database = {
           importe_exonerado?: number
           isv_15?: number
           isv_18?: number
+          motivo_nota?: string | null
           lineas?: Json
           no_constancia_exonerado?: string | null
           no_orden_compra_exenta?: string | null

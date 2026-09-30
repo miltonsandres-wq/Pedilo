@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { crearRango, type EstadoAccion } from "@/app/admin/fiscal/actions";
 import { Button } from "@/components/ui/Button";
 import { inputClass, labelClass, cn } from "@/lib/ui";
-import { formatearNumeroDocumento, normalizarCai } from "@/lib/fiscal/formato";
+import { formatearNumeroDocumento, normalizarCai, rangosTraslapan } from "@/lib/fiscal/formato";
 import { validarEntradaRango, type CampoRango } from "@/lib/fiscal/validaciones";
 import { ErrorCampo, ResultadoAccion } from "./ResultadoAccion";
 
@@ -17,6 +17,15 @@ export interface CajaOpcion {
   puntoEmision: string;
 }
 
+/** Rango ya cargado: sirve para avisar de traslapes antes de guardar. */
+export interface RangoExistente {
+  establecimiento: string;
+  puntoEmision: string;
+  tipoDoc: string;
+  desde: number;
+  hasta: number;
+}
+
 const VACIO = { dispositivoId: "", clase: "factura", tipoDoc: "01", cai: "", desde: "", hasta: "", fechaLimite: "" };
 
 /**
@@ -25,7 +34,15 @@ const VACIO = { dispositivoId: "", clase: "factura", tipoDoc: "01", cai: "", des
  * primer y el último número antes de guardar; el servidor repite las
  * validaciones y la base impide traslapes.
  */
-export function FormularioRango({ cajas, hoyHN }: { cajas: CajaOpcion[]; hoyHN: string }) {
+export function FormularioRango({
+  cajas,
+  hoyHN,
+  existentes = [],
+}: {
+  cajas: CajaOpcion[];
+  hoyHN: string;
+  existentes?: RangoExistente[];
+}) {
   const [estado, accion, pendiente] = useActionState<EstadoAccion | null, FormData>(crearRango, null);
   const [v, setV] = useState(VACIO);
   const [tocados, setTocados] = useState<Partial<Record<CampoRango, boolean>>>({});
@@ -38,11 +55,27 @@ export function FormularioRango({ cajas, hoyHN }: { cajas: CajaOpcion[]; hoyHN: 
   }, [estado]);
 
   const validacion = validarEntradaRango(v, hoyHN);
-  const errorDe = (c: CampoRango) => (tocados[c] ? validacion.errores[c] : undefined) ?? estado?.errores?.[c];
+  const cajaElegida = cajas.find((c) => c.id === v.dispositivoId);
+
+  // Traslape con un rango ya cargado para la misma caja y el mismo tipo de documento
+  let traslape: string | undefined;
+  if (cajaElegida && validacion.ok && validacion.valor) {
+    const choque = existentes.find(
+      (r) =>
+        r.establecimiento === cajaElegida.establecimiento &&
+        r.puntoEmision === cajaElegida.puntoEmision &&
+        r.tipoDoc === validacion.valor!.tipoDoc &&
+        rangosTraslapan(r, validacion.valor!)
+    );
+    if (choque) traslape = `Se traslapa con el rango ${choque.desde}–${choque.hasta} que ya cargaste para esta caja.`;
+  }
+
+  const errorDe = (c: CampoRango) =>
+    (tocados[c] ? validacion.errores[c] : undefined) ?? (c === "hasta" ? traslape : undefined) ?? estado?.errores?.[c];
   const tocar = (c: CampoRango) => setTocados((t) => ({ ...t, [c]: true }));
   const cambiar = <K extends keyof typeof VACIO>(campo: K, valor: string) => setV((x) => ({ ...x, [campo]: valor }));
 
-  const caja = cajas.find((c) => c.id === v.dispositivoId);
+  const caja = cajaElegida;
   let vista: string | null = null;
   if (caja && validacion.ok && validacion.valor) {
     try {
@@ -185,7 +218,7 @@ export function FormularioRango({ cajas, hoyHN }: { cajas: CajaOpcion[]; hoyHN: 
 
       <div className="col-span-full space-y-2">
         <ResultadoAccion estado={estado} />
-        <Button type="submit" disabled={pendiente || !validacion.ok}>
+        <Button type="submit" disabled={pendiente || !validacion.ok || !!traslape}>
           <Plus className="h-4 w-4" strokeWidth={2} />
           {pendiente ? "Guardando…" : "Cargar rango"}
         </Button>

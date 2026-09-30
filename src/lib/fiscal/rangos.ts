@@ -11,6 +11,8 @@ export type CodigoFiscal =
   | "cliente_invalido"
   | "sin_lineas"
   | "documento_no_encontrado"
+  | "factura_invalida"
+  | "motivo_requerido"
   | "ya_acreditado";
 
 /** Error de facturación con código estable para que la UI decida qué mostrar. */

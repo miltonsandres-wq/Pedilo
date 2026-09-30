@@ -70,7 +70,17 @@ export default async function FiscalRangosPage() {
       <Card>
         <CardHeader title="Cargar un rango" subtitle="Copia los datos exactos de la resolución del SAR." />
         <div className="p-5">
-          <FormularioRango cajas={opciones} hoyHN={hoy} />
+          <FormularioRango
+            cajas={opciones}
+            hoyHN={hoy}
+            existentes={(rangos ?? []).map((r) => ({
+              establecimiento: r.establecimiento,
+              puntoEmision: r.punto_emision,
+              tipoDoc: r.tipo_doc,
+              desde: r.desde,
+              hasta: r.hasta,
+            }))}
+          />
         </div>
       </Card>
     </div>

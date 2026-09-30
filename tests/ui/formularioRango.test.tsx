@@ -126,6 +126,28 @@ describe("FormularioRango", () => {
     expect((screen.getByLabelText("CAI") as HTMLInputElement).value).toBe(CAI);
   });
 
+  it("avisa en vivo si el rango se traslapa con uno ya cargado para esa caja y tipo, y bloquea guardar", async () => {
+    const user = userEvent.setup();
+    render(<FormularioRango cajas={cajas} hoyHN="2030-06-15" existentes={[{ establecimiento: "001", puntoEmision: "002", tipoDoc: "01", desde: 400, hasta: 900 }]} />);
+    await llenarValido(user); // 1-500 choca con 400-900
+    expect(screen.getByText(/Se traslapa con el rango 400–900/)).toBeTruthy();
+    expect(boton().disabled).toBe(true);
+
+    const hasta = screen.getByLabelText("Hasta (número)");
+    await user.clear(hasta);
+    await user.type(hasta, "399");
+    expect(screen.queryByText(/Se traslapa/)).toBeNull();
+    expect(boton().disabled).toBe(false);
+  });
+
+  it("un rango de otra caja o de otro tipo de documento no cuenta como traslape", async () => {
+    const user = userEvent.setup();
+    render(<FormularioRango cajas={cajas} hoyHN="2030-06-15" existentes={[{ establecimiento: "001", puntoEmision: "003", tipoDoc: "01", desde: 1, hasta: 900 }, { establecimiento: "001", puntoEmision: "002", tipoDoc: "03", desde: 1, hasta: 900 }]} />);
+    await llenarValido(user);
+    expect(screen.queryByText(/Se traslapa/)).toBeNull();
+    expect(boton().disabled).toBe(false);
+  });
+
   it("sin cajas avisa que primero hay que crear una", () => {
     render(<FormularioRango cajas={[]} hoyHN="2030-06-15" />);
     expect(screen.getByText(/Primero crea una caja/)).toBeTruthy();

@@ -112,6 +112,7 @@ create table public.documentos_fiscales (
   anulada_at               timestamptz,
   anulada_por              uuid references public.usuarios(id) on delete set null,
   documento_referencia_id  uuid references public.documentos_fiscales(id),
+  motivo_nota              text, -- por qué se emite la nota de crédito/débito
   created_at               timestamptz not null default now(),
   unique (tenant_id, establecimiento, punto_emision, tipo_doc, correlativo),
   -- base + ISV + cargo tiene que cuadrar EXACTO con el total
@@ -131,6 +132,11 @@ create table public.documentos_fiscales (
 create unique index documentos_fiscales_una_factura_por_orden
   on public.documentos_fiscales (orden_id)
   where clase = 'factura' and estado = 'emitida';
+
+-- Una nota de crédito vigente por factura (se acredita la factura completa)
+create unique index documentos_fiscales_una_nota_credito_por_factura
+  on public.documentos_fiscales (documento_referencia_id)
+  where clase = 'nota_credito' and estado = 'emitida';
 
 create index documentos_fiscales_tenant_fecha_idx on public.documentos_fiscales(tenant_id, fecha_emision);
 create index documentos_fiscales_sucursal_id_idx on public.documentos_fiscales(sucursal_id);
@@ -313,6 +319,7 @@ language plpgsql
 as $$
 declare
   r public.cai_rangos;
+  ref public.documentos_fiscales;
 begin
   select * into r
     from public.cai_rangos
@@ -340,6 +347,20 @@ begin
   if new.numero_completo <> new.establecimiento || '-' || new.punto_emision || '-' || new.tipo_doc
                             || '-' || lpad(new.correlativo::text, 8, '0') then
     raise exception 'FISCAL_NUMERO_INVALIDO: el número completo no corresponde a establecimiento-punto-tipo-correlativo';
+  end if;
+
+  -- Las notas apuntan a una factura VIGENTE del mismo negocio y no la exceden
+  if new.documento_referencia_id is not null then
+    select * into ref from public.documentos_fiscales where id = new.documento_referencia_id;
+    if not found or ref.tenant_id <> new.tenant_id or ref.clase <> 'factura' then
+      raise exception 'FISCAL_REFERENCIA_INVALIDA: la nota debe referirse a una factura del mismo negocio';
+    end if;
+    if ref.estado <> 'emitida' then
+      raise exception 'FISCAL_REFERENCIA_ANULADA: la factura referida está anulada';
+    end if;
+    if new.clase = 'nota_credito' and new.total > ref.total then
+      raise exception 'FISCAL_NOTA_EXCEDE: la nota de crédito no puede ser mayor que la factura (% > %)', new.total, ref.total;
+    end if;
   end if;
 
   -- El rango del servidor manda sobre lo que diga el cliente

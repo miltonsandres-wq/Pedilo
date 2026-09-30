@@ -357,3 +357,101 @@ describe("tasa de ISV por producto", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("notas de crédito", () => {
+  // Punto 006-006 aparte para no chocar con los demás tests
+  const EST = "006";
+  const CAI_FACT = "AAAAAA-BBBBBB-CCCCCC-DDDDDD-EEEEEE-01";
+  const CAI_NC = "AAAAAA-BBBBBB-CCCCCC-DDDDDD-EEEEEE-03";
+  let factura: Awaited<ReturnType<typeof doc>>;
+
+  const base = (correlativo: number, over: Record<string, unknown> = {}) =>
+    doc({
+      establecimiento: EST, punto_emision: EST, correlativo, cai: CAI_FACT, rango_desde: 1, rango_hasta: 50,
+      numero_completo: `${EST}-${EST}-01-${String(correlativo).padStart(8, "0")}`, ...over,
+    });
+
+  const nota = (correlativo: number, over: Record<string, unknown> = {}) =>
+    doc({
+      establecimiento: EST, punto_emision: EST, tipo_doc: "03", clase: "nota_credito", correlativo, cai: CAI_NC,
+      rango_desde: 1, rango_hasta: 20, numero_completo: `${EST}-${EST}-03-${String(correlativo).padStart(8, "0")}`,
+      documento_referencia_id: factura.id, motivo_nota: "Devolución", ...over,
+    });
+
+  beforeAll(async () => {
+    await crearRango({ establecimiento: EST, punto_emision: EST, tipo_doc: "01", cai: CAI_FACT, desde: 1, hasta: 50 });
+    await crearRango({ establecimiento: EST, punto_emision: EST, tipo_doc: "03", clase: "nota_credito", cai: CAI_NC, desde: 1, hasta: 20 });
+    factura = await base(1);
+    expect(await sync(factura)).toMatchObject({ ok: true });
+  });
+
+  it("una nota de crédito válida se sincroniza con su referencia y motivo", async () => {
+    expect(await sync(await nota(1))).toMatchObject({ ok: true });
+    const r = await pg.query<{ clase: string; documento_referencia_id: string; motivo_nota: string }>(
+      "select clase, documento_referencia_id, motivo_nota from public.documentos_fiscales where tipo_doc='03' and establecimiento=$1", [EST]
+    );
+    expect(r.rows[0]).toMatchObject({ clase: "nota_credito", documento_referencia_id: factura.id, motivo_nota: "Devolución" });
+  });
+
+  it("la misma factura no se puede acreditar dos veces", async () => {
+    expect(await sync(await nota(2))).toMatchObject({ ok: false, tipo: "duplicado" });
+  });
+
+  it("una nota sin factura de referencia se rechaza", async () => {
+    expect(await sync(await nota(3, { documento_referencia_id: null }))).toMatchObject({ ok: false, tipo: "datos_invalidos" });
+  });
+
+  it("no puede ser mayor que la factura", async () => {
+    const f2 = await base(2);
+    expect(await sync(f2)).toMatchObject({ ok: true });
+    const r = await sync(await nota(3, { documento_referencia_id: f2.id, total: 200, gravado_15: 173.91, isv_15: 26.09 }));
+    expect(r).toMatchObject({ ok: false, tipo: "nota_excede" });
+  });
+
+  it("no se puede acreditar una factura anulada", async () => {
+    const f3 = await base(3);
+    expect(await sync(f3)).toMatchObject({ ok: true });
+    await comoUsuario(pg, ADMIN_A, () => pg.query("select public.anular_documento_fiscal($1, 'Error')", [f3.id]));
+    expect(await sync(await nota(3, { documento_referencia_id: f3.id }))).toMatchObject({ ok: false, tipo: "referencia_anulada" });
+  });
+
+  it("no puede referirse a una factura de otro negocio ni a otra nota", async () => {
+    expect(await sync(await nota(3, { documento_referencia_id: crypto.randomUUID() }))).toMatchObject({ ok: false });
+    const nc1 = (await pg.query<{ id: string }>("select id from public.documentos_fiscales where tipo_doc='03' and establecimiento=$1 and correlativo=1", [EST])).rows[0].id;
+    expect(await sync(await nota(3, { documento_referencia_id: nc1 }))).toMatchObject({ ok: false, tipo: "referencia_invalida" });
+  });
+
+  it("un documento en su propia numeración no consume la de la factura", async () => {
+    const r = await pg.query<{ tipo_doc: string; siguiente: number }>(
+      "select tipo_doc, siguiente from public.cai_rangos where establecimiento=$1 order by tipo_doc", [EST]
+    );
+    expect(r.rows.map((x) => [x.tipo_doc, x.siguiente])).toEqual([["01", 4], ["03", 2]]);
+  });
+});
+
+describe("notas de crédito entre negocios", () => {
+  it("el negocio B no puede emitir una nota que referencie una factura del negocio A", async () => {
+    const MESA_B = "bbbbbbbb-4444-0000-0000-00000000000b";
+    const ORDEN_B = "bbbbbbbb-5555-0000-0000-00000000000b";
+    const CAI_B = "BBBBBB-BBBBBB-BBBBBB-BBBBBB-BBBBBB-03";
+    await pg.exec(`
+      insert into public.mesas (id, tenant_id, sucursal_id, nombre) values ('${MESA_B}','${T_B}','${S_B}','M1');
+      insert into public.ordenes (id, tenant_id, sucursal_id, mesa_id, estado) values ('${ORDEN_B}','${T_B}','${S_B}','${MESA_B}','pagada');
+      insert into public.cai_rangos (tenant_id, sucursal_id, establecimiento, punto_emision, tipo_doc, clase, cai, desde, hasta, fecha_limite)
+        values ('${T_B}','${S_B}','001','001','03','nota_credito','${CAI_B}',1,10,'2099-12-31');
+    `);
+    const facturaDeA = (await pg.query<{ id: string }>("select id from public.documentos_fiscales where clase='factura' and estado='emitida' limit 1")).rows[0].id;
+
+    const r = await comoUsuario(pg, ADMIN_B, async () =>
+      (await pg.query<{ r: { ok: boolean; tipo?: string } }>("select public.sincronizar_documento_fiscal($1::jsonb) as r", [
+        JSON.stringify({
+          id: crypto.randomUUID(), tenant_id: T_B, sucursal_id: S_B, orden_id: ORDEN_B, clase: "nota_credito", tipo_doc: "03",
+          establecimiento: "001", punto_emision: "001", correlativo: 1, numero_completo: "001-001-03-00000001", cai: CAI_B,
+          rango_desde: 1, rango_hasta: 10, fecha_limite: "2099-12-31", fecha_emision: new Date().toISOString(),
+          emisor_snapshot: {}, cliente_nombre: "X", total: 0, total_letras: "CERO", lineas: [], documento_referencia_id: facturaDeA,
+        }),
+      ])).rows[0].r
+    );
+    expect(r).toMatchObject({ ok: false, tipo: "referencia_invalida" });
+  });
+});

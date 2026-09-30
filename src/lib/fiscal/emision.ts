@@ -52,11 +52,27 @@ export interface DatosExoneracion {
   noRegistroSag?: string;
 }
 
+/** Montos y líneas ya definidos (una nota de crédito copia EXACTO los de su factura). */
+export interface ContenidoFijo {
+  importeExonerado: number;
+  importeExento: number;
+  gravado15: number;
+  gravado18: number;
+  isv15: number;
+  isv18: number;
+  cargoServicio: number;
+  total: number;
+  lineas: DocumentoFiscalLocal["lineas"];
+}
+
 export interface DatosEmision {
   ordenId: string;
   sucursalId: string;
   usuarioId: string | null;
-  lineas: LineaFiscal[];
+  lineas?: LineaFiscal[];
+  /** Si viene, se usa tal cual en vez de calcular impuestos desde `lineas`. */
+  contenido?: ContenidoFijo;
+  motivoNota?: string;
   opciones?: Omit<OpcionesImpuestos, "exonerado">;
   cliente?: DatosCliente;
   exoneracion?: DatosExoneracion;
@@ -144,7 +160,9 @@ export async function emitirDocumentoFiscal(datos: DatosEmision): Promise<Docume
     const config = await leerConfigFiscal();
     const { dispositivo, emisor } = requerirConfig(config);
 
-    if (!datos.lineas.length) throw new FiscalError("sin_lineas", "La orden no tiene productos para facturar.");
+    if (!datos.contenido && !datos.lineas?.length) {
+      throw new FiscalError("sin_lineas", "La orden no tiene productos para facturar.");
+    }
 
     const nombreCliente = vacioANulo(datos.cliente?.nombre);
     const rtnCliente = vacioANulo(datos.cliente?.rtn);
@@ -163,7 +181,30 @@ export async function emitirDocumentoFiscal(datos: DatosEmision): Promise<Docume
     );
     const plan = planificarEmision(rangos, clase, ahora);
 
-    const calculo = calcularImpuestos(datos.lineas, { ...datos.opciones, exonerado });
+    // Factura normal: se calculan los impuestos. Nota: se copian los montos de su factura.
+    let calculo: ContenidoFijo;
+    if (datos.contenido) {
+      calculo = datos.contenido;
+    } else {
+      const c = calcularImpuestos(datos.lineas ?? [], { ...datos.opciones, exonerado });
+      calculo = {
+        importeExonerado: c.importeExonerado,
+        importeExento: c.importeExento,
+        gravado15: c.gravado15,
+        gravado18: c.gravado18,
+        isv15: c.isv15,
+        isv18: c.isv18,
+        cargoServicio: c.cargoServicio,
+        total: c.total,
+        lineas: c.lineas.map((l) => ({
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          precio_unitario: l.precioUnitario,
+          total: l.totalLinea,
+          tasa: l.tasa,
+        })),
+      };
+    }
 
     for (const [id, cambio] of Object.entries(plan.cambios)) {
       await db.rangos_cai.update(id, cambio);
@@ -209,18 +250,13 @@ export async function emitirDocumentoFiscal(datos: DatosEmision): Promise<Docume
       cargo_servicio: calculo.cargoServicio,
       total: calculo.total,
       total_letras: totalEnLetras(calculo.total),
-      lineas: calculo.lineas.map((l) => ({
-        nombre: l.nombre,
-        cantidad: l.cantidad,
-        precio_unitario: l.precioUnitario,
-        total: l.totalLinea,
-        tasa: l.tasa,
-      })),
+      lineas: calculo.lineas,
       estado: "emitida",
       anulada_motivo: null,
       anulada_at: null,
       anulada_por: null,
       documento_referencia_id: datos.documentoReferenciaId ?? null,
+      motivo_nota: vacioANulo(datos.motivoNota),
       created_at: ahora.toISOString(),
       sync_estado: "pendiente",
       sync_detalle: null,
