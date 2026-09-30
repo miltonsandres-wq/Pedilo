@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
-import { crearBaseConMigraciones } from "../sql/harness";
+import { crearBaseConMigraciones, comoUsuario } from "../sql/harness";
 import { servidor } from "./servidorFalso";
 
 vi.mock("@/lib/supabase/client", async () => {
@@ -272,5 +272,27 @@ describe("sincronizarFiscal: configuración, emisor, logo y vinculación", () =>
     await sincronizarFiscal(S, T);
     expect((await leerConfigFiscal())?.dispositivo?.id).toBe(DISP);
     expect(await db.rangos_cai.count()).toBe(1);
+  });
+});
+
+describe("documentos bajados del servidor", () => {
+  it("los de otra caja se consideran ya impresos (reimprimir sale REIMPRESIÓN); los propios sin imprimir siguen siendo 'original'", async () => {
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+    await vincularDispositivoLocal(DISP);
+
+    // Un documento emitido por OTRA caja y ya en el servidor
+    const ordenAjena = await ordenEnServidor();
+    const [propio] = await emitir(1);
+    await vaciar();
+
+    const ajeno = { ...(await db.documentos_fiscales.get(propio.id))!, id: crypto.randomUUID(), orden_id: ordenAjena, correlativo: 2, numero_completo: "001-001-01-00000002" };
+    const { sync_estado: _a, sync_detalle: _b, impreso_at: _c, ...payload } = ajeno;
+    void _a; void _b; void _c;
+    await comoUsuario(pg, CAJERO, () => pg.query("select public.sincronizar_documento_fiscal($1::jsonb)", [JSON.stringify(payload)]));
+
+    await sincronizarFiscal(S, T);
+
+    expect((await db.documentos_fiscales.get(ajeno.id))?.impreso_at).toBeTruthy(); // ya salió en otra caja
+    expect((await db.documentos_fiscales.get(propio.id))?.impreso_at).toBeFalsy(); // el propio nunca imprimió aquí
   });
 });

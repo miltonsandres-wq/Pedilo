@@ -92,3 +92,10 @@ formato de la factura no obliga a actualizar el agente de cada sucursal.
 
 **Actualiza el agente en cada sucursal** para poder imprimir facturas:
 copia el nuevo `index.js` y reinicia el servicio (`npm start` / pm2 / NSSM).
+
+### Verificar el agente sin impresora
+
+```bash
+npm install
+npm run smoke   # imprime contra una impresora TCP simulada y revisa los bytes ESC/POS
+```

@@ -227,7 +227,15 @@ async function bajarDocumentosRecientes(sucursalId: string) {
       const existente = await db.documentos_fiscales.get(d.id);
       // Lo que esta caja aún no sincroniza o marcó en conflicto NO se pisa
       if (existente && existente.sync_estado !== "sincronizado") continue;
-      const fila: DocumentoFiscalLocal = { ...d, sync_estado: "sincronizado", sync_detalle: null };
+      // Un documento que esta caja no conocía salió impreso en OTRA caja (o antes de
+      // reinstalar): reimprimirlo debe marcarse REIMPRESIÓN. Los que ya eran de esta
+      // caja conservan su marca (si nunca imprimieron bien, siguen siendo "original").
+      const fila: DocumentoFiscalLocal = {
+        ...d,
+        sync_estado: "sincronizado",
+        sync_detalle: null,
+        impreso_at: existente ? existente.impreso_at : d.fecha_emision,
+      };
       await db.documentos_fiscales.put(fila);
     }
   });
