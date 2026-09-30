@@ -1,12 +1,12 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { RolUsuario } from "@/lib/types/helpers";
+import { cifrarClave, descifrarClave, generarClaveTemporal, validarClave } from "@/lib/auth/clave";
 
 export async function crearSucursal(formData: FormData) {
   const sesion = await requireAdmin();
@@ -71,18 +71,13 @@ export async function actualizarLogoSucursal(sucursalId: string, logoUrl: string
   revalidatePath("/admin/sucursales");
 }
 
-function generarClaveTemporal() {
-  return randomBytes(6).toString("base64url");
-}
-
 /**
- * Da de alta un cajero/mesero (o admin): crea su usuario de Supabase Auth
- * con una contraseña temporal y su fila en `usuarios` (tenant/rol/sucursal).
- * Se llama desde el formulario de personal de cada sucursal (rol fijo
- * cajero/mesero, sucursal implícita) y desde el de administradores (rol
- * admin, sin sucursal). Requiere la service_role key porque crear usuarios
- * de Auth no es algo que un usuario común pueda hacer (se salta RLS a
- * propósito, solo aquí).
+ * Da de alta un cajero/mesero (o admin): crea su usuario de Supabase Auth con
+ * la contraseña que escribe el admin (si la deja vacía se genera una) y su fila
+ * en `usuarios` (tenant/rol/sucursal). La contraseña queda CIFRADA en la fila
+ * para que el admin pueda volver a verla (ver verClaveUsuario). Requiere la
+ * service_role key porque crear usuarios de Auth no es algo que un usuario
+ * común pueda hacer (se salta RLS a propósito, solo aquí).
  */
 export async function crearUsuario(formData: FormData) {
   const sesion = await requireAdmin();
@@ -90,17 +85,22 @@ export async function crearUsuario(formData: FormData) {
   const nombre = String(formData.get("nombre") ?? "");
   const rol = String(formData.get("rol") ?? "mesero") as RolUsuario;
   const sucursalId = String(formData.get("sucursal_id") ?? "") || null;
+  const claveEscrita = String(formData.get("clave") ?? "");
 
   if (rol !== "admin" && !sucursalId) {
     throw new Error("Cajero/mesero necesita una sucursal asignada.");
   }
+  if (claveEscrita) {
+    const problema = validarClave(claveEscrita);
+    if (problema) redirect(`/admin/sucursales?errorClave=${encodeURIComponent(problema)}`);
+  }
 
   const admin = createAdminClient();
-  const claveTemporal = generarClaveTemporal();
+  const clave = claveEscrita || generarClaveTemporal();
 
   const { data: authUser, error } = await admin.auth.admin.createUser({
     email,
-    password: claveTemporal,
+    password: clave,
     email_confirm: true,
   });
 
@@ -115,6 +115,7 @@ export async function crearUsuario(formData: FormData) {
     sucursal_id: rol === "admin" ? null : sucursalId,
     rol,
     nombre,
+    clave_cifrada: cifrarClave(clave),
   });
 
   if (errorPerfil) {
@@ -123,9 +124,7 @@ export async function crearUsuario(formData: FormData) {
   }
 
   revalidatePath("/admin/sucursales");
-  redirect(
-    `/admin/sucursales?nuevoEmail=${encodeURIComponent(email)}&nuevaClave=${encodeURIComponent(claveTemporal)}`
-  );
+  redirect(`/admin/sucursales?nuevoEmail=${encodeURIComponent(email)}`);
 }
 
 export async function actualizarUsuario(id: string, formData: FormData) {
@@ -133,16 +132,48 @@ export async function actualizarUsuario(id: string, formData: FormData) {
   const supabase = await createClient();
   const rol = String(formData.get("rol") ?? "mesero") as RolUsuario;
   const sucursalId = String(formData.get("sucursal_id") ?? "") || null;
+  const claveNueva = String(formData.get("clave") ?? "");
 
-  await supabase
-    .from("usuarios")
-    .update({
-      nombre: String(formData.get("nombre") ?? ""),
-      rol,
-      sucursal_id: rol === "admin" ? null : sucursalId,
-      activo: formData.get("activo") === "on",
-    })
-    .eq("id", id);
+  const cambios: {
+    nombre: string;
+    rol: RolUsuario;
+    sucursal_id: string | null;
+    activo: boolean;
+    clave_cifrada?: string;
+  } = {
+    nombre: String(formData.get("nombre") ?? ""),
+    rol,
+    sucursal_id: rol === "admin" ? null : sucursalId,
+    activo: formData.get("activo") === "on",
+  };
+
+  // Cambiar la contraseña: primero se confirma (por RLS) que el usuario es de este
+  // negocio y luego se actualiza en Auth y en la copia cifrada.
+  if (claveNueva) {
+    const problema = validarClave(claveNueva);
+    if (problema) redirect(`/admin/sucursales?errorClave=${encodeURIComponent(problema)}`);
+    const { data: propio } = await supabase.from("usuarios").select("id").eq("id", id).maybeSingle();
+    if (propio) {
+      const { error } = await createAdminClient().auth.admin.updateUserById(id, { password: claveNueva });
+      if (error) redirect(`/admin/sucursales?errorClave=${encodeURIComponent("No se pudo cambiar la contraseña.")}`);
+      cambios.clave_cifrada = cifrarClave(claveNueva);
+    }
+  }
+
+  await supabase.from("usuarios").update(cambios).eq("id", id);
 
   revalidatePath("/admin/sucursales");
+}
+
+/**
+ * Muestra la contraseña de un usuario de ESTE negocio. Solo admin; se descifra
+ * en el servidor y nunca viaja guardada en claro. Devuelve null si el usuario
+ * no tiene una guardada (creado antes de esta función) o se cambió por fuera.
+ */
+export async function verClaveUsuario(id: string): Promise<{ ok: boolean; clave: string | null }> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data } = await supabase.from("usuarios").select("clave_cifrada").eq("id", id).maybeSingle();
+  if (!data) return { ok: false, clave: null };
+  return { ok: true, clave: descifrarClave(data.clave_cifrada) };
 }

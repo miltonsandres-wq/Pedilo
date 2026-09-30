@@ -1171,6 +1171,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          configuracion_inicial_at: string | null
           tutorial_completado_at: string | null
           activo: boolean
           created_at: string
@@ -1193,6 +1194,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
           activo?: boolean
           created_at?: string
@@ -1215,6 +1217,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
           activo?: boolean
           created_at?: string
@@ -1240,6 +1243,7 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          clave_cifrada: string | null
           activo: boolean
           created_at: string
           id: string
@@ -1249,6 +1253,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          clave_cifrada?: string | null
           activo?: boolean
           created_at?: string
           id: string
@@ -1258,6 +1263,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          clave_cifrada?: string | null
           activo?: boolean
           created_at?: string
           id?: string

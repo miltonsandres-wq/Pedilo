@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { ArrowLeftRight, CircleHelp, Menu, X } from "lucide-react";
 import { AdminNav } from "./AdminNav";
 import { BrandMark } from "@/components/BrandMark";
@@ -23,6 +24,7 @@ export function AdminShell({
   usuarioEmail: string | null;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [abierto, setAbierto] = useState(false);
 
   // El recorrido guiado pide abrir el menú lateral en móvil para poder señalar un enlace
@@ -46,15 +48,23 @@ export function AdminShell({
 
   const pie = (
     <div className="mt-auto space-y-3 pt-4">
-      <Link
-        href="/pos"
+      {/* El POS lo usa el cajero/mesero con SU usuario: se cierra la sesión del dueño
+          y se muestra el login para entrar con esa cuenta. */}
+      <button
+        type="button"
         data-tour="ir-pos"
-        onClick={() => setAbierto(false)}
-        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white"
+        title="Cierra tu sesión y abre el login para entrar con un cajero o mesero"
+        onClick={async () => {
+          setAbierto(false);
+          await createClient().auth.signOut();
+          router.replace("/login");
+          router.refresh();
+        }}
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white"
       >
         <ArrowLeftRight className="h-4 w-4" strokeWidth={2} />
         Ir al POS
-      </Link>
+      </button>
       <button
         type="button"
         onClick={() => {

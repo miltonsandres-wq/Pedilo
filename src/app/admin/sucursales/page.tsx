@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Colapsable } from "@/components/ui/Colapsable";
 import { SucursalLogoUploader } from "@/components/admin/SucursalLogoUploader";
+import { ClaveUsuario } from "@/components/admin/ClaveUsuario";
 import { linkWhatsapp } from "@/lib/whatsapp";
 import { crearSucursal, actualizarSucursal, desactivarSucursal, crearUsuario, actualizarUsuario } from "./actions";
 
@@ -30,11 +31,11 @@ const ROL_TONE = { admin: "brand", cajero: "warning", mesero: "neutral" } as con
 export default async function SucursalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nuevoEmail?: string; nuevaClave?: string; errorPlan?: string }>;
+  searchParams: Promise<{ nuevoEmail?: string; errorClave?: string; errorPlan?: string }>;
 }) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
-  const { nuevoEmail, nuevaClave, errorPlan } = await searchParams;
+  const { nuevoEmail, errorClave, errorPlan } = await searchParams;
 
   const [{ data: sucursales }, { data: mesas }, { data: prodSuc }, { data: usuarios }] =
     await Promise.all([
@@ -76,14 +77,20 @@ export default async function SucursalesPage({
         </div>
       )}
 
-      {nuevaClave && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      {nuevoEmail && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <KeyRound className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
           <p>
-            Usuario <b>{nuevoEmail}</b> creado. Contraseña temporal (cópiala y compártela de forma
-            segura, no se volverá a mostrar):{" "}
-            <code className="rounded bg-amber-100 px-2 py-0.5 font-mono">{nuevaClave}</code>
+            Usuario <b>{nuevoEmail}</b> creado. Puedes ver su contraseña cuando quieras abriendo su fila y tocando «Ver
+            contraseña».
           </p>
+        </div>
+      )}
+
+      {errorClave && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <p>{errorClave}</p>
         </div>
       )}
 
@@ -127,9 +134,21 @@ export default async function SucursalesPage({
                   />
                   Activo
                 </label>
+                <div className="min-w-32 flex-1">
+                  <label className="mb-1 block text-xs font-medium text-ink-500">Nueva contraseña (opcional)</label>
+                  <input
+                    name="clave"
+                    autoComplete="off"
+                    placeholder="Dejar vacío para no cambiarla"
+                    className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
                 <Button size="sm" variant="secondary" className="ml-auto">
                   Guardar
                 </Button>
+                <div className="w-full">
+                  <ClaveUsuario usuarioId={u.id} />
+                </div>
               </form>
             </Colapsable>
           ))}
@@ -147,10 +166,11 @@ export default async function SucursalesPage({
               </span>
             }
           >
-            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <form action={crearUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <input type="hidden" name="rol" value="admin" />
               <Field label="Nombre" name="nombre" required />
               <Field label="Correo" name="email" type="email" required />
+              <Field label="Contraseña (vacío = generar)" name="clave" autoComplete="off" />
               <div className="flex items-end">
                 <Button type="submit" size="sm" className="w-full">
                   <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />
@@ -291,19 +311,32 @@ export default async function SucursalesPage({
                           <option value="mesero">Mesero</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-ink-500">Sucursal</label>
-                        <select
-                          name="sucursal_id"
-                          defaultValue={s.id}
-                          className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
-                        >
-                          {(sucursales ?? []).map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.nombre}
-                            </option>
-                          ))}
-                        </select>
+                      {(sucursales ?? []).length > 1 ? (
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink-500">Sucursal</label>
+                          <select
+                            name="sucursal_id"
+                            defaultValue={s.id}
+                            className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs"
+                          >
+                            {(sucursales ?? []).map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <input type="hidden" name="sucursal_id" value={s.id} />
+                      )}
+                      <div className="min-w-32 flex-1">
+                        <label className="mb-1 block text-xs font-medium text-ink-500">Nueva contraseña (opcional)</label>
+                        <input
+                          name="clave"
+                          autoComplete="off"
+                          placeholder="Dejar vacío para no cambiarla"
+                          className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                        />
                       </div>
                       <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
                         <input
@@ -317,6 +350,9 @@ export default async function SucursalesPage({
                       <Button size="sm" variant="secondary" className="ml-auto">
                         Guardar
                       </Button>
+                      <div className="w-full">
+                        <ClaveUsuario usuarioId={u.id} />
+                      </div>
                     </form>
                   </Colapsable>
                 ))}
@@ -337,10 +373,11 @@ export default async function SucursalesPage({
                     </span>
                   }
                 >
-                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                  <form action={crearUsuario} data-tour="form-personal" className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                     <input type="hidden" name="sucursal_id" value={s.id} />
                     <Field label="Nombre" name="nombre" required />
                     <Field label="Correo" name="email" type="email" required />
+                    <Field label="Contraseña (vacío = generar)" name="clave" autoComplete="off" />
                     <SelectField label="Rol" name="rol" defaultValue="mesero">
                       <option value="mesero">Mesero</option>
                       <option value="cajero">Cajero</option>
