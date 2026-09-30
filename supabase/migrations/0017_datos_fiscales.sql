@@ -134,6 +134,25 @@ alter table public.orden_items
   add column if not exists tasa_isv text not null default '15'
     check (tasa_isv in ('exento', '15', '18'));
 
+-- La tasa del ítem la fija el SERVIDOR al insertar, copiándola del producto
+-- (igual que se captura el precio). Así también quedan bien los ítems que
+-- entran por la carta QR, que no la mandan.
+create or replace function public.fn_orden_items_tasa_isv()
+returns trigger
+language plpgsql
+as $$
+begin
+  select p.tasa_isv into new.tasa_isv
+    from public.productos p
+   where p.id = new.producto_id;
+  return new;
+end;
+$$;
+
+create trigger trg_orden_items_tasa_isv
+  before insert on public.orden_items
+  for each row execute function public.fn_orden_items_tasa_isv();
+
 -- ----------------------------------------------------------------------------
 -- RLS
 --   emisor / dispositivos: todos los usuarios del tenant leen (el cajero los

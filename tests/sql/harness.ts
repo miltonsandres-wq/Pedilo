@@ -26,7 +26,15 @@ grant usage on schema public, auth to authenticated, anon;
 const MIGRATIONS_DIR = path.resolve(__dirname, "../../supabase/migrations");
 
 export async function crearBaseConMigraciones(): Promise<PGlite> {
-  const pg = new PGlite({ extensions: { btree_gist, pgcrypto } });
+  // Los parsers imitan lo que devuelve PostgREST (numeric como número, fechas como texto ISO)
+  const pg = new PGlite({
+    extensions: { btree_gist, pgcrypto },
+    parsers: {
+      1700: (v: string) => parseFloat(v),
+      1184: (v: string) => new Date(v).toISOString(),
+      1082: (v: string) => v,
+    },
+  });
   await pg.exec(STUBS);
   const archivos = fs.readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
   for (const f of archivos) {

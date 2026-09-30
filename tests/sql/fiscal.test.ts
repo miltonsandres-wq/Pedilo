@@ -337,3 +337,23 @@ describe("dispositivos: un punto de emisión, un navegador", () => {
     ).rejects.toThrow(/NO_DISPONIBLE/);
   });
 });
+
+describe("tasa de ISV por producto", () => {
+  it("el servidor copia la tasa del producto al insertar el ítem, aunque el cliente mande otra", async () => {
+    const prod = "aaaaaaaa-6666-0000-0000-00000000000a";
+    await pg.query("insert into public.productos (id, tenant_id, nombre, precio, tasa_isv) values ($1,$2,'Cerveza',59,'18')", [prod, T_A]);
+    const orden = await nuevaOrden();
+    await pg.query(
+      "insert into public.orden_items (orden_id, producto_id, nombre_producto, cantidad, precio_unitario, tasa_isv) values ($1,$2,'Cerveza',1,59,'15')",
+      [orden, prod]
+    );
+    const r = await pg.query<{ tasa_isv: string }>("select tasa_isv from public.orden_items where orden_id=$1", [orden]);
+    expect(r.rows[0].tasa_isv).toBe("18");
+  });
+
+  it("solo acepta exento, 15 o 18", async () => {
+    await expect(
+      pg.query("insert into public.productos (tenant_id, nombre, precio, tasa_isv) values ($1,'X',1,'12')", [T_A])
+    ).rejects.toThrow();
+  });
+});

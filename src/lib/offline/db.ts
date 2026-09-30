@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { EstadoMesa, EstadoOrden, FormaPago } from "@/lib/types/helpers";
+import type { EstadoMesa, EstadoOrden, FormaPago, Tables } from "@/lib/types/helpers";
 
 /**
  * Caché local (IndexedDB) para que el POS siga funcionando sin internet.
@@ -33,6 +33,7 @@ export interface ProductoLocal {
   precio: number;
   foto_url: string | null;
   disponible: boolean;
+  tasa_isv?: string; // exento | 15 | 18 (ausente en cachés viejas = 15)
 }
 
 export interface OrdenLocal {
@@ -68,6 +69,9 @@ export interface OrdenItemLocal {
   nota: string | null;
   impreso: boolean;
   origen_cliente: boolean;
+  // Tasa de ISV capturada al agregar el ítem (igual que el precio). Ausente en
+  // ítems creados antes de la facturación fiscal = 15.
+  tasa_isv?: string;
   created_at: string;
 }
 
@@ -82,7 +86,13 @@ export interface PagoLocal {
 }
 
 export type OutboxOperacion = "insert" | "update" | "delete";
-export type OutboxTabla = "ordenes" | "orden_items" | "pagos" | "mesas" | "comandas";
+export type OutboxTabla =
+  | "ordenes"
+  | "orden_items"
+  | "pagos"
+  | "mesas"
+  | "comandas"
+  | "documentos_fiscales";
 
 export interface OutboxEntry {
   id: string; // uuid propio de la entrada de cola
@@ -100,6 +110,17 @@ export interface ConfigEntry {
   valor: unknown;
 }
 
+/** Copia local de un rango CAI del punto de emisión de ESTE dispositivo. */
+export type RangoCaiLocal = Omit<Tables<"cai_rangos">, "created_at">;
+
+export type EstadoSyncDocumento = "pendiente" | "sincronizado" | "conflicto";
+
+/** Documento fiscal emitido en este dispositivo (o bajado del servidor para reimprimir). */
+export type DocumentoFiscalLocal = Tables<"documentos_fiscales"> & {
+  sync_estado: EstadoSyncDocumento;
+  sync_detalle: string | null;
+};
+
 export const db = new Dexie("pos_offline") as Dexie & {
   mesas: EntityTable<MesaLocal, "id">;
   productos: EntityTable<ProductoLocal, "id">;
@@ -108,6 +129,8 @@ export const db = new Dexie("pos_offline") as Dexie & {
   pagos: EntityTable<PagoLocal, "id">;
   outbox: EntityTable<OutboxEntry, "id">;
   config: EntityTable<ConfigEntry, "clave">;
+  rangos_cai: EntityTable<RangoCaiLocal, "id">;
+  documentos_fiscales: EntityTable<DocumentoFiscalLocal, "id">;
 };
 
 db.version(1).stores({
@@ -118,4 +141,12 @@ db.version(1).stores({
   pagos: "id, orden_id",
   outbox: "id, tabla, creado_en",
   config: "clave",
+});
+
+// v2: facturación fiscal. El correlativo se asigna EN el dispositivo dentro de
+// una transacción sobre rangos_cai, así que su copia local es la fuente de
+// verdad del "siguiente" (el servidor solo valida al sincronizar).
+db.version(2).stores({
+  rangos_cai: "id, sucursal_id, estado, clase",
+  documentos_fiscales: "id, orden_id, sync_estado, numero_completo, fecha_emision",
 });
