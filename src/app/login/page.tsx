@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { buttonClass, inputClass, labelClass } from "@/lib/ui";
 import { BrandMark } from "@/components/BrandMark";
+import { rolDeLogin } from "@/lib/auth/enlaces";
 import { iniciarSesion } from "./actions";
 
 export default function LoginPage() {
@@ -17,6 +18,9 @@ export default function LoginPage() {
 
 function FormularioLogin() {
   const searchParams = useSearchParams();
+  // Enlaces «Abrir panel de cajero/mesero» del admin: /login?rol=cajero&email=...
+  const rol = rolDeLogin(searchParams.get("rol"));
+  const emailInicial = searchParams.get("email") ?? "";
   const [state, formAction, pending] = useActionState(iniciarSesion, undefined as
     | { error: string }
     | undefined);
@@ -62,8 +66,12 @@ function FormularioLogin() {
             <span className="text-sm font-semibold text-ink-900">Pedilo</span>
           </div>
 
-          <h1 className="mb-1 text-lg font-semibold text-ink-900">Bienvenido de nuevo</h1>
-          <p className="mb-5 text-sm text-ink-500">Ingresa con tu usuario para continuar</p>
+          <h1 className="mb-1 text-lg font-semibold text-ink-900">
+            {rol ? `Panel de ${rol}` : "Bienvenido de nuevo"}
+          </h1>
+          <p className="mb-5 text-sm text-ink-500">
+            {rol ? `Ingresa con tu usuario de ${rol} para abrir el POS` : "Ingresa con tu usuario para continuar"}
+          </p>
 
           <form action={formAction}>
           <input type="hidden" name="next" value={searchParams.get("next") ?? "/"} />
@@ -75,6 +83,7 @@ function FormularioLogin() {
               <input
                 name="email"
                 type="email"
+                defaultValue={emailInicial}
                 required
                 autoComplete="email"
                 placeholder="tucorreo@negocio.com"

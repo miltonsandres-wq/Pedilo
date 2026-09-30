@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Colapsable } from "@/components/ui/Colapsable";
 import { SucursalLogoUploader } from "@/components/admin/SucursalLogoUploader";
 import { ClaveUsuario } from "@/components/admin/ClaveUsuario";
+import { AbrirPanelPersonal } from "@/components/admin/AbrirPanelPersonal";
+import { rolDeLogin } from "@/lib/auth/enlaces";
 import { linkWhatsapp } from "@/lib/whatsapp";
 import { crearSucursal, actualizarSucursal, desactivarSucursal, crearUsuario, actualizarUsuario } from "./actions";
 
@@ -31,11 +33,12 @@ const ROL_TONE = { admin: "brand", cajero: "warning", mesero: "neutral" } as con
 export default async function SucursalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nuevoEmail?: string; errorClave?: string; errorUsuario?: string; errorPlan?: string }>;
+  searchParams: Promise<{ nuevoEmail?: string; nuevoRol?: string; errorClave?: string; errorUsuario?: string; errorPlan?: string }>;
 }) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
-  const { nuevoEmail, errorClave, errorUsuario, errorPlan } = await searchParams;
+  const { nuevoEmail, nuevoRol, errorClave, errorUsuario, errorPlan } = await searchParams;
+  const rolNuevo = rolDeLogin(nuevoRol);
 
   const [{ data: sucursales }, { data: mesas }, { data: prodSuc }, { data: usuarios }] =
     await Promise.all([
@@ -84,6 +87,11 @@ export default async function SucursalesPage({
             Usuario <b>{nuevoEmail}</b> creado. Puedes ver su contraseña cuando quieras abriendo su fila y tocando «Ver
             contraseña».
           </p>
+          {rolNuevo && (
+            <div className="ml-auto shrink-0">
+              <AbrirPanelPersonal rol={rolNuevo} email={nuevoEmail} />
+            </div>
+          )}
         </div>
       )}
 
@@ -276,11 +284,15 @@ export default async function SucursalesPage({
                 </div>
               </div>
 
-              <div className="border-b border-ink-100 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-ink-100 px-5 py-3">
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
                   <Users className="h-3.5 w-3.5" strokeWidth={2} />
                   Personal de esta sucursal
                 </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <AbrirPanelPersonal rol="cajero" compacto soloAbrir />
+                  <AbrirPanelPersonal rol="mesero" compacto soloAbrir />
+                </div>
               </div>
               <div className="space-y-2 p-5 pb-3">
                 {personal.map((u) => (
@@ -357,8 +369,9 @@ export default async function SucursalesPage({
                       <Button size="sm" variant="secondary" className="ml-auto">
                         Guardar
                       </Button>
-                      <div className="w-full">
+                      <div className="flex w-full flex-wrap items-center justify-between gap-2">
                         <ClaveUsuario usuarioId={u.id} />
+                        {(u.rol === "cajero" || u.rol === "mesero") && <AbrirPanelPersonal rol={u.rol} compacto />}
                       </div>
                     </form>
                   </Colapsable>

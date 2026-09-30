@@ -127,7 +127,8 @@ export async function crearUsuario(formData: FormData) {
   }
 
   revalidatePath("/admin/sucursales");
-  redirect(`/admin/sucursales?nuevoEmail=${encodeURIComponent(email)}`);
+  const rolNuevo = rol === "admin" ? "" : `&nuevoRol=${rol}`;
+  redirect(`/admin/sucursales?nuevoEmail=${encodeURIComponent(email)}${rolNuevo}`);
 }
 
 export async function actualizarUsuario(id: string, formData: FormData) {

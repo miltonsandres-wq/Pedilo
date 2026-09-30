@@ -101,7 +101,7 @@ describe("crearUsuario: nunca revienta la pantalla, avisa", () => {
 describe("crearUsuario: camino feliz", () => {
   it("usa la contraseña escrita, guarda su copia CIFRADA y normaliza el correo", async () => {
     const url = await destino(form({ ...base, clave: "Mesero2026" }));
-    expect(url).toBe("/admin/sucursales?nuevoEmail=mesero@negocio.com");
+    expect(url).toBe("/admin/sucursales?nuevoEmail=mesero@negocio.com&nuevoRol=mesero");
 
     expect(createUser).toHaveBeenCalledWith({ email: "mesero@negocio.com", password: "Mesero2026", email_confirm: true });
     const fila = insertUsuario.mock.calls[0][0];
@@ -117,8 +117,9 @@ describe("crearUsuario: camino feliz", () => {
     expect(descifrarClave(insertUsuario.mock.calls[0][0].clave_cifrada)).toBe(enviada);
   });
 
-  it("un admin nuevo no queda atado a una sucursal", async () => {
-    await destino(form({ ...base, rol: "admin", sucursal_id: "" }));
+  it("un admin nuevo no queda atado a una sucursal (y no lleva enlace de panel de personal)", async () => {
+    const url = await destino(form({ ...base, rol: "admin", sucursal_id: "" }));
+    expect(url).not.toContain("nuevoRol");
     expect(insertUsuario.mock.calls[0][0]).toMatchObject({ rol: "admin", sucursal_id: null });
   });
 });
