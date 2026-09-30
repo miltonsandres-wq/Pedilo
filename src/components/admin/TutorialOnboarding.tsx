@@ -186,8 +186,8 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
     if (ultimoDesplazamiento.current === clave) return;
     ultimoDesplazamiento.current = clave;
     const { top, height } = marca.rect;
-    if (top < 80 || top + height > window.innerHeight * 0.55) {
-      window.scrollTo({ top: Math.max(0, window.scrollY + top - window.innerHeight * 0.2), behavior: "smooth" });
+    if (top < 230 || top + height > window.innerHeight * 0.9) {
+      window.scrollTo({ top: Math.max(0, window.scrollY + top - window.innerHeight * 0.32), behavior: "smooth" });
     }
   }, [marca, paso]);
 
@@ -283,147 +283,148 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
   const rect = marca?.rect;
   const hayFoco = !!rect && fase !== "hecho";
 
+  // La guía va como una BARRA en el flujo de la página (pegada arriba al hacer scroll): empuja
+  // el contenido en vez de taparlo, así nunca queda encima de un botón o un formulario.
+  const contenedor =
+    "sticky top-14 z-20 mb-4 overflow-hidden rounded-xl border border-brand-200 bg-white shadow-card lg:top-2";
+
   if (minimizado) {
     return (
-      <button
-        onClick={() => setMinimizado(false)}
-        className="fixed bottom-4 right-4 z-[46] flex items-center gap-2 rounded-full bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-popover hover:bg-brand-700"
-        aria-label="Abrir la guía"
-      >
-        <CircleHelp className="h-4 w-4" strokeWidth={2} />
-        Guía · paso {paso + 1}/{PASOS_GUIA.length}
-        <ChevronUp className="h-4 w-4" strokeWidth={2} />
-      </button>
+      <div className={contenedor} data-testid="barra-guia-minimizada">
+        <button
+          onClick={() => setMinimizado(false)}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+          aria-label="Abrir la guía"
+        >
+          <CircleHelp className="h-4 w-4 shrink-0" strokeWidth={2} />
+          <span className="min-w-0 flex-1 truncate">
+            Guía · paso {paso + 1}/{PASOS_GUIA.length} · {actual.titulo}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2} />
+        </button>
+      </div>
     );
   }
 
   return (
     <>
+      {/* Solo un marco sobre lo que hay que tocar: no oscurece la pantalla ni bloquea clics */}
       {hayFoco && rect && (
         <div
           aria-hidden
           data-testid="foco-guia"
           data-foco={marca?.selector ?? ""}
-          className="pointer-events-none fixed z-[45] rounded-2xl ring-4 ring-brand-500 transition-all duration-200"
-          style={{
-            top: rect.top - 6,
-            left: rect.left - 6,
-            width: rect.width + 12,
-            height: rect.height + 12,
-            boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.55)",
-          }}
+          className="pointer-events-none fixed z-[45] animate-pulse rounded-2xl ring-4 ring-brand-500/80 transition-all duration-200"
+          style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }}
         />
       )}
 
-      <aside
-        className="fixed inset-x-3 bottom-3 z-[46] flex max-h-[45vh] flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-popover sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-h-[80vh] sm:w-[24rem]"
-        aria-label="Guía paso a paso"
-      >
-        <div className="flex items-center gap-2 bg-ink-950 px-4 py-2.5 text-white">
-          <CircleHelp className="h-4 w-4 shrink-0 text-brand-200" strokeWidth={2} />
-          <p className="flex-1 text-xs font-medium">
-            Guía · paso {paso + 1} de {PASOS_GUIA.length}
+      <aside className={contenedor} aria-label="Guía paso a paso">
+        <div className="flex items-center gap-2 border-b border-ink-100 bg-brand-50/70 px-3 py-2">
+          <CircleHelp className="h-4 w-4 shrink-0 text-brand-600" strokeWidth={2} />
+          <p className="min-w-0 flex-1 truncate text-xs font-semibold text-brand-800">
+            Guía · paso {paso + 1} de {PASOS_GUIA.length} · {actual.titulo}
           </p>
-          <button onClick={() => setMinimizado(true)} aria-label="Minimizar guía" className="rounded p-1 hover:bg-ink-800">
-            <ChevronDown className="h-4 w-4" strokeWidth={2} />
+          <button onClick={() => setMinimizado(true)} aria-label="Minimizar guía" className="rounded p-1 text-ink-500 hover:bg-white">
+            <ChevronUp className="h-4 w-4" strokeWidth={2} />
           </button>
-          <button onClick={omitirEstaSesion} aria-label="Cerrar tutorial" className="rounded p-1 hover:bg-ink-800">
+          <button onClick={omitirEstaSesion} aria-label="Cerrar tutorial" className="rounded p-1 text-ink-500 hover:bg-white">
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
-        <div className="h-1 bg-ink-100" aria-hidden>
+        <div className="h-0.5 bg-ink-100" aria-hidden>
           <div className="h-full bg-brand-600 transition-all" style={{ width: `${((paso + 1) / PASOS_GUIA.length) * 100}%` }} />
         </div>
 
-        <div className="overflow-y-auto px-4 py-3">
-          <h2 className="mb-2 text-base font-semibold leading-tight text-ink-900">{actual.titulo}</h2>
+        <div className="flex flex-col gap-3 px-3 py-2.5 md:flex-row md:items-center">
+          <div className="min-w-0 flex-1">
+            {fase === "ir" && (
+              <p className="text-sm text-ink-700">
+                Haz clic en <b>«{actual.rutaEtiqueta}»</b> en el menú lateral: está resaltado.
+              </p>
+            )}
+            {fase === "abrir" && (
+              <p className="text-sm text-ink-700">
+                Toca <b>«{actual.abrirEtiqueta}»</b> (resaltado) para abrir el formulario.
+              </p>
+            )}
+            {fase === "hecho" && (
+              <p role="status" className="flex items-center gap-2 text-sm font-medium text-libre-text">
+                <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                {actual.textoHecho ?? "¡Hecho!"} {!esUltimo && "Pasamos al siguiente paso…"}
+              </p>
+            )}
+            {(fase === "llenar" || fase === "info" || fase === undefined) && (
+              <>
+                <ol className="space-y-0.5">
+                  {actual.instrucciones.map((t, i) => (
+                    <li key={t} className="flex gap-2 text-sm text-ink-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-ink-100 text-[10px] font-semibold text-ink-600">
+                        {i + 1}
+                      </span>
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ol>
+                {detectable && fase === "llenar" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
+                    <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
+                    Esperando a que lo hagas… lo detectamos solos.
+                  </p>
+                )}
+              </>
+            )}
+            {error && (
+              <p role="alert" className="mt-1 rounded-lg bg-red-50 px-2.5 py-1.5 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+          </div>
 
-          {fase === "ir" && (
-            <p className="text-sm text-ink-700">
-              Haz clic en <b>«{actual.rutaEtiqueta}»</b> en el menú lateral: está resaltado.
-            </p>
-          )}
-          {fase === "abrir" && (
-            <p className="text-sm text-ink-700">
-              Toca <b>«{actual.abrirEtiqueta}»</b> (resaltado) para abrir el formulario.
-            </p>
-          )}
-          {fase === "hecho" && (
-            <p role="status" className="flex items-center gap-2 rounded-lg bg-libre-bg px-3 py-2 text-sm font-medium text-libre-text">
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              {actual.textoHecho ?? "¡Hecho!"} {!esUltimo && "Pasamos al siguiente paso…"}
-            </p>
-          )}
-          {(fase === "llenar" || fase === "info" || fase === undefined) && (
-            <>
-              <ol className="space-y-1.5">
-                {actual.instrucciones.map((t, i) => (
-                  <li key={t} className="flex gap-2.5 text-sm text-ink-700">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink-100 text-[11px] font-semibold text-ink-600">
-                      {i + 1}
-                    </span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ol>
-              {actual.ejemplo && (
-                <div className="mt-2.5 rounded-xl border border-brand-100 bg-brand-50/60 p-2.5">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-brand-700">Ejemplo</p>
-                  <dl className="space-y-0.5">
-                    {actual.ejemplo.map((e) => (
-                      <div key={e.etiqueta} className="flex items-baseline justify-between gap-3 text-sm">
-                        <dt className="text-ink-500">{e.etiqueta}</dt>
-                        <dd className="font-mono text-xs font-medium text-ink-900">{e.valor}</dd>
-                      </div>
-                    ))}
-                  </dl>
+          {actual.ejemplo && (fase === "llenar" || fase === "info" || fase === undefined) && (
+            <dl className="shrink-0 rounded-lg border border-brand-100 bg-brand-50/60 px-2.5 py-1.5 md:w-64">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">Ejemplo</p>
+              {actual.ejemplo.map((e) => (
+                <div key={e.etiqueta} className="flex items-baseline justify-between gap-2 text-xs">
+                  <dt className="text-ink-500">{e.etiqueta}</dt>
+                  <dd className="font-mono font-medium text-ink-900">{e.valor}</dd>
                 </div>
-              )}
-              {detectable && fase === "llenar" && (
-                <p className="mt-2 flex items-center gap-2 text-xs text-ink-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-                  Esperando a que lo hagas… lo detectamos solos.
-                </p>
-              )}
-            </>
+              ))}
+            </dl>
           )}
-          {error && (
-            <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-        </div>
 
-        <div className="flex items-center gap-2 border-t border-ink-100 px-4 py-3">
-          {paso > 0 && (
-            <Button variant="secondary" size="sm" onClick={() => irAPaso(paso - 1)} disabled={guardando}>
-              Anterior
-            </Button>
-          )}
-          {fase === "ir" && actual.ruta && (
-            <Link href={actual.ruta} className="text-xs font-medium text-ink-500 underline hover:text-ink-800">
-              Llévame a {actual.rutaEtiqueta}
-            </Link>
-          )}
-          <span className="flex-1" />
-          {!esUltimo ? (
-            <Button
-              size="sm"
-              variant={fase === "info" || fase === "hecho" ? "primary" : "secondary"}
-              onClick={() => irAPaso(paso + 1)}
-            >
-              {fase === "info" || fase === "hecho" ? "Siguiente paso" : "Saltar este paso"}
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => void terminar()} disabled={guardando}>
-              {guardando ? (
-                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
-              ) : (
-                <Check className="h-4 w-4" strokeWidth={2.5} />
+          <div className="flex shrink-0 items-center gap-2 md:flex-col md:items-stretch">
+            {fase === "ir" && actual.ruta && (
+              <Link href={actual.ruta} className="text-center text-xs font-medium text-ink-500 underline hover:text-ink-800">
+                Llévame a {actual.rutaEtiqueta}
+              </Link>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              {paso > 0 && (
+                <Button variant="secondary" size="sm" onClick={() => irAPaso(paso - 1)} disabled={guardando}>
+                  Anterior
+                </Button>
               )}
-              {yaCompletado ? "Cerrar" : "Tutorial completado"}
-            </Button>
-          )}
+              {!esUltimo ? (
+                <Button
+                  size="sm"
+                  variant={fase === "info" || fase === "hecho" ? "primary" : "secondary"}
+                  onClick={() => irAPaso(paso + 1)}
+                >
+                  {fase === "info" || fase === "hecho" ? "Siguiente paso" : "Saltar este paso"}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => void terminar()} disabled={guardando}>
+                  {guardando ? (
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <Check className="h-4 w-4" strokeWidth={2.5} />
+                  )}
+                  {yaCompletado ? "Cerrar" : "Tutorial completado"}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </aside>
     </>

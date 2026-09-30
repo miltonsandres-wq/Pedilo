@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { fechaLocalHN } from "@/lib/fiscal/formato";
 import { calcularRequisitos } from "@/lib/fiscal/requisitos";
-import { obtenerOCrearCaja } from "@/lib/fiscal/cajaPorDefecto";
+import { cargarRangoCai, guardarDatosEmisor, mensajeDeErrorFiscal } from "@/lib/fiscal/configurar";
 import { validarEmisor, validarEntradaRango } from "@/lib/fiscal/validaciones";
 
 /** Resultado que las pantallas muestran debajo del formulario. */
@@ -18,18 +18,6 @@ export interface EstadoAccion {
 
 const texto = (fd: FormData, k: string) => String(fd.get(k) ?? "");
 const RUTA = "/admin/fiscal";
-
-/** Convierte el error de la base a algo que el dueño entienda. */
-function mensajeDeError(e: { code?: string; message?: string } | null | undefined, porDefecto: string): string {
-  const m = e?.message ?? "";
-  if (e?.code === "23P01" || m.includes("cai_rangos_sin_traslape")) {
-    return "Ese rango se traslapa con otro ya cargado para esta caja y este tipo de documento.";
-  }
-  if (e?.code === "23505" && m.includes("dispositivos_pos")) return "Ya existe una caja con ese establecimiento y punto de emisión.";
-  if (m.includes("EN_USO")) return "El rango ya emitió documentos: no se puede borrar ni modificar.";
-  if (m.includes("DISPOSITIVO_INCONSISTENTE")) return "La caja elegida no corresponde a ese establecimiento/punto.";
-  return porDefecto;
-}
 
 // --- Activación ----------------------------------------------------------------
 
@@ -93,15 +81,8 @@ export async function guardarEmisor(_prev: EstadoAccion | null, formData: FormDa
     correo: v.valor.correo,
   };
 
-  let consulta = supabase.from("datos_fiscales_emisor").select("id").eq("tenant_id", sesion.tenant_id);
-  consulta = sucursalId ? consulta.eq("sucursal_id", sucursalId) : consulta.is("sucursal_id", null);
-  const { data: existente } = await consulta.maybeSingle();
-
-  const { error } = existente
-    ? await supabase.from("datos_fiscales_emisor").update(fila).eq("id", existente.id)
-    : await supabase.from("datos_fiscales_emisor").insert({ ...fila, tenant_id: sesion.tenant_id, sucursal_id: sucursalId });
-
-  if (error) return { ok: false, error: "No se pudieron guardar los datos. Intenta de nuevo." };
+  const res = await guardarDatosEmisor(supabase, sesion.tenant_id, sucursalId, fila);
+  if (!res.ok) return { ok: false, error: res.error };
   revalidatePath(RUTA, "layout");
   return { ok: true, mensaje: "Datos fiscales guardados." };
 }
@@ -136,31 +117,8 @@ export async function crearRango(_prev: EstadoAccion | null, formData: FormData)
   );
   if (!v.ok || !v.valor) return { ok: false, error: "Revisa los campos marcados.", errores: v.errores };
 
-  // La caja de cobro de la sucursal se crea sola; aquí solo se obtiene
-  const { data: sucursal } = await supabase
-    .from("sucursales")
-    .select("id")
-    .eq("id", v.valor.sucursalId)
-    .eq("tenant_id", sesion.tenant_id)
-    .maybeSingle();
-  const caja = sucursal ? await obtenerOCrearCaja(supabase, sesion.tenant_id, sucursal.id) : null;
-  if (!caja) return { ok: false, error: "La sucursal elegida no existe.", errores: { sucursalId: "Elige una sucursal válida." } };
-
-  const { error } = await supabase.from("cai_rangos").insert({
-    tenant_id: sesion.tenant_id,
-    sucursal_id: caja.sucursal_id,
-    establecimiento: caja.establecimiento,
-    punto_emision: caja.punto_emision,
-    tipo_doc: v.valor.tipoDoc,
-    clase: v.valor.clase,
-    cai: v.valor.cai,
-    desde: v.valor.desde,
-    hasta: v.valor.hasta,
-    siguiente: v.valor.desde,
-    fecha_limite: v.valor.fechaLimite,
-    dispositivo_id: caja.id,
-  });
-  if (error) return { ok: false, error: mensajeDeError(error, "No se pudo cargar el rango.") };
+  const res = await cargarRangoCai(supabase, sesion.tenant_id, v.valor);
+  if (!res.ok) return { ok: false, error: res.error, errores: res.errores };
 
   revalidatePath(RUTA, "layout");
   return { ok: true, mensaje: "Rango cargado. Si la caja no tenía uno activo, ya quedó activo." };
@@ -170,7 +128,7 @@ export async function eliminarRango(id: string): Promise<EstadoAccion> {
   await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("cai_rangos").delete().eq("id", id);
-  if (error) return { ok: false, error: mensajeDeError(error, "No se pudo borrar el rango.") };
+  if (error) return { ok: false, error: mensajeDeErrorFiscal(error, "No se pudo borrar el rango.") };
   revalidatePath(RUTA, "layout");
   return { ok: true };
 }

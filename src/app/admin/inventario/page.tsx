@@ -137,11 +137,11 @@ export default async function InventarioPage() {
                 />
                 <Field label="Proveedor (opcional)" name="proveedor" defaultValue={item.proveedor ?? ""} />
                 <div className="col-span-full">
-                  <p className="mb-1.5 text-xs font-medium text-ink-500">Existencias por sucursal</p>
+                  <p className="mb-1.5 text-xs font-medium text-ink-500">{(sucursales ?? []).length > 1 ? "Existencias por sucursal" : "Existencias"}</p>
                   <div className="flex flex-wrap gap-3">
                     {(sucursales ?? []).map((s) => (
                       <label key={s.id} className="flex items-center gap-1.5 text-xs text-ink-700">
-                        {s.nombre}
+                        {(sucursales ?? []).length > 1 ? s.nombre : "Cantidad"}
                         <input
                           type="number"
                           step="0.01"
@@ -203,11 +203,11 @@ export default async function InventarioPage() {
           <Field label="Costo unitario (opcional)" name="costo_unitario" type="number" step="0.01" min="0" />
           <Field label="Proveedor (opcional)" name="proveedor" />
           <div className="col-span-full">
-            <p className="mb-1.5 text-xs font-medium text-ink-500">Existencias por sucursal</p>
+            <p className="mb-1.5 text-xs font-medium text-ink-500">{(sucursales ?? []).length > 1 ? "Existencias por sucursal" : "Existencias"}</p>
             <div className="flex flex-wrap gap-3">
               {(sucursales ?? []).map((s) => (
                 <label key={s.id} className="flex items-center gap-1.5 text-xs text-ink-700">
-                  {s.nombre}
+                  {(sucursales ?? []).length > 1 ? s.nombre : "Cantidad"}
                   <input
                     type="number"
                     step="0.01"

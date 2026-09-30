@@ -43,6 +43,7 @@ export default async function MesasPage({
     <div>
       <PageHeader title="Mesas / Layout" subtitle="Arrastra las mesas para armar el plano del local." />
 
+      {(sucursales ?? []).length > 1 && (
       <div className="mb-6 flex flex-wrap gap-2">
         {(sucursales ?? []).map((s) => (
           <Link
@@ -59,6 +60,7 @@ export default async function MesasPage({
           </Link>
         ))}
       </div>
+      )}
 
       {!sucursalId ? (
         <p className="text-sm text-ink-500">Crea primero una sucursal.</p>

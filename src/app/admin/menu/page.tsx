@@ -40,6 +40,9 @@ export default async function MenuPage({
     sucursalesPorProducto.set(rel.producto_id, arr);
   }
 
+  // Con UNA sola sucursal todo es de esa sucursal: no se pregunta ni se filtra
+  const unaSola = (sucursales ?? []).length === 1;
+
   const productosFiltrados = sucursalFiltro
     ? (productos ?? []).filter((p) => sucursalesPorProducto.get(p.id)?.includes(sucursalFiltro))
     : (productos ?? []);
@@ -48,7 +51,7 @@ export default async function MenuPage({
     <div>
       <PageHeader
         title="Menú digital"
-        subtitle="Cada sucursal tiene su propio menú — filtra abajo o entra desde Sucursales."
+        subtitle={unaSola ? "Los productos que vende tu negocio." : "Cada sucursal tiene su propio menú — filtra abajo o entra desde Sucursales."}
         action={
           <Link href="/admin/menu/importar">
             <Button variant="secondary" size="sm">
@@ -59,6 +62,7 @@ export default async function MenuPage({
         }
       />
 
+      {!unaSola && (
       <div className="mb-6 flex flex-wrap gap-2">
         <Link
           href="/admin/menu"
@@ -86,6 +90,7 @@ export default async function MenuPage({
           </Link>
         ))}
       </div>
+      )}
 
       <Card className="mb-6">
         <CardHeader title="Categorías" />
@@ -171,6 +176,9 @@ export default async function MenuPage({
               </label>
               <FotoProductoField name="foto_url" defaultValue={p.foto_url} />
               <TextareaField label="Descripción" name="descripcion" defaultValue={p.descripcion ?? ""} full />
+              {unaSola ? (
+                <input type="hidden" name="sucursales" value={sucursales![0].id} />
+              ) : (
               <div className="col-span-full">
                 <p className="mb-1.5 text-xs font-medium text-ink-500">Aplica en</p>
                 <div className="flex flex-wrap gap-3">
@@ -188,6 +196,7 @@ export default async function MenuPage({
                   ))}
                 </div>
               </div>
+              )}
               <div className="col-span-full flex gap-2 pt-1">
                 <Button size="sm">Guardar</Button>
                 <Button
@@ -222,11 +231,13 @@ export default async function MenuPage({
           </span>
         }
       >
-        <p className="mb-3 text-xs text-ink-500">
-          {sucursalFiltro
-            ? "Se marcará para esta sucursal — puedes agregar más abajo."
-            : "Aparece en el menú del mesero apenas lo asignes a una sucursal."}
-        </p>
+        {!unaSola && (
+          <p className="mb-3 text-xs text-ink-500">
+            {sucursalFiltro
+              ? "Se marcará para esta sucursal — puedes agregar más abajo."
+              : "Aparece en el menú del mesero apenas lo asignes a una sucursal."}
+          </p>
+        )}
         <form action={crearProducto} data-tour="form-producto" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nombre" name="nombre" required />
           <Field label="Precio (con ISV incluido)" name="precio" type="number" step="0.01" required />
@@ -245,6 +256,9 @@ export default async function MenuPage({
           </SelectField>
           <FotoProductoField name="foto_url" defaultValue={null} />
           <TextareaField label="Descripción" name="descripcion" full />
+          {unaSola ? (
+            <input type="hidden" name="sucursales" value={sucursales![0].id} />
+          ) : (
           <div className="col-span-full">
             <p className="mb-1.5 text-xs font-medium text-ink-500">Aplica en</p>
             <div className="flex flex-wrap gap-3">
@@ -262,6 +276,7 @@ export default async function MenuPage({
               ))}
             </div>
           </div>
+          )}
           <div className="col-span-full">
             <Button type="submit">
               <UtensilsCrossed className="h-4 w-4" strokeWidth={2} />

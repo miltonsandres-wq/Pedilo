@@ -63,12 +63,13 @@ export const PASOS_GUIA: PasoGuia[] = [
     abrirEtiqueta: "Agregar cajero o mesero",
     form: "form-personal",
     instrucciones: [
-      "Llena el ejemplo y toca «Agregar».",
-      "La persona recibe una contraseña temporal para entrar al POS.",
+      "Llena el ejemplo y toca «Agregar». Si dejas la contraseña vacía, generamos una.",
+      "Cuando quieras, abre la fila de esa persona y toca «Ver contraseña» para consultarla o cambiarla.",
     ],
     ejemplo: [
       { etiqueta: "Nombre", valor: "Cajero 1" },
       { etiqueta: "Correo", valor: "cajero1@minegocio.com" },
+      { etiqueta: "Contraseña", valor: "Cajero2026" },
       { etiqueta: "Rol", valor: "Cajero" },
     ],
     hecho: (p) => p.personal >= 1,
@@ -187,7 +188,7 @@ export const PASOS_GUIA: PasoGuia[] = [
     rutaEtiqueta: "el POS",
     destacar: "ir-pos",
     instrucciones: [
-      "Toca «Ir al POS» (resaltado) y entra con el usuario Cajero que creaste para abrir «Mesa 1».",
+      "Toca «Ir al POS» (resaltado): cierra tu sesión y abre el login para entrar con el usuario Cajero que creaste, y abre «Mesa 1».",
       "El mesero agrega la Coca-Cola y toca «Enviar a cocina»; después el cajero toca «Cobrar».",
       "Regresa al panel: detectamos tu primera orden. Si prefieres hacerlo después, salta este paso.",
     ],

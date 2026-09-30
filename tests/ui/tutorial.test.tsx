@@ -131,7 +131,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy();
 
     await empezar(user);
-    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
     expect(screen.getByText(/Haz clic en/).textContent).toContain("«Sucursales»");
     await waitFor(() => expect(foco()).toBe('[data-tour="nav-sucursales"]'));
   });
@@ -161,7 +161,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     progresoTutorial.mockResolvedValue({ ...PROGRESO_VACIO, personal: 1 });
     expect(await screen.findByText(/Ya tienes personal registrado/, {}, { timeout: 6000 })).toBeTruthy();
     expect(foco()).toBeNull();
-    expect(await screen.findByText("Crea tu primera categoría", {}, { timeout: 6000 })).toBeTruthy();
+    expect(await screen.findByText(/Crea tu primera categoría/, {}, { timeout: 6000 })).toBeTruthy();
 
     // 4) y el siguiente paso arranca señalando el menú «Menú digital»
     await waitFor(() => expect(foco()).toBe('[data-tour="nav-menu"]'));
@@ -198,14 +198,14 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     const { unmount } = render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     await user.click(await screen.findByRole("button", { name: "Saltar este paso" }));
-    expect(screen.getByText("Crea tu primera categoría")).toBeTruthy();
+    expect(screen.getByText(/Crea tu primera categoría/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Anterior" }));
-    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Saltar este paso" }));
     unmount();
 
     render(<TutorialOnboarding completado={false} tenantId={T} />);
-    expect(await screen.findByText("Crea tu primera categoría")).toBeTruthy();
+    expect(await screen.findByText(/Crea tu primera categoría/)).toBeTruthy();
     expect(bienvenida()).toBeNull();
   });
 
@@ -219,7 +219,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     render(<TutorialOnboarding completado={false} tenantId={T2} />);
     expect(await screen.findByText("¡Bienvenido a Pedilo!")).toBeTruthy(); // negocio 2: bienvenida, no el paso 4
     await empezar(user);
-    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
     expect(localStorage.getItem(`pedilo_tutorial_paso_${T}`)).toBe("3"); // no se pisa el del otro negocio
   });
 
@@ -228,7 +228,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     pathname = "/admin/reportes";
     const user = userEvent.setup();
     const { unmount } = render(<TutorialOnboarding completado={false} tenantId={T} />);
-    expect(await screen.findByText("Reportes y cierre del día")).toBeTruthy();
+    expect(await screen.findByText(/Reportes y cierre del día/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Siguiente paso|Saltar este paso/ })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Tutorial completado" }));
@@ -278,6 +278,32 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     expect(completarTutorial).not.toHaveBeenCalled();
   });
 
+  it("NO estorba: la guía es una barra en el flujo de la página (no flota sobre botones) y el marco no oscurece ni bloquea clics", async () => {
+    const user = userEvent.setup();
+    montar("nav-sucursales");
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await empezar(user);
+    const barra = await screen.findByRole("complementary", { name: "Guía paso a paso" });
+    expect(barra.className).toContain("sticky");
+    expect(barra.className).not.toContain("fixed");
+
+    await waitFor(() => expect(foco()).not.toBeNull());
+    const marco = screen.getByTestId("foco-guia") as HTMLElement;
+    expect(marco.className).toContain("pointer-events-none"); // los clics pasan a la pantalla de abajo
+    expect(marco.style.boxShadow).toBe(""); // sin velo oscuro sobre el resto
+  });
+
+  it("minimizada también queda en el flujo (una sola línea), sin flotar", async () => {
+    const user = userEvent.setup();
+    montar("nav-sucursales");
+    render(<TutorialOnboarding completado={false} tenantId={T} />);
+    await empezar(user);
+    await user.click(await screen.findByRole("button", { name: "Minimizar guía" }));
+    const barra = screen.getByTestId("barra-guia-minimizada");
+    expect(barra.className).toContain("sticky");
+    expect(barra.className).not.toContain("fixed");
+  });
+
   it("se puede minimizar (sin resaltar nada) y volver a abrir en el mismo paso", async () => {
     const user = userEvent.setup();
     montar("nav-sucursales");
@@ -291,7 +317,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     const pastilla = screen.getByRole("button", { name: "Abrir la guía" });
     expect(pastilla.textContent).toContain("paso 1/11");
     await user.click(pastilla);
-    expect(screen.getByText("Crea a tu personal")).toBeTruthy();
+    expect(screen.getByText(/Crea a tu personal/)).toBeTruthy();
   });
 
   it("«Ver tutorial» lo reabre desde el principio aunque ya esté completado; cerrarlo al final no guarda nada", async () => {
@@ -303,7 +329,7 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     await act(async () => {
       window.dispatchEvent(new Event(EVENTO_ABRIR_TUTORIAL));
     });
-    expect(await screen.findByText("Crea a tu personal")).toBeTruthy();
+    expect(await screen.findByText(/Crea a tu personal/)).toBeTruthy();
 
     // salta al final y cierra
     irAlPaso("reportes");

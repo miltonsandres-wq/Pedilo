@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/session";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AlertasFiscalesAdmin } from "@/components/admin/AlertasFiscalesAdmin";
@@ -6,10 +7,19 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const sesion = await requireAdmin();
+  const supabase = await createClient();
+
+  // Negocio recién registrado: primero su configuración inicial (datos, logo, CAI).
+  // Si la consulta falla (p. ej. la migración 0020 todavía no está aplicada) no se pide nada.
+  const { data: configuracion } = await supabase
+    .from("tenants")
+    .select("configuracion_inicial_at")
+    .eq("id", sesion.tenant_id)
+    .single();
+  if (configuracion && !configuracion.configuracion_inicial_at) redirect("/configuracion-inicial");
 
   // null = negocio nuevo que aún no completa el tutorial. Si la consulta falla
   // (p. ej. la migración 0019 todavía no está aplicada) no se muestra nada.
-  const supabase = await createClient();
   const { data: tenant } = await supabase
     .from("tenants")
     .select("tutorial_completado_at")

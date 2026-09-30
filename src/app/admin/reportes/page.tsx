@@ -35,7 +35,7 @@ export default async function ReportesPage({
     <div>
       <PageHeader
         title="Cierre diario"
-        subtitle="Comparación entre sucursales — se calcula al vuelo desde los pagos del día, no es una tabla."
+        subtitle={(sucursales ?? []).length > 1 ? "Comparación entre sucursales — se calcula al vuelo desde los pagos del día, no es una tabla." : "Cierre del día — se calcula al vuelo desde los pagos."}
       />
 
       <form className="mb-6 flex items-center gap-2">

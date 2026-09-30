@@ -159,6 +159,8 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
               ))}
             </div>
 
+            {sucursales.length > 1 && (
+            <>
             <p className="mb-1.5 text-xs font-medium text-ink-600">Importar a estas sucursales</p>
             <div className="mb-4 flex flex-wrap gap-3">
               {sucursales.map((s) => (
@@ -177,6 +179,8 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
                 </label>
               ))}
             </div>
+            </>
+            )}
 
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setItems(null)}>
