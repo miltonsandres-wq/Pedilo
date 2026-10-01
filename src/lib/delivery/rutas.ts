@@ -32,11 +32,13 @@ export function slugDesdeNombre(nombre: string): string {
  * ¿Es una página pública de delivery? (sin sesión de Supabase)
  *   /fondita                      -> menú
  *   /fondita/pedido/<token>       -> seguimiento
+ *   /fondita/pedido/<token>/factura -> factura en PDF (solo con el token)
  */
 export function esRutaPublicaDelivery(pathname: string): boolean {
   const partes = pathname.split("/").filter(Boolean);
   if (partes.length === 0) return false;
   if (!slugValido(partes[0])) return false;
   if (partes.length === 1) return true;
-  return partes.length === 3 && partes[1] === "pedido" && partes[2].length > 0;
+  if (partes[1] !== "pedido" || partes.length < 3 || partes.length > 4) return false;
+  return partes.length === 3 || partes[3] === "factura";
 }

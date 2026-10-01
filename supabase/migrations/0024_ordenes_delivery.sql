@@ -349,6 +349,42 @@ create policy orden_items_select_repartidor on public.orden_items
 alter publication supabase_realtime add table public.ordenes_delivery;
 
 -- ----------------------------------------------------------------------------
+-- Aviso en vivo al seguimiento del cliente (Realtime broadcast en el canal
+-- público pedido:<token>, cuyo nombre es el secreto). Solo lleva el estado: la
+-- página vuelve a pedir el detalle por seguimiento_pedido(). Si Realtime no
+-- está (pruebas locales) se ignora; el seguimiento además consulta cada pocos
+-- segundos, así que esto solo lo hace instantáneo.
+-- ----------------------------------------------------------------------------
+create or replace function public.fn_delivery_avisar_seguimiento()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  begin
+    execute format(
+      'select realtime.send(%L::jsonb, %L, %L, false)',
+      jsonb_build_object('estado', new.estado_delivery, 'llegado', new.llegado_at is not null)::text,
+      'estado',
+      'pedido:' || new.tracking_token
+    );
+  exception when others then
+    null;
+  end;
+  return new;
+end;
+$$;
+
+create trigger trg_ordenes_delivery_avisar
+  after update on public.ordenes_delivery
+  for each row
+  when (old.estado_delivery is distinct from new.estado_delivery
+        or old.llegado_at is distinct from new.llegado_at
+        or old.repartidor_id is distinct from new.repartidor_id)
+  execute function public.fn_delivery_avisar_seguimiento();
+
+-- ----------------------------------------------------------------------------
 -- Seguimiento público: SOLO con el token. Devuelve únicamente lo que el
 -- cliente puede ver de SU pedido (la ubicación en vivo NO pasa por aquí: va
 -- por Realtime broadcast y solo mientras está en camino).
@@ -394,6 +430,7 @@ begin
 
   return jsonb_build_object(
     'orden_id', d.orden_id,
+    'slug', v_config.slug,
     'numero', o.numero_dia,
     'sucursal', (select s.nombre from public.sucursales s where s.id = d.sucursal_id),
     'estado', d.estado_delivery,

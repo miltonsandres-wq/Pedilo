@@ -20,6 +20,14 @@ create table storage.objects (bucket_id text, name text);
 create function storage.foldername(name text) returns text[] language sql as
   $$ select string_to_array(name, '/') $$;
 create publication supabase_realtime;
+create schema realtime;
+create table realtime.messages (id bigserial primary key, topic text, extension text);
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as
+  $$ select nullif(current_setting('realtime.topic', true), '') $$;
+grant usage on schema realtime to authenticated, anon;
+grant select, insert on realtime.messages to authenticated;
+grant usage on all sequences in schema realtime to authenticated;
 grant usage on schema public, auth to authenticated, anon;
 `;
 

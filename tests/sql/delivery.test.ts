@@ -353,3 +353,34 @@ describe("rate limit", () => {
     expect([await hit(), await hit(), await hit(), await hit()]).toEqual([true, true, true, false]);
   });
 });
+
+describe("canal privado de la flota (Realtime Authorization)", () => {
+  const conTopic = async <X,>(topic: string, fn: () => Promise<X>) => {
+    await pg.exec(`select set_config('realtime.topic', '${topic}', false)`);
+    try {
+      return await fn();
+    } finally {
+      await pg.exec("select set_config('realtime.topic', '', false)");
+    }
+  };
+  const puedeRecibir = (topic: string, quien: <X>(f: () => Promise<X>) => Promise<X>) =>
+    conTopic(topic, () => quien(async () => {
+      return (await pg.query("select 1 from realtime.messages where topic = realtime.topic()")).rows.length > 0;
+    }));
+
+  it("el personal de la sucursal recibe; cocina y otros negocios no", async () => {
+    await pg.exec(`insert into realtime.messages (topic, extension) values ('flota:${S1}', 'broadcast')`);
+    expect(await puedeRecibir(`flota:${S1}`, comoCajero)).toBe(true);
+    expect(await puedeRecibir(`flota:${S1}`, comoCocina)).toBe(false);
+    expect(await puedeRecibir(`flota:${S1}`, comoAdmin2)).toBe(false);
+    expect(await puedeRecibir("otro:canal", comoCajero)).toBe(false);
+  });
+
+  it("solo el repartidor de esa sucursal puede enviar su posición", async () => {
+    const enviar = (topic: string, rep: string) =>
+      conTopic(topic, () => comoRepartidor(pg, rep, () => pg.exec(`insert into realtime.messages (topic, extension) values ('${topic}', 'broadcast')`)));
+    await enviar(`flota:${S1}`, R1);
+    await expect(enviar(`flota:${S2}`, R1)).rejects.toThrow(/row-level security/);
+    await expect(conTopic(`flota:${S1}`, () => comoCajero(() => pg.exec(`insert into realtime.messages (topic, extension) values ('flota:${S1}', 'broadcast')`)))).rejects.toThrow(/row-level security/);
+  });
+});

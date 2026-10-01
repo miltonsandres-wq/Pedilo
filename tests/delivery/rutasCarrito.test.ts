@@ -19,6 +19,8 @@ describe("rutas públicas de delivery", () => {
     for (const r of ["/", "/admin", "/pos", "/pos/mesa/1", "/cocina", "/login", "/repartidor", "/carta/abc", "/admin/menu"]) {
       expect(esRutaPublicaDelivery(r), r).toBe(false);
     }
+    expect(esRutaPublicaDelivery("/fondita/pedido/AbC123/factura")).toBe(true);
+    expect(esRutaPublicaDelivery("/fondita/pedido/AbC123/otra")).toBe(false);
     expect(esRutaPublicaDelivery("/fondita/otra/cosa")).toBe(false);
     expect(esRutaPublicaDelivery("/fondita/pedido")).toBe(false);
     expect(esRutaPublicaDelivery("/fondita/pedido/a/b")).toBe(false);
