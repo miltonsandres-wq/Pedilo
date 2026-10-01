@@ -362,7 +362,7 @@ create table public.ordenes_delivery (
   factura_rtn                   text,
   repartidor_id                 uuid references public.repartidores(id) on delete set null,
   tracking_token                text not null unique
-                                  default translate(encode(gen_random_bytes(32), 'base64'), '+/=', '-_'),
+                                  default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   estado_delivery               text not null default 'recibido'
                                   check (estado_delivery in ('recibido','aceptado','en_cocina','listo',
                                                              'en_camino','entregado','rechazado','cancelado')),
@@ -1358,4 +1358,18 @@ begin
   end if;
 end;
 $$;
+
+-- ============================== 0030_token_seguimiento_sin_pgcrypto.sql ==============================
+-- ============================================================================
+-- Corrección a 0024: el token de seguimiento usaba gen_random_bytes() (pgcrypto).
+-- En Supabase pgcrypto vive en el esquema `extensions`, que NO está en el
+-- search_path de crear_pedido_delivery (security definer, search_path = public):
+-- el INSERT del pedido fallaría con "function gen_random_bytes does not exist".
+-- gen_random_uuid() es del núcleo de Postgres (CSPRNG): dos uuid v4 dan
+-- 64 caracteres hexadecimales con ~244 bits aleatorios, sin depender de nada.
+-- ============================================================================
+
+alter table public.ordenes_delivery
+  alter column tracking_token
+  set default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
 

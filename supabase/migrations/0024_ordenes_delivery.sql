@@ -41,7 +41,7 @@ create table public.ordenes_delivery (
   factura_rtn                   text,
   repartidor_id                 uuid references public.repartidores(id) on delete set null,
   tracking_token                text not null unique
-                                  default translate(encode(gen_random_bytes(32), 'base64'), '+/=', '-_'),
+                                  default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   estado_delivery               text not null default 'recibido'
                                   check (estado_delivery in ('recibido','aceptado','en_cocina','listo',
                                                              'en_camino','entregado','rechazado','cancelado')),
