@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { EstadoMesa, EstadoOrden } from "@/lib/types/helpers";
-import { db, type OrdenLocal } from "./db";
+import { db, CLAVE_DELIVERY_CONFIG, type OrdenLocal } from "./db";
 import { flushOutbox } from "./outbox";
 import { solicitarAlmacenamientoPersistente, sincronizarFiscal } from "@/lib/fiscal/sincronizacion";
 
@@ -30,6 +30,7 @@ export async function iniciarSync(
   void solicitarAlmacenamientoPersistente();
   await pullInicial(sucursalId, tenantId);
   await refrescarFiscal(sucursalId, tenantId, puedeCobrar, omitirFiscal);
+  await refrescarDelivery(sucursalId);
   await flushOutbox();
 
   const canal = supabase
@@ -54,6 +55,11 @@ export async function iniciarSync(
       { event: "*", schema: "public", table: "pagos", filter: `sucursal_id=eq.${sucursalId}` },
       (payload) => aplicarCambioRemoto("pagos", payload)
     )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "ordenes_delivery", filter: `sucursal_id=eq.${sucursalId}` },
+      (payload) => aplicarCambioRemoto("ordenes_delivery", payload)
+    )
     .subscribe();
 
   const onOnline = () => void flushOutbox();
@@ -64,6 +70,11 @@ export async function iniciarSync(
   const intervaloFiscal = window.setInterval(() => void refrescarFiscal(sucursalId, tenantId, puedeCobrar, omitirFiscal), 300_000);
   const onOnlineFiscal = () => void refrescarFiscal(sucursalId, tenantId, puedeCobrar, omitirFiscal);
   window.addEventListener("online", onOnlineFiscal);
+  // Config, zonas, repartidores y pedidos de delivery: se vuelven a bajar cada
+  // 5 min y al reconectar (Realtime cubre los cambios de los pedidos en vivo).
+  const intervaloDelivery = window.setInterval(() => void refrescarDelivery(sucursalId), 300_000);
+  const onOnlineDelivery = () => void refrescarDelivery(sucursalId);
+  window.addEventListener("online", onOnlineDelivery);
 
   return () => {
     iniciado = false;
@@ -72,6 +83,8 @@ export async function iniciarSync(
     window.clearInterval(intervalo);
     window.clearInterval(intervaloFiscal);
     window.removeEventListener("online", onOnlineFiscal);
+    window.clearInterval(intervaloDelivery);
+    window.removeEventListener("online", onOnlineDelivery);
   };
 }
 
@@ -83,6 +96,57 @@ async function refrescarFiscal(sucursalId: string, tenantId: string, puedeCobrar
   } catch (e) {
     console.warn("No se pudo sincronizar la facturación fiscal:", e);
   }
+}
+
+/**
+ * Baja lo de delivery de esta sucursal: config (pausa, tasa del envío), zonas,
+ * repartidores y los pedidos activos + los de las últimas 24 h. Nunca debe
+ * tumbar el POS: sin red (o sin permiso, ej. cocina) se queda con lo cacheado.
+ */
+export async function refrescarDelivery(sucursalId: string) {
+  try {
+    const supabase = createClient();
+    const desde = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const [{ data: config }, { data: zonas }, { data: repartidores }, { data: pedidos }] = await Promise.all([
+      supabase.from("delivery_config").select("*").eq("sucursal_id", sucursalId).maybeSingle(),
+      supabase.from("delivery_zonas").select("*").eq("sucursal_id", sucursalId),
+      supabase.from("repartidores").select("*").eq("sucursal_id", sucursalId),
+      supabase
+        .from("ordenes_delivery")
+        .select("*")
+        .eq("sucursal_id", sucursalId)
+        .or(`estado_delivery.in.(recibido,aceptado,en_cocina,listo,en_camino),created_at.gte.${desde}`),
+    ]);
+    if (config) await db.config.put({ clave: CLAVE_DELIVERY_CONFIG, valor: config });
+    if (zonas) await db.delivery_zonas.bulkPut(zonas);
+    if (repartidores) await db.repartidores.bulkPut(repartidores);
+    if (pedidos) {
+      await db.delivery_pedidos.bulkPut(pedidos);
+      // las órdenes de delivery ya terminadas no vienen en el pull de órdenes abiertas
+      const ids = pedidos.map((p) => p.orden_id);
+      if (ids.length) await traerOrdenes(ids);
+    }
+  } catch (e) {
+    console.warn("No se pudo sincronizar el delivery:", e);
+  }
+}
+
+/** Trae (y cachea) las órdenes e ítems de estos pedidos que aún no estén en el dispositivo. */
+async function traerOrdenes(ids: string[]) {
+  const supabase = createClient();
+  const locales = new Set((await db.ordenes.bulkGet(ids)).filter(Boolean).map((o) => o!.id));
+  const pendientes = ids.filter((id) => !locales.has(id));
+  if (pendientes.length === 0) return;
+  const [{ data: ordenes }, { data: items }] = await Promise.all([
+    supabase.from("ordenes").select("*").in("id", pendientes),
+    supabase.from("orden_items").select("*").in("orden_id", pendientes),
+  ]);
+  if (ordenes) {
+    await db.ordenes.bulkPut(ordenes.map((o) => ({
+      ...o, estado: o.estado as EstadoOrden, canal: o.canal as OrdenLocal["canal"], total: Number(o.total),
+    })));
+  }
+  if (items) await db.orden_items.bulkPut(items);
 }
 
 async function pullInicial(sucursalId: string, tenantId: string) {
@@ -168,15 +232,28 @@ async function pullInicial(sucursalId: string, tenantId: string) {
   void tenantId; // reservado por si luego se cachea catálogo a nivel tenant
 }
 
+/** Tabla de Supabase -> tabla de Dexie, y la llave primaria cuando no es "id". */
+const DESTINO_REMOTO = {
+  mesas: { local: "mesas", pk: "id" },
+  ordenes: { local: "ordenes", pk: "id" },
+  orden_items: { local: "orden_items", pk: "id" },
+  pagos: { local: "pagos", pk: "id" },
+  ordenes_delivery: { local: "delivery_pedidos", pk: "orden_id" },
+} as const;
+
 async function aplicarCambioRemoto(
-  tabla: "mesas" | "ordenes" | "orden_items" | "pagos",
+  tabla: keyof typeof DESTINO_REMOTO,
   payload: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }
 ) {
-  const tabla_ = db[tabla];
+  const { local, pk } = DESTINO_REMOTO[tabla];
+  const tabla_ = db[local] as unknown as {
+    put(fila: unknown): Promise<unknown>;
+    delete(id: string): Promise<void>;
+  };
   if (payload.eventType === "DELETE") {
-    const id = (payload.old as { id: string }).id;
+    const id = payload.old[pk] as string | undefined;
     if (id) await tabla_.delete(id);
     return;
   }
-  await tabla_.put(payload.new as never);
+  await tabla_.put(payload.new);
 }

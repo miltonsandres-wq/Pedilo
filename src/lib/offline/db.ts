@@ -126,6 +126,14 @@ export type DocumentoFiscalLocal = Tables<"documentos_fiscales"> & {
   impreso_at?: string | null;
 };
 
+/** Pedido de delivery (espejo de ordenes_delivery) para el tablero del POS. */
+export type DeliveryPedidoLocal = Tables<"ordenes_delivery">;
+export type RepartidorLocal = Tables<"repartidores">;
+export type DeliveryZonaLocal = Tables<"delivery_zonas">;
+/** Copia local de delivery_config (clave "delivery_config" en la tabla config). */
+export type DeliveryConfigLocal = Tables<"delivery_config">;
+export const CLAVE_DELIVERY_CONFIG = "delivery_config";
+
 export const db = new Dexie("pos_offline") as Dexie & {
   mesas: EntityTable<MesaLocal, "id">;
   productos: EntityTable<ProductoLocal, "id">;
@@ -136,6 +144,9 @@ export const db = new Dexie("pos_offline") as Dexie & {
   config: EntityTable<ConfigEntry, "clave">;
   rangos_cai: EntityTable<RangoCaiLocal, "id">;
   documentos_fiscales: EntityTable<DocumentoFiscalLocal, "id">;
+  delivery_pedidos: EntityTable<DeliveryPedidoLocal, "orden_id">;
+  repartidores: EntityTable<RepartidorLocal, "id">;
+  delivery_zonas: EntityTable<DeliveryZonaLocal, "id">;
 };
 
 db.version(1).stores({
@@ -154,4 +165,13 @@ db.version(1).stores({
 db.version(2).stores({
   rangos_cai: "id, sucursal_id, estado, clase",
   documentos_fiscales: "id, sucursal_id, orden_id, sync_estado, numero_completo, fecha_emision",
+});
+
+// v3: delivery. El tablero del POS lee de aquí (se llena con el pull inicial y
+// Realtime sobre ordenes_delivery); los ítems y la orden ya viajan por las
+// tablas de siempre.
+db.version(3).stores({
+  delivery_pedidos: "orden_id, sucursal_id, estado_delivery, repartidor_id",
+  repartidores: "id, sucursal_id",
+  delivery_zonas: "id, sucursal_id",
 });

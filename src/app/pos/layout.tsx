@@ -7,6 +7,7 @@ import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
 import { BrandMark } from "@/components/BrandMark";
 import { AvisosFiscales } from "@/components/pos/AvisosFiscales";
 import { EnlaceFacturas } from "@/components/pos/EnlaceFacturas";
+import { AlertaDelivery } from "@/components/pos/delivery/AlertaDelivery";
 
 export default async function PosLayout({ children }: { children: React.ReactNode }) {
   const sesion = await requireSucursal();
@@ -32,6 +33,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
           >
             <ChefHat className="h-4 w-4" strokeWidth={2} />
           </Link>
+          <AlertaDelivery sucursalId={sesion.sucursal_id} />
           <EnlaceFacturas />
           <SyncIndicator />
           <CerrarSesionBoton />

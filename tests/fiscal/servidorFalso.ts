@@ -21,6 +21,7 @@ class Consulta implements PromiseLike<Resultado> {
   private orden = "";
   private tope = "";
   private modo: "todos" | "single" | "maybe" = "todos";
+  private cambios: Record<string, unknown> | null = null;
   constructor(private tabla: string) {}
 
   select(_columnas?: string) {
@@ -45,6 +46,11 @@ class Consulta implements PromiseLike<Resultado> {
     this.tope = ` limit ${n}`;
     return this;
   }
+  /** update(valores).eq(...): corre el UPDATE real (con triggers y RLS) y devuelve el error si la base lo rechaza. */
+  update(valores: Record<string, unknown>) {
+    this.cambios = valores;
+    return this;
+  }
   single() {
     this.modo = "single";
     return this;
@@ -57,6 +63,19 @@ class Consulta implements PromiseLike<Resultado> {
   private async ejecutar(): Promise<Resultado> {
     if (servidor.caido) return SIN_RED;
     const donde = this.filtros.length ? ` where ${this.filtros.join(" and ")}` : "";
+    if (this.cambios) {
+      const claves = Object.keys(this.cambios);
+      const set = claves.map((k, i) => `${k} = $${this.valores.length + i + 1}`).join(", ");
+      const params = [...this.valores, ...claves.map((k) => this.cambios![k])];
+      try {
+        await comoUsuario(servidor.pg!, servidor.userId, () =>
+          servidor.pg!.query(`update public.${this.tabla} set ${set}${donde}`, params)
+        );
+        return { data: null, error: null };
+      } catch (e) {
+        return { data: null, error: { message: (e as Error).message } };
+      }
+    }
     const sql = `select * from public.${this.tabla}${donde}${this.orden}${this.tope}`;
     try {
       const r = await comoUsuario(servidor.pg!, servidor.userId, () => servidor.pg!.query(sql, this.valores));
