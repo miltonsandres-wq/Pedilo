@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { esRutaPublicaDelivery } from "@/lib/delivery/rutas";
 
 // Rutas públicas que no requieren sesión.
-const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos"];
+// /repartidor: la PWA del repartidor entra con restaurante + PIN (JWT propio), no con Supabase Auth.
+const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos", "/repartidor"];
 
 export async function middleware(request: NextRequest) {
   // /carta/[token] lo abren clientes sin cuenta (QR de la mesa): ni falta
@@ -75,6 +76,6 @@ export const config = {
     /*
      * Aplica a todas las rutas menos assets estáticos e imágenes.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
