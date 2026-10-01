@@ -1665,6 +1665,7 @@ export type Database = {
     Functions: {
       calcular_liquidacion: { Args: { p_repartidor: string }; Returns: Json }
       cerrar_liquidacion: { Args: { p_repartidor: string; p_entregado: number; p_notas?: string }; Returns: Json }
+      crear_pedido_delivery: { Args: { p_sucursal: string; p_canal: string; p_pedido: Json }; Returns: Json }
       delivery_abierto: { Args: { p_sucursal: string; p_ahora?: string }; Returns: boolean }
       delivery_pausar: { Args: { p_sucursal: string; p_pausado: boolean }; Returns: undefined }
       delivery_rate_limit_hit: { Args: { p_clave: string; p_max: number; p_ventana_seg: number }; Returns: boolean }
