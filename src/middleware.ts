@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { esRutaPublicaDelivery } from "@/lib/delivery/rutas";
 
 // Rutas públicas que no requieren sesión.
 const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos"];
@@ -8,6 +9,12 @@ export async function middleware(request: NextRequest) {
   // /carta/[token] lo abren clientes sin cuenta (QR de la mesa): ni falta
   // revisar sesión de Supabase para esas peticiones.
   if (request.nextUrl.pathname.startsWith("/carta")) {
+    return NextResponse.next();
+  }
+
+  // Menú público de delivery (/[slug]) y su seguimiento (/[slug]/pedido/[token]):
+  // los abre el cliente final sin cuenta.
+  if (esRutaPublicaDelivery(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
 

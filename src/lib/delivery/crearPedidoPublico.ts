@@ -1,4 +1,4 @@
-import { esRtn, esTelefonoHN, normalizarRtn, normalizarTelefonoHN, type MetodoPago } from "./validaciones";
+import { esTelefonoHN, normalizarRtn, normalizarTelefonoHN, type MetodoPago } from "./validaciones";
 
 /**
  * Lógica del pedido público, SIN dependencias de Next, para poder probarla.
