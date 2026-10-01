@@ -12,6 +12,7 @@ import {
   Boxes,
   FileText,
   Users,
+  Bike,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/admin/inventario", label: "Inventario", icon: Boxes },
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },
   { href: "/admin/formas-pago", label: "Formas de pago", icon: Wallet },
+  { href: "/admin/delivery", label: "Delivery", icon: Bike },
   { href: "/admin/fiscal", label: "Facturación fiscal", icon: FileText },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];

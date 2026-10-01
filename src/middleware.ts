@@ -4,7 +4,8 @@ import { esRutaPublicaDelivery } from "@/lib/delivery/rutas";
 
 // Rutas públicas que no requieren sesión.
 // /repartidor: la PWA del repartidor entra con restaurante + PIN (JWT propio), no con Supabase Auth.
-const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos", "/repartidor"];
+// /api/delivery: endpoints de cron que se autentican con un secreto propio.
+const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/carta", "/privacidad", "/terminos", "/repartidor", "/api/delivery"];
 
 export async function middleware(request: NextRequest) {
   // /carta/[token] lo abren clientes sin cuenta (QR de la mesa): ni falta

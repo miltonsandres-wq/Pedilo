@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database.types";
+import { resumirLiquidaciones, type ResumenDeliveryCierre } from "@/lib/delivery/reportes";
 
 /**
  * El cierre diario NO es una tabla: es una consulta que suma los `pagos`
@@ -12,6 +13,8 @@ export interface CierreDiario {
   totalOrdenes: number;
   porFormaPago: Record<string, number>;
   productosMasVendidos: { nombre: string; cantidad: number; subtotal: number }[];
+  /** Delivery del día: entregas y liquidaciones de repartidores (el efectivo que entregaron en caja). */
+  delivery: ResumenDeliveryCierre;
 }
 
 export async function obtenerCierreDiario(
@@ -72,12 +75,34 @@ export async function obtenerCierreDiario(
       .slice(0, 10);
   }
 
+  // Delivery: lo cobrado por los repartidores ya está en `pagos` (se registra al entregar);
+  // aquí se suma lo que entregaron en caja al liquidar, y la diferencia.
+  const [{ count: entregados }, { data: liquidaciones }] = await Promise.all([
+    supabase
+      .from("ordenes_delivery")
+      .select("*", { count: "exact", head: true })
+      .eq("sucursal_id", params.sucursalId)
+      .eq("estado_delivery", "entregado")
+      .gte("entregado_at", params.desde)
+      .lte("entregado_at", params.hasta),
+    supabase
+      .from("liquidaciones_repartidor")
+      .select("total_efectivo_cobrado, total_entregado_en_caja, diferencia, total_pago_envios")
+      .eq("sucursal_id", params.sucursalId)
+      .gte("cerrada_at", params.desde)
+      .lte("cerrada_at", params.hasta),
+  ]);
+
   return {
     sucursalId: params.sucursalId,
     totalCobrado,
     totalOrdenes: totalOrdenes ?? 0,
     porFormaPago,
     productosMasVendidos,
+    delivery: resumirLiquidaciones(entregados ?? 0, (liquidaciones ?? []).map((l) => ({
+      total_efectivo_cobrado: Number(l.total_efectivo_cobrado), total_entregado_en_caja: Number(l.total_entregado_en_caja),
+      diferencia: Number(l.diferencia), total_pago_envios: Number(l.total_pago_envios),
+    }))),
   };
 }
 

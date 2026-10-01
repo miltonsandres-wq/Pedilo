@@ -1,4 +1,4 @@
-import { Wallet, Flame, Calendar, Receipt } from "lucide-react";
+import { Wallet, Flame, Calendar, Receipt, Bike } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { obtenerCierreDiario, rangoDelDia } from "@/lib/reportes/cierreDiario";
@@ -101,6 +101,22 @@ export default async function ReportesPage({
                     <li className="text-ink-400">Sin cobros ese día.</li>
                   )}
                 </ul>
+
+                {(c.delivery.pedidosEntregados > 0 || c.delivery.liquidaciones > 0) && (
+                  <>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
+                      <Bike className="h-3.5 w-3.5" strokeWidth={2} />
+                      Delivery
+                    </p>
+                    <ul className="mb-4 space-y-1.5 text-sm text-ink-700">
+                      <li className="flex justify-between"><span>Pedidos entregados</span><span className="font-medium">{c.delivery.pedidosEntregados}</span></li>
+                      <li className="flex justify-between"><span>Liquidaciones cerradas</span><span className="font-medium">{c.delivery.liquidaciones}</span></li>
+                      <li className="flex justify-between"><span>Efectivo entregado en caja</span><span className="font-medium">L. {c.delivery.efectivoEntregadoEnCaja.toFixed(2)}</span></li>
+                      <li className="flex justify-between"><span>Diferencia (entregado − sistema)</span><span className={`font-medium ${c.delivery.diferencia < 0 ? "text-red-600" : ""}`}>L. {c.delivery.diferencia.toFixed(2)}</span></li>
+                      {c.delivery.pagoEnvios > 0 && <li className="flex justify-between"><span>Pago a repartidores (envíos)</span><span className="font-medium">L. {c.delivery.pagoEnvios.toFixed(2)}</span></li>}
+                    </ul>
+                  </>
+                )}
 
                 <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
                   <Flame className="h-3.5 w-3.5" strokeWidth={2} />

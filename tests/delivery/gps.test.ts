@@ -136,7 +136,7 @@ describe("ControladorRastreo", () => {
     });
   });
 
-  const espera = () => new Promise((r) => setTimeout(r, 15));
+  const espera = () => ctl.esperar();
 
   it("enciende el GPS y la pantalla SOLO con un pedido en camino, y los apaga al entregar el último", () => {
     ctl.actualizarPedidos([pedido("A", { estado_delivery: "listo" })]);

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { SLUGS_RESERVADOS, esRutaPublicaDelivery, slugDesdeNombre, slugValido } from "@/lib/delivery/rutas";
 import { cambiarCantidad, cambiarNota, limpiarCarrito, subtotal, totalUnidades, MAX_POR_PRODUCTO } from "@/lib/delivery/carrito";
-import { textoHorario } from "@/lib/delivery/horario";
+import { textoHorario, horarioDesdeFormulario, diaHonduras } from "@/lib/delivery/horario";
 
 describe("rutas públicas de delivery", () => {
   it("la lista de slugs reservados de TS coincide con el CHECK de la migración", () => {
@@ -78,5 +78,29 @@ describe("horario de hoy", () => {
     expect(textoHorario(h, "lun")).toBe("10:00 a 14:00 y 18:00 a 22:00");
     expect(textoHorario(h, "mar")).toBeNull();
     expect(textoHorario(null, "lun")).toBeNull();
+  });
+});
+
+describe("horario del formulario del admin", () => {
+  const form = (campos: Record<string, string>) => (c: string) => campos[c];
+
+  it("arma un tramo por día abierto y deja cerrados los demás", () => {
+    const r = horarioDesdeFormulario(form({ abre_lun: "on", desde_lun: "10:00", hasta_lun: "22:00", abre_vie: "on", desde_vie: "18:00", hasta_vie: "02:00" }));
+    expect(r).toEqual({ ok: true, horario: { lun: [{ desde: "10:00", hasta: "22:00" }], vie: [{ desde: "18:00", hasta: "02:00" }] } });
+  });
+
+  it("rechaza horas mal escritas o iguales, con mensaje en español", () => {
+    expect(horarioDesdeFormulario(form({ abre_mar: "on", desde_mar: "10", hasta_mar: "22:00" }))).toMatchObject({ ok: false, error: expect.stringContaining("martes") });
+    expect(horarioDesdeFormulario(form({ abre_sab: "on", desde_sab: "25:00", hasta_sab: "22:00" }))).toMatchObject({ ok: false });
+    expect(horarioDesdeFormulario(form({ abre_dom: "on", desde_dom: "10:00", hasta_dom: "10:00" }))).toMatchObject({ ok: false, error: expect.stringContaining("misma hora") });
+  });
+
+  it("sin días marcados el horario queda vacío (cerrado siempre)", () => {
+    expect(horarioDesdeFormulario(form({}))).toEqual({ ok: true, horario: {} });
+  });
+
+  it("el día se calcula en hora de Honduras (UTC-6)", () => {
+    expect(diaHonduras(new Date("2026-06-01T05:59:00Z"))).toBe("dom"); // domingo 23:59 en Honduras
+    expect(diaHonduras(new Date("2026-06-01T06:01:00Z"))).toBe("lun");
   });
 });

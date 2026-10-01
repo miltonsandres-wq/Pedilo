@@ -101,6 +101,11 @@ export function TableroDelivery({ sucursalId, usuarioId, puedeDespachar }: { suc
               {config.pausado ? "Reanudar pedidos" : "Pausar pedidos"}
             </Button>
           )}
+          {puedeDespachar && (
+            <Link href="/pos/delivery/liquidacion" className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
+              <Receipt className="h-3.5 w-3.5" /> Liquidación
+            </Link>
+          )}
           <Link href="/pos/delivery/flota" className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
             <MapPin className="h-3.5 w-3.5" /> Mapa de flota
           </Link>

@@ -61,9 +61,20 @@ export class ControladorRastreo {
 
   constructor(private readonly deps: DepsRastreo) {
     this.callbacks = {
-      onLectura: (l) => void this.procesarLectura(l),
+      onLectura: (l) => this.encolar(l),
       onError: (e) => this.procesarError(e),
     };
+  }
+
+  /** Las lecturas se procesan de a una, en orden (el guardado en la base local es asíncrono). */
+  private cola: Promise<void> = Promise.resolve();
+  private encolar(l: Lectura) {
+    this.cola = this.cola.then(() => this.procesarLectura(l)).catch(() => undefined);
+  }
+
+  /** Espera a que termine de procesarse lo que ya llegó (útil en pruebas y antes de cerrar sesión). */
+  esperar() {
+    return this.cola;
   }
 
   get estadoActual() {
