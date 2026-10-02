@@ -33,7 +33,8 @@ import {
   eliminarItem,
   enviarACocina,
 } from "@/lib/pos/acciones";
-import type { FormaPago, RolUsuario } from "@/lib/types/helpers";
+import { ETIQUETA_FORMA_PAGO, FORMA_DELIVERY_EXTERNO, type FormaPago, type RolUsuario } from "@/lib/types/helpers";
+import { imprimirReciboDeliveryExterno } from "@/lib/delivery/reciboExterno";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Field";
 import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
@@ -569,11 +570,15 @@ export function FormularioCobro({
   const [referencia, setReferencia] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Tras cobrar con delivery externo se muestra el resultado del recibo antes de cerrar
+  const [reciboExterno, setReciboExterno] = useState<{ ok: boolean; error?: string; imprimiendo: boolean } | null>(null);
 
   // Facturación fiscal: solo aparece si el negocio la tiene activa
   const config = useLiveQuery(() => leerConfigFiscal(), [], undefined);
   const rangos = useLiveQuery(() => db.rangos_cai.toArray(), [], []);
-  const factura = !!config?.activa;
+  // Delivery externo: sin factura CAI (solo recibo no fiscal), así que no aplica nada fiscal
+  const externo = formaPago === FORMA_DELIVERY_EXTERNO;
+  const factura = !!config?.activa && !externo;
   const bloqueo = factura ? evaluarFacturacion(config, rangos ?? []) : null;
   const [conRtn, setConRtn] = useState(false);
   const [clienteNombre, setClienteNombre] = useState("");
@@ -615,6 +620,13 @@ export function FormularioCobro({
             }
           : undefined,
       });
+      if (formaPago === FORMA_DELIVERY_EXTERNO) {
+        // El cobro ya quedó registrado: ahora el recibo (no fiscal). Si falla la impresora se puede reintentar.
+        setReciboExterno({ ok: false, imprimiendo: true });
+        const r = await imprimirReciboDeliveryExterno(ordenId, referencia);
+        setReciboExterno({ ok: r.ok, error: r.error, imprimiendo: false });
+        return;
+      }
       onCobrado(documentoId);
     } catch (e) {
       // Un FiscalError (sin CAI, RTN inválido...) no escribió nada: se puede corregir y reintentar
@@ -625,6 +637,48 @@ export function FormularioCobro({
 
   const inputClase =
     "w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+
+  if (reciboExterno) {
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink-950/40 p-0 sm:items-center sm:p-4">
+        <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 text-center shadow-popover sm:rounded-2xl">
+          <h2 className="text-base font-semibold text-ink-900">Cobro registrado</h2>
+          <p className="mt-1 text-sm text-ink-500">Delivery externo · sin factura CAI</p>
+          <p
+            role="status"
+            className={cn(
+              "mt-4 rounded-lg px-3 py-2 text-sm",
+              reciboExterno.imprimiendo ? "bg-ink-50 text-ink-600" : reciboExterno.ok ? "bg-libre-bg text-libre-text" : "bg-red-50 text-red-700"
+            )}
+          >
+            {reciboExterno.imprimiendo
+              ? "Imprimiendo recibo…"
+              : reciboExterno.ok
+                ? "Recibo enviado a la impresora."
+                : (reciboExterno.error ?? "No se pudo imprimir el recibo.")}
+          </p>
+          <div className="mt-5 flex gap-2">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={reciboExterno.imprimiendo}
+              onClick={async () => {
+                setReciboExterno({ ok: false, imprimiendo: true });
+                const r = await imprimirReciboDeliveryExterno(ordenId, referencia);
+                setReciboExterno({ ok: r.ok, error: r.error, imprimiendo: false });
+              }}
+            >
+              Reimprimir
+            </Button>
+            <Button size="lg" className="flex-1" onClick={() => onCobrado(null)}>
+              Listo
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink-950/40 p-0 sm:items-center sm:p-4">
@@ -654,6 +708,11 @@ export function FormularioCobro({
             className="w-full rounded-lg border border-ink-200 bg-white py-3 pl-8 pr-3 text-lg font-semibold tabular-nums outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
+        {externo && (
+          <p className="mb-3 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
+            Delivery externo: <b>no se emite factura CAI</b>. Se imprime un recibo (no fiscal) con el detalle y el subtotal.
+          </p>
+        )}
         {factura && esParcial && (
           <p className="mb-3 text-xs text-amber-700">
             Pago parcial: la factura se emite cuando los pagos cubran el total (L. {total.toFixed(2)}).
@@ -671,13 +730,15 @@ export function FormularioCobro({
             ? formasDisponibles
             : (["efectivo", "tarjeta", "transferencia"] as const)
           ).map((f) => (
-            <option key={f} value={f} className="capitalize">
-              {f}
+            <option key={f} value={f}>
+              {ETIQUETA_FORMA_PAGO[f] ?? f}
             </option>
           ))}
         </SelectField>
 
-        <label className="mb-1.5 block text-xs font-medium text-ink-500">Referencia (opcional)</label>
+        <label className="mb-1.5 block text-xs font-medium text-ink-500">
+          {externo ? "Empresa de reparto / # de pedido (opcional)" : "Referencia (opcional)"}
+        </label>
         <input value={referencia} onChange={(e) => setReferencia(e.target.value)} className={cn(inputClase, "mb-4")} />
 
         {factura && (

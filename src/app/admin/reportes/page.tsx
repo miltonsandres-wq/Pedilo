@@ -93,7 +93,7 @@ export default async function ReportesPage({
                 <ul className="mb-4 space-y-1.5 text-sm text-ink-700">
                   {Object.entries(c.porFormaPago).map(([forma, monto]) => (
                     <li key={forma} className="flex justify-between capitalize">
-                      <span>{forma}</span>
+                      <span>{forma.replaceAll("_", " ")}</span>
                       <span className="font-medium">L. {monto.toFixed(2)}</span>
                     </li>
                   ))}

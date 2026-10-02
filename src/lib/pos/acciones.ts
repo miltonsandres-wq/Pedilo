@@ -204,7 +204,9 @@ export async function cobrar(params: {
     [db.pagos, db.ordenes, db.mesas, db.orden_items, db.rangos_cai, db.documentos_fiscales, db.config, db.outbox],
     async () => {
       const config = await leerConfigFiscal();
-      const facturar = !!config?.activa;
+      // Delivery externo: se cobra SIN factura CAI (solo recibo no fiscal) y sin
+      // depender del estado de los rangos; no consume ningún correlativo.
+      const facturar = !!config?.activa && params.formaPago !== "delivery_externo";
 
       if (facturar) {
         const bloqueo = await verificarPuedeFacturar();

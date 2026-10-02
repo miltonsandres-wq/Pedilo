@@ -276,3 +276,49 @@ export function construirPrecuenta(d: DatosPrecuenta): Instruccion[] {
   out.push({ op: "salto", n: 3 }, { op: "cortar" });
   return out;
 }
+
+// --- recibo de delivery externo ---------------------------------------------
+
+export interface DatosReciboExterno {
+  /** Nombre del restaurante (comercial / razón social / sucursal). */
+  restaurante: string;
+  telefono?: string | null;
+  numeroDia: number | null;
+  fecha: Date;
+  /** Empresa de reparto y/o # de pedido de esa empresa (lo que escribe el cajero). */
+  referencia?: string | null;
+  lineas: LineaImprimible[];
+  subtotal: number;
+}
+
+/**
+ * Recibo para pedidos que reparte una empresa externa. NO es factura: no usa
+ * CAI ni consume correlativo. Lleva el nombre del restaurante, el detalle del
+ * pedido y el subtotal.
+ */
+export function construirReciboDeliveryExterno(d: DatosReciboExterno): Instruccion[] {
+  const out: Instruccion[] = [{ op: "logo" }];
+  out.push(...centrado(d.restaurante, { bold: true, size: "doble" }));
+  if (d.telefono) out.push(...centrado(`Tel: ${d.telefono}`));
+
+  out.push({ op: "salto" });
+  out.push(...centrado("RECIBO", { bold: true, size: "doble" }));
+  out.push(...centrado("Delivery externo", { bold: true }));
+  out.push({ op: "salto" });
+
+  if (d.numeroDia != null) out.push(...campo("Orden:", `#${d.numeroDia}`));
+  if (d.referencia?.trim()) out.push(...campo("Empresa / pedido:", d.referencia));
+  out.push(...campo("Fecha:", formatearFechaHora(d.fecha)));
+
+  out.push({ op: "linea" });
+  out.push(...filasDetalle(d.lineas));
+
+  out.push({ op: "linea" });
+  out.push(...par("SUBTOTAL L.", dinero(d.subtotal)).map((t) => texto(t, { bold: true })));
+  out.push(...centrado("Precios con ISV incluido"));
+
+  out.push({ op: "salto" });
+  out.push(...centrado("NO ES DOCUMENTO FISCAL", { bold: true }));
+  out.push({ op: "salto", n: 3 }, { op: "cortar" });
+  return out;
+}

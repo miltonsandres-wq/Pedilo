@@ -18,4 +18,14 @@ export type Enums<T extends keyof Database["public"]["Enums"]> =
 export type RolUsuario = "admin" | "cajero" | "mesero" | "cocina";
 export type EstadoOrden = "abierta" | "enviada" | "pagada" | "cancelada";
 export type EstadoMesa = "libre" | "ocupada";
-export type FormaPago = "efectivo" | "tarjeta" | "transferencia";
+export type FormaPago = "efectivo" | "tarjeta" | "transferencia" | "delivery_externo";
+
+/** Cobro de un pedido que reparte una empresa externa: sin factura CAI, solo un recibo no fiscal. */
+export const FORMA_DELIVERY_EXTERNO = "delivery_externo" as const;
+
+export const ETIQUETA_FORMA_PAGO: Record<FormaPago, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+  delivery_externo: "Delivery externo",
+};
