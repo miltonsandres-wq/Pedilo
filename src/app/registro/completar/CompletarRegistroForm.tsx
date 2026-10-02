@@ -3,7 +3,9 @@
 import { startTransition, useState } from "react";
 import { useActionState } from "react";
 import { User, Mail, Building2, MapPin, Phone, Plus, Trash2 } from "lucide-react";
-import { inputClass, labelClass, buttonClass } from "@/lib/ui";
+import { buttonClass } from "@/lib/ui";
+import { CampoRegistro } from "../CampoRegistro";
+import { validarNombre, validarSucursales } from "@/lib/registro/validaciones";
 import { BrandMark } from "@/components/BrandMark";
 import { completarRegistroGoogle, type CompletarRegistroPayload } from "./actions";
 import type { SucursalRegistro } from "../crear-tenant";
@@ -13,7 +15,8 @@ const SUCURSAL_VACIA: SucursalRegistro = { nombre: "", telefono: "", direccion: 
 export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial: string; correo: string }) {
   const [nombreAdmin, setNombreAdmin] = useState(nombreInicial);
   const [sucursales, setSucursales] = useState<SucursalRegistro[]>([{ ...SUCURSAL_VACIA }]);
-  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [tocados, setTocados] = useState<Record<string, boolean>>({});
+  const [intento, setIntento] = useState(false);
   const [state, dispatch, pending] = useActionState(completarRegistroGoogle, undefined as
     | { error: string }
     | undefined);
@@ -30,17 +33,23 @@ export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial
     setSucursales((lista) => lista.filter((_, idx) => idx !== i));
   }
 
+  const errNombre = validarNombre(nombreAdmin);
+  const errSucursales = validarSucursales(sucursales);
+  const tocar = (clave: string) => setTocados((t) => (t[clave] ? t : { ...t, [clave]: true }));
+  const ver = (clave: string, error?: string) => (error && (intento || tocados[clave]) ? error : undefined);
+
   function enviar() {
-    if (!nombreAdmin.trim()) {
-      setErrorLocal("Escribe tu nombre.");
+    setIntento(true);
+    const ids: string[] = [];
+    if (errNombre) ids.push("reg-nombreAdmin");
+    errSucursales.porSucursal.forEach((e, i) => {
+      for (const c of ["nombre", "telefono", "direccion"] as const) if (e[c]) ids.push(`reg-suc${i}-${c}`);
+    });
+    if (ids.length > 0 || errSucursales.general) {
+      document.getElementById(ids[0])?.focus();
       return;
     }
-    if (!sucursales.some((s) => s.nombre.trim())) {
-      setErrorLocal("Agrega al menos una sucursal con nombre.");
-      return;
-    }
-    setErrorLocal(null);
-    const payload: CompletarRegistroPayload = { nombreAdmin, sucursales };
+    const payload: CompletarRegistroPayload = { nombreAdmin: nombreAdmin.trim(), sucursales };
     startTransition(() => {
       dispatch(payload);
     });
@@ -90,17 +99,17 @@ export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial
           </div>
 
           <div className="mb-5">
-            <label className={labelClass}>Tu nombre</label>
-            <div className="relative">
-              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                value={nombreAdmin}
-                onChange={(e) => setNombreAdmin(e.target.value)}
-                placeholder="Ej. María Rodríguez"
-                autoComplete="name"
-                className={`${inputClass} pl-9`}
-              />
-            </div>
+            <CampoRegistro
+              id="reg-nombreAdmin"
+              icon={User}
+              label="Tu nombre"
+              value={nombreAdmin}
+              onChange={setNombreAdmin}
+              onBlur={() => tocar("nombreAdmin")}
+              error={ver("nombreAdmin", errNombre)}
+              placeholder="Ej. María Rodríguez"
+              autoComplete="name"
+            />
           </div>
 
           <div className="space-y-4">
@@ -120,25 +129,37 @@ export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial
                   )}
                 </div>
                 <div className="space-y-3">
-                  <IconField
-                    icon={Building2}
-                    label="Nombre"
-                    value={s.nombre}
-                    onChange={(v) => setSucursal(i, "nombre", v)}
-                    placeholder="Ej. Fondita — barrio"
-                  />
-                  <IconField
-                    icon={Phone}
-                    label="Teléfono (opcional)"
-                    value={s.telefono}
-                    onChange={(v) => setSucursal(i, "telefono", v)}
-                  />
-                  <IconField
-                    icon={MapPin}
-                    label="Dirección (opcional)"
-                    value={s.direccion}
-                    onChange={(v) => setSucursal(i, "direccion", v)}
-                  />
+                                  <CampoRegistro
+                                    id={`reg-suc${i}-nombre`}
+                                    icon={Building2}
+                                    label="Nombre"
+                                    value={s.nombre}
+                                    onChange={(v) => setSucursal(i, "nombre", v)}
+                                    onBlur={() => tocar(`suc${i}-nombre`)}
+                                    error={ver(`suc${i}-nombre`, errSucursales.porSucursal[i]?.nombre)}
+                                    placeholder="Ej. Fondita — barrio"
+                                  />
+                                  <CampoRegistro
+                                    id={`reg-suc${i}-telefono`}
+                                    icon={Phone}
+                                    label="Teléfono (opcional)"
+                                    type="tel"
+                                    inputMode="tel"
+                                    autoComplete="tel"
+                                    value={s.telefono}
+                                    onChange={(v) => setSucursal(i, "telefono", v)}
+                                    onBlur={() => tocar(`suc${i}-telefono`)}
+                                    error={ver(`suc${i}-telefono`, errSucursales.porSucursal[i]?.telefono)}
+                                  />
+                                  <CampoRegistro
+                                    id={`reg-suc${i}-direccion`}
+                                    icon={MapPin}
+                                    label="Dirección (opcional)"
+                                    value={s.direccion}
+                                    onChange={(v) => setSucursal(i, "direccion", v)}
+                                    onBlur={() => tocar(`suc${i}-direccion`)}
+                                    error={ver(`suc${i}-direccion`, errSucursales.porSucursal[i]?.direccion)}
+                                  />
                 </div>
               </div>
             ))}
@@ -148,9 +169,9 @@ export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial
             </button>
           </div>
 
-          {(errorLocal || state?.error) && (
-            <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-              {errorLocal ?? state?.error}
+          {((intento && errSucursales.general) || state?.error) && (
+            <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {state?.error ?? errSucursales.general}
             </p>
           )}
 
@@ -163,35 +184,6 @@ export function CompletarRegistroForm({ nombreInicial, correo }: { nombreInicial
             {pending ? "Creando cuenta..." : "Entrar a mi panel"}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function IconField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={`${inputClass} pl-9`}
-        />
       </div>
     </div>
   );

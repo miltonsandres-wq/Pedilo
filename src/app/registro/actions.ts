@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { crearTenantConSucursales, type SucursalRegistro } from "./crear-tenant";
+import { mensajeErrorAuth, normalizarCorreo, validarCuenta, validarSucursales } from "@/lib/registro/validaciones";
 
 export type { SucursalRegistro };
 
@@ -27,32 +28,34 @@ export async function registrarNegocio(
   payload: RegistroPayload
 ): Promise<{ error: string } | undefined> {
   const nombreAdmin = payload.nombreAdmin.trim();
-  const email = payload.email.trim().toLowerCase();
+  const email = normalizarCorreo(payload.email);
   const password = payload.password;
 
-  if (!nombreAdmin || !email || !password) {
-    return { error: "Faltan datos obligatorios." };
-  }
-  if (password.length < 8) {
-    return { error: "La contraseña debe tener al menos 8 caracteres." };
-  }
-
-  const resultado = await crearTenantConSucursales(payload.sucursales);
-  if ("error" in resultado) return resultado;
-  const { tenantId } = resultado;
+  // El servidor valida lo mismo que el formulario: nunca confía en el navegador
+  const errCuenta = validarCuenta({ nombreAdmin, email, password, confirmarPassword: password });
+  const primero = Object.values(errCuenta)[0];
+  if (primero) return { error: primero };
+  const errSucursales = validarSucursales(payload.sucursales);
+  const primeraSucursal = errSucursales.general ?? errSucursales.porSucursal.flatMap((e) => Object.values(e))[0];
+  if (primeraSucursal) return { error: primeraSucursal };
 
   const admin = createAdminClient();
 
+  // Primero el usuario: si el correo ya existe o la contraseña no sirve, se avisa de inmediato
+  // y no se crea nada a medias (antes se creaba el negocio y luego se descubría el problema).
   const { data: authUser, error: errAuth } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
-  if (errAuth || !authUser.user) {
-    await admin.from("tenants").delete().eq("id", tenantId);
-    const yaExiste = errAuth?.message?.toLowerCase().includes("already registered");
-    return { error: yaExiste ? "Ya existe una cuenta con ese correo." : "No se pudo crear la cuenta. Intenta de nuevo." };
+  if (errAuth || !authUser.user) return { error: mensajeErrorAuth(errAuth) };
+
+  const resultado = await crearTenantConSucursales(payload.sucursales);
+  if ("error" in resultado) {
+    await admin.auth.admin.deleteUser(authUser.user.id);
+    return resultado;
   }
+  const { tenantId } = resultado;
 
   const { error: errPerfil } = await admin.from("usuarios").insert({
     id: authUser.user.id,

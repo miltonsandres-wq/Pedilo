@@ -4,8 +4,10 @@ import { startTransition, useState } from "react";
 import { useActionState } from "react";
 import Link from "next/link";
 import { User, Mail, Lock, Building2, MapPin, Phone, Check, Plus, Trash2 } from "lucide-react";
-import { inputClass, labelClass, buttonClass } from "@/lib/ui";
+import { buttonClass } from "@/lib/ui";
 import { BrandMark } from "@/components/BrandMark";
+import { CampoRegistro } from "./CampoRegistro";
+import { hayErrores, normalizarCorreo, validarCuenta, validarSucursales } from "@/lib/registro/validaciones";
 import { registrarNegocio, type RegistroPayload, type SucursalRegistro } from "./actions";
 
 const PASOS = [
@@ -22,10 +24,18 @@ export default function RegistroPage() {
   const [password, setPassword] = useState("");
   const [confirmarPassword, setConfirmarPassword] = useState("");
   const [sucursales, setSucursales] = useState<SucursalRegistro[]>([{ ...SUCURSAL_VACIA }]);
-  const [errorPaso, setErrorPaso] = useState<string | null>(null);
+  // Un campo muestra su error al salir de él; todos lo muestran al intentar continuar
+  const [tocados, setTocados] = useState<Record<string, boolean>>({});
+  const [intento, setIntento] = useState(false);
   const [state, dispatch, pending] = useActionState(registrarNegocio, undefined as
     | { error: string }
     | undefined);
+
+  const errCuenta = validarCuenta({ nombreAdmin, email, password, confirmarPassword });
+  const errSucursales = validarSucursales(sucursales);
+
+  const tocar = (clave: string) => setTocados((t) => (t[clave] ? t : { ...t, [clave]: true }));
+  const ver = (clave: string, error?: string) => (error && (intento || tocados[clave]) ? error : undefined);
 
   function setSucursal(i: number, campo: keyof SucursalRegistro, valor: string) {
     setSucursales((lista) => lista.map((s, idx) => (idx === i ? { ...s, [campo]: valor } : s)));
@@ -37,46 +47,48 @@ export default function RegistroPage() {
 
   function quitarSucursal(i: number) {
     setSucursales((lista) => lista.filter((_, idx) => idx !== i));
+    setTocados((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith("suc"))));
   }
 
-  function validarPasoActual(): string | null {
+  /** Revisa el paso actual; si algo falla, deja el cursor en el primer campo con problema. */
+  function pasoValido(): boolean {
+    setIntento(true);
+    const ids: string[] = [];
     if (paso === 0) {
-      if (!nombreAdmin.trim()) return "Escribe tu nombre.";
-      if (!email.trim()) return "Escribe tu correo.";
-      if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres.";
-      if (password !== confirmarPassword) return "Las contraseñas no coinciden.";
+      for (const c of ["nombreAdmin", "email", "password", "confirmarPassword"] as const) if (errCuenta[c]) ids.push(`reg-${c}`);
+    } else {
+      if (errSucursales.general) return false;
+      errSucursales.porSucursal.forEach((e, i) => {
+        for (const c of ["nombre", "telefono", "direccion"] as const) if (e[c]) ids.push(`reg-suc${i}-${c}`);
+      });
     }
-    if (paso === 1) {
-      if (sucursales.length === 0 || !sucursales.some((s) => s.nombre.trim())) {
-        return "Agrega al menos una sucursal con nombre.";
-      }
+    if (ids.length > 0) {
+      document.getElementById(ids[0])?.focus();
+      return false;
     }
-    return null;
+    setIntento(false);
+    return true;
   }
 
   function siguiente() {
-    const error = validarPasoActual();
-    if (error) {
-      setErrorPaso(error);
-      return;
-    }
-    setErrorPaso(null);
+    if (!pasoValido()) return;
     setPaso((p) => Math.min(p + 1, PASOS.length - 1));
   }
 
   function anterior() {
-    setErrorPaso(null);
+    setIntento(false);
     setPaso((p) => Math.max(p - 1, 0));
   }
 
   function enviar() {
-    const error = validarPasoActual();
-    if (error) {
-      setErrorPaso(error);
+    // Antes de crear nada se vuelve a revisar TODO (por si cambió algo al volver atrás)
+    if (hayErrores(errCuenta)) {
+      setPaso(0);
+      setIntento(true);
       return;
     }
-    setErrorPaso(null);
-    const payload: RegistroPayload = { nombreAdmin, email, password, sucursales };
+    if (!pasoValido()) return;
+    const payload: RegistroPayload = { nombreAdmin: nombreAdmin.trim(), email: normalizarCorreo(email), password, sucursales };
     startTransition(() => {
       dispatch(payload);
     });
@@ -149,38 +161,52 @@ export default function RegistroPage() {
 
           {paso === 0 && (
             <div className="space-y-4">
-              <IconField
+              <CampoRegistro
+                id="reg-nombreAdmin"
                 icon={User}
                 label="Tu nombre"
                 value={nombreAdmin}
                 onChange={setNombreAdmin}
+                onBlur={() => tocar("nombreAdmin")}
+                error={ver("nombreAdmin", errCuenta.nombreAdmin)}
                 placeholder="Ej. María Rodríguez"
                 autoComplete="name"
               />
-              <IconField
+              <CampoRegistro
+                id="reg-email"
                 icon={Mail}
                 label="Correo"
                 type="email"
+                inputMode="email"
                 value={email}
                 onChange={setEmail}
+                onBlur={() => tocar("email")}
+                error={ver("email", errCuenta.email)}
                 placeholder="tucorreo@negocio.com"
                 autoComplete="email"
               />
-              <IconField
+              <CampoRegistro
+                id="reg-password"
                 icon={Lock}
                 label="Contraseña"
                 type="password"
                 value={password}
                 onChange={setPassword}
+                onBlur={() => tocar("password")}
+                error={ver("password", errCuenta.password)}
+                ayuda="Mínimo 8 caracteres."
                 placeholder="Mínimo 8 caracteres"
                 autoComplete="new-password"
               />
-              <IconField
+              <CampoRegistro
+                id="reg-confirmarPassword"
                 icon={Lock}
                 label="Confirmar contraseña"
                 type="password"
                 value={confirmarPassword}
                 onChange={setConfirmarPassword}
+                onBlur={() => tocar("confirmarPassword")}
+                error={ver("confirmarPassword", errCuenta.confirmarPassword)}
                 placeholder="Repite la contraseña"
                 autoComplete="new-password"
               />
@@ -207,24 +233,36 @@ export default function RegistroPage() {
                     )}
                   </div>
                   <div className="space-y-3">
-                    <IconField
+                    <CampoRegistro
+                      id={`reg-suc${i}-nombre`}
                       icon={Building2}
                       label="Nombre"
                       value={s.nombre}
                       onChange={(v) => setSucursal(i, "nombre", v)}
+                      onBlur={() => tocar(`suc${i}-nombre`)}
+                      error={ver(`suc${i}-nombre`, errSucursales.porSucursal[i]?.nombre)}
                       placeholder="Ej. Fondita — barrio"
                     />
-                    <IconField
+                    <CampoRegistro
+                      id={`reg-suc${i}-telefono`}
                       icon={Phone}
                       label="Teléfono (opcional)"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       value={s.telefono}
                       onChange={(v) => setSucursal(i, "telefono", v)}
+                      onBlur={() => tocar(`suc${i}-telefono`)}
+                      error={ver(`suc${i}-telefono`, errSucursales.porSucursal[i]?.telefono)}
                     />
-                    <IconField
+                    <CampoRegistro
+                      id={`reg-suc${i}-direccion`}
                       icon={MapPin}
                       label="Dirección (opcional)"
                       value={s.direccion}
                       onChange={(v) => setSucursal(i, "direccion", v)}
+                      onBlur={() => tocar(`suc${i}-direccion`)}
+                      error={ver(`suc${i}-direccion`, errSucursales.porSucursal[i]?.direccion)}
                     />
                   </div>
                 </div>
@@ -240,9 +278,9 @@ export default function RegistroPage() {
             </div>
           )}
 
-          {(errorPaso || state?.error) && (
-            <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-              {errorPaso ?? state?.error}
+          {((intento && paso === 1 && errSucursales.general) || state?.error) && (
+            <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {state?.error ?? errSucursales.general}
             </p>
           )}
 
@@ -284,41 +322,6 @@ export default function RegistroPage() {
             </Link>
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function IconField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  autoComplete,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-  autoComplete?: string;
-}) {
-  return (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          className={`${inputClass} pl-9`}
-        />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { validarNombre, validarSucursales } from "@/lib/registro/validaciones";
 import { crearTenantConSucursales, type SucursalRegistro } from "../crear-tenant";
 
 export type CompletarRegistroPayload = {
@@ -31,7 +32,11 @@ export async function completarRegistroGoogle(
   if (existente) redirect("/");
 
   const nombreAdmin = payload.nombreAdmin.trim();
-  if (!nombreAdmin) return { error: "Escribe tu nombre." };
+  const errNombre = validarNombre(nombreAdmin);
+  if (errNombre) return { error: errNombre };
+  const errSucursales = validarSucursales(payload.sucursales);
+  const primero = errSucursales.general ?? errSucursales.porSucursal.flatMap((e) => Object.values(e))[0];
+  if (primero) return { error: primero };
 
   const resultado = await crearTenantConSucursales(payload.sucursales);
   if ("error" in resultado) return resultado;
@@ -48,6 +53,7 @@ export async function completarRegistroGoogle(
     nombre: nombreAdmin,
   });
   if (errPerfil) {
+    await admin.from("tenants").delete().eq("id", resultado.tenantId); // sin dejar un negocio huérfano
     return { error: "No se pudo completar el registro. Intenta de nuevo." };
   }
 
