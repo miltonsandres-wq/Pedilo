@@ -57,7 +57,7 @@ const bienvenida = () => screen.queryByRole("dialog", { name: "Bienvenida a Pedi
 const foco = () => screen.queryByTestId("foco-guia")?.getAttribute("data-foco") ?? null;
 
 async function empezar(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("button", { name: /Empezar la guía/ }));
+  await user.click(await screen.findByRole("button", { name: /Sí, ver el tutorial/ }));
 }
 
 const irAlPaso = (id: string) => localStorage.setItem(`pedilo_tutorial_paso_${T}`, String(PASOS_GUIA.findIndex((p) => p.id === id)));
@@ -276,19 +276,18 @@ describe("recorrido guiado: resalta en pantalla y avanza solo", () => {
     expect(completarTutorial).toHaveBeenCalledTimes(2);
   });
 
-  it("«Más tarde» y la X cierran solo en esta sesión y NO lo marcan como completado", async () => {
+  it("«No, gracias» lo guarda como completado: no vuelve a preguntar", async () => {
     const user = userEvent.setup();
     montar("nav-equipo");
-    const a = render(<TutorialOnboarding completado={false} tenantId={T} />);
-    await user.click(await screen.findByRole("button", { name: "Más tarde" }));
-    expect(bienvenida()).toBeNull();
-    a.unmount();
     render(<TutorialOnboarding completado={false} tenantId={T} />);
-    await act(async () => {});
-    expect(bienvenida()).toBeNull(); // misma sesión: no molesta
-    cleanup();
+    await user.click(await screen.findByRole("button", { name: "No, gracias" }));
+    expect(bienvenida()).toBeNull();
+    expect(completarTutorial).toHaveBeenCalledTimes(1);
+  });
 
-    sessionStorage.clear(); // sesión nueva: como no lo completó, vuelve a salir
+  it("la X cierra solo en esta sesión y NO lo marca como completado", async () => {
+    const user = userEvent.setup();
+    montar("nav-equipo");
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await empezar(user);
     await user.click(screen.getByRole("button", { name: "Cerrar tutorial" }));

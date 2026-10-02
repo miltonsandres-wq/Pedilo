@@ -201,6 +201,14 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
     setVista("oculto");
   }, [tenantId]);
 
+  // «No, gracias»: se guarda en el negocio y no vuelve a preguntar; «Ver tutorial» del menú lo reabre
+  const rechazar = useCallback(async () => {
+    setVista("oculto");
+    const r = await completarTutorial().catch(() => ({ ok: false }));
+    if (!r.ok) omitirEstaSesion();
+    else setYaCompletado(true);
+  }, [omitirEstaSesion]);
+
   const irAPaso = useCallback(
     (n: number) => {
       setPaso(n);
@@ -254,7 +262,7 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
           </div>
           <h2 className="text-lg font-semibold text-ink-900">¡Bienvenido a Pedilo!</h2>
           <p className="mt-2 text-sm text-ink-600">
-            Te llevamos de la mano por tu panel: te vamos señalando dónde hacer clic y dejamos tu negocio listo con un
+            ¿Quieres ver el tutorial? Es opcional y puedes abrirlo después desde «Ver tutorial» en el menú. Te llevamos de la mano por tu panel: te vamos señalando dónde hacer clic y dejamos tu negocio listo con un
             ejemplo real (personal, una categoría, un producto, una mesa…). Toma unos 10 minutos y avanza solo a medida
             que completas cada paso.
           </p>
@@ -267,11 +275,11 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
                 setVista("guia");
               }}
             >
-              Empezar la guía
+              Sí, ver el tutorial
               <ArrowRight className="h-4 w-4" strokeWidth={2} />
             </Button>
-            <Button variant="secondary" size="lg" className="flex-1" onClick={omitirEstaSesion}>
-              Más tarde
+            <Button variant="secondary" size="lg" className="flex-1" onClick={() => void rechazar()}>
+              No, gracias
             </Button>
           </div>
         </div>
