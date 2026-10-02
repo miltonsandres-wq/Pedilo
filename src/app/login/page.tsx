@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useActionState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { buttonClass, inputClass, labelClass } from "@/lib/ui";
@@ -124,9 +125,9 @@ function FormularioLogin() {
 
           <p className="mt-5 text-center text-xs text-ink-500">
             ¿No tienes cuenta?{" "}
-            <a href="/registro" className="font-medium text-brand-600 hover:underline">
+            <Link href="/registro" className="font-medium text-brand-600 hover:underline">
               Regístrate
-            </a>
+            </Link>
           </p>
         </div>
       </div>
