@@ -58,7 +58,15 @@ const CARACTERISTICAS = [
   },
 ];
 
-const PLANES = [
+const PLANES: {
+  nombre: string;
+  precio: string;
+  periodo: string;
+  destacado: boolean;
+  descripcion: string;
+  extras?: string[];
+  cta: { texto: string; href: string; externo?: boolean };
+}[] = [
   {
     nombre: "1 sucursal",
     precio: "L 1,200",
@@ -73,6 +81,15 @@ const PLANES = [
     periodo: "/mes",
     destacado: true,
     descripcion: "Lo mismo que el plan anterior, para dos locales administrados desde una sola cuenta.",
+    cta: { texto: "Registrar mi negocio", href: "/registro" },
+  },
+  {
+    nombre: "Restaurante + Delivery",
+    precio: "L 3,500",
+    periodo: "/mes",
+    destacado: false,
+    descripcion: "Todo el restaurante más tu propia app de delivery: pedidos desde tu menú, repartidores y seguimiento en vivo.",
+    extras: ["App de delivery con menú público", "Repartidores con PIN y mapa en vivo", "Seguimiento del pedido para el cliente"],
     cta: { texto: "Registrar mi negocio", href: "/registro" },
   },
   {
@@ -227,7 +244,7 @@ export function LandingPage() {
             Precios claros, sin sorpresas
           </h2>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANES.map((plan) => (
             <div
               key={plan.nombre}
@@ -259,6 +276,13 @@ export function LandingPage() {
                   <Check className="h-4 w-4 shrink-0 text-brand-600" strokeWidth={2.5} />
                   Funciona sin internet
                 </li>
+                {plan.extras &&
+                  plan.extras.map((e) => (
+                    <li key={e} className="flex items-center gap-2">
+                      <Check className="h-4 w-4 shrink-0 text-brand-600" strokeWidth={2.5} />
+                      {e}
+                    </li>
+                  ))}
               </ul>
               {"externo" in plan.cta ? (
                 <a
