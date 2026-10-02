@@ -101,7 +101,7 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [yaCompletado, setYaCompletado] = useState(completado);
-  const ultimoAvisoMenu = useRef(0);
+  const menuAbiertoParaPaso = useRef<number | null>(null);
   const ultimoDesplazamiento = useRef<string>("");
 
   useEffect(() => {
@@ -159,9 +159,10 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
         if (el) {
           const r = el.getBoundingClientRect();
           rect = { top: r.top, left: r.left, width: r.width, height: r.height };
-        } else if (fase === "ir" && Date.now() - ultimoAvisoMenu.current > 1500) {
-          // En móvil el menú es un cajón cerrado: pedirle que se abra para poder señalar el enlace
-          ultimoAvisoMenu.current = Date.now();
+        } else if (fase === "ir" && menuAbiertoParaPaso.current !== paso) {
+          // En móvil el menú es un cajón cerrado: se abre UNA vez por paso para señalar el enlace
+          // (si el dueño lo cierra, no se le vuelve a abrir a la fuerza)
+          menuAbiertoParaPaso.current = paso;
           window.dispatchEvent(new Event(EVENTO_ABRIR_MENU));
         }
       }
@@ -187,7 +188,7 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
     ultimoDesplazamiento.current = clave;
     const { top, height } = marca.rect;
     if (top < 230 || top + height > window.innerHeight * 0.9) {
-      window.scrollTo({ top: Math.max(0, window.scrollY + top - window.innerHeight * 0.32), behavior: "smooth" });
+      window.scrollTo({ top: Math.max(0, window.scrollY + top - window.innerHeight * 0.32), behavior: "auto" });
     }
   }, [marca, paso]);
 
@@ -286,7 +287,7 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
   // La guía va como una BARRA en el flujo de la página (pegada arriba al hacer scroll): empuja
   // el contenido en vez de taparlo, así nunca queda encima de un botón o un formulario.
   const contenedor =
-    "sticky top-14 z-20 mb-4 overflow-hidden rounded-xl border border-brand-200 bg-white shadow-card lg:top-2";
+    "sticky top-14 z-20 mb-4 max-h-[45vh] overflow-y-auto rounded-xl border border-brand-200 bg-white shadow-card lg:top-2";
 
   if (minimizado) {
     return (
@@ -314,7 +315,7 @@ export function TutorialOnboarding({ completado, tenantId }: { completado: boole
           aria-hidden
           data-testid="foco-guia"
           data-foco={marca?.selector ?? ""}
-          className="pointer-events-none fixed z-[45] animate-pulse rounded-2xl ring-4 ring-brand-500/80 transition-all duration-200"
+          className="pointer-events-none fixed z-[45] rounded-2xl ring-4 ring-brand-500/80"
           style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }}
         />
       )}

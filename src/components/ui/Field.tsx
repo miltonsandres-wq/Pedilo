@@ -20,7 +20,7 @@ export function Field({
   const auto = useId();
   const id = props.id ?? auto;
   return (
-    <div className={full ? "col-span-full" : undefined}>
+    <div className={full ? "col-span-full min-w-0" : "min-w-0"}>
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>
@@ -39,7 +39,7 @@ export function SelectField({
   const auto = useId();
   const id = props.id ?? auto;
   return (
-    <div className={full ? "col-span-full" : undefined}>
+    <div className={full ? "col-span-full min-w-0" : "min-w-0"}>
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>
@@ -59,7 +59,7 @@ export function TextareaField({
   const auto = useId();
   const id = props.id ?? auto;
   return (
-    <div className={full ? "col-span-full" : undefined}>
+    <div className={full ? "col-span-full min-w-0" : "min-w-0"}>
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>

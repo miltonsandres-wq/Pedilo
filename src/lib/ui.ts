@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50 disabled:text-ink-400";
+  "w-full min-w-0 max-w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base text-ink-900 sm:text-sm placeholder:text-ink-400 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50 disabled:text-ink-400";
 
 export const labelClass = "mb-1.5 block text-xs font-medium text-ink-500";
 
