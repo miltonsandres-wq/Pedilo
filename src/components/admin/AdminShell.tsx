@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeftRight, CircleHelp, Menu, X } from "lucide-react";
 import { AdminNav } from "./AdminNav";
 import { BrandMark } from "@/components/BrandMark";
 import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
-import { EVENTO_ABRIR_MENU, EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
+import { EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
 
 /**
  * El sidebar fijo de 256px solo cabe en pantallas grandes. En celular se
@@ -26,13 +26,6 @@ export function AdminShell({
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
-
-  // El recorrido guiado pide abrir el menú lateral en móvil para poder señalar un enlace
-  useEffect(() => {
-    const abrir = () => setAbierto(true);
-    window.addEventListener(EVENTO_ABRIR_MENU, abrir);
-    return () => window.removeEventListener(EVENTO_ABRIR_MENU, abrir);
-  }, []);
 
   const marca = (
     <div className="mb-6 flex items-center gap-2.5 px-1">
