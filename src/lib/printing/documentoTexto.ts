@@ -7,8 +7,27 @@ import type { Instruccion, InstruccionTexto } from "./types";
  * tocan red ni impresora (ver enviarComanda.ts y print-agent/index.js).
  */
 
-export const COLUMNAS = 48;
-const COLUMNAS_DOBLE = COLUMNAS / 2;
+/**
+ * Ancho del ticket en caracteres. 48 = papel de 80 mm (lo normal en cocina y
+ * caja); 32 = papel de 58 mm (impresoras térmicas portátiles). Los armadores
+ * leen este valor al construir: para otro ancho se envuelven con
+ * `conAnchoTicket(cols, () => construir...())`, que lo restaura al terminar.
+ */
+export let COLUMNAS = 48;
+export const ANCHO_80MM = 48;
+export const ANCHO_58MM = 32;
+const mitad = () => Math.floor(COLUMNAS / 2);
+
+/** Ejecuta un armador síncrono con otro ancho de papel y vuelve al anterior. */
+export function conAnchoTicket<T>(columnas: number, construir: () => T): T {
+  const anterior = COLUMNAS;
+  COLUMNAS = columnas;
+  try {
+    return construir();
+  } finally {
+    COLUMNAS = anterior;
+  }
+}
 
 export interface LineaImprimible {
   nombre: string;
@@ -117,7 +136,7 @@ const texto = (t: string, extra: Omit<InstruccionTexto, "op" | "texto"> = {}): I
 });
 
 function centrado(t: string, extra: Omit<InstruccionTexto, "op" | "texto" | "align"> = {}): InstruccionTexto[] {
-  const ancho = extra.size === "doble" ? COLUMNAS_DOBLE : COLUMNAS;
+  const ancho = extra.size === "doble" ? mitad() : COLUMNAS;
   return envolver(t, ancho).map((l) => texto(l, { ...extra, align: "center" }));
 }
 
@@ -134,11 +153,11 @@ function campo(etiqueta: string, valor: string | null | undefined): InstruccionT
 
 function filasDetalle(lineas: LineaImprimible[]): InstruccionTexto[] {
   const out: InstruccionTexto[] = [
-    texto(`${"CANT".padEnd(5)}${"DESCRIPCIÓN".padEnd(30)}${"TOTAL".padStart(13)}`, { bold: true }),
+    texto(`${"CANT".padEnd(5)}${"DESCRIPCIÓN".padEnd(COLUMNAS - 18)}${"TOTAL".padStart(13)}`, { bold: true }),
   ];
   for (const l of lineas) {
-    const desc = envolver(l.nombre, 30);
-    out.push(texto(`${String(l.cantidad).padEnd(5)}${desc[0].padEnd(30)}${dinero(l.total).padStart(13)}`));
+    const desc = envolver(l.nombre, COLUMNAS - 18);
+    out.push(texto(`${String(l.cantidad).padEnd(5)}${desc[0].padEnd(COLUMNAS - 18)}${dinero(l.total).padStart(13)}`));
     for (const extra of desc.slice(1)) out.push(texto(`${" ".repeat(5)}${extra}`));
   }
   return out;

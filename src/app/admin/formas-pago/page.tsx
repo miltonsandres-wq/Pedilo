@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, ArrowLeftRight, Bike } from "lucide-react";
+import { Banknote, CreditCard, ArrowLeftRight } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
@@ -10,7 +10,6 @@ const TODAS = [
   { valor: "efectivo", etiqueta: "Efectivo", icon: Banknote },
   { valor: "tarjeta", etiqueta: "Tarjeta", icon: CreditCard },
   { valor: "transferencia", etiqueta: "Transferencia", icon: ArrowLeftRight },
-  { valor: "delivery_externo", etiqueta: "Delivery externo (sin factura CAI)", icon: Bike },
 ] as const;
 
 export default async function FormasPagoPage() {
@@ -38,7 +37,7 @@ export default async function FormasPagoPage() {
           <Card key={s.id}>
             <CardHeader title={s.nombre} />
             <form action={actualizarFormasPago.bind(null, s.id)} data-tour="form-pagos" className="p-5 pt-4">
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {TODAS.map((f) => {
                   const activa = activasPorSucursal.get(s.id)?.has(f.valor);
                   const Icon = f.icon;

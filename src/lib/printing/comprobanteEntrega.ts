@@ -29,7 +29,7 @@ export interface DatosComprobanteEntrega {
   repartidor?: string | null;
 }
 
-const COLUMNAS_DOBLE = COLUMNAS / 2;
+const mitad = () => Math.floor(COLUMNAS / 2);
 
 const texto = (t: string, extra: Omit<InstruccionTexto, "op" | "texto"> = {}): InstruccionTexto => ({
   op: "texto",
@@ -38,7 +38,7 @@ const texto = (t: string, extra: Omit<InstruccionTexto, "op" | "texto"> = {}): I
 });
 
 const centrado = (t: string, extra: Omit<InstruccionTexto, "op" | "texto" | "align"> = {}) =>
-  envolver(t, extra.size === "doble" ? COLUMNAS_DOBLE : COLUMNAS).map((l) => texto(l, { ...extra, align: "center" }));
+  envolver(t, extra.size === "doble" ? mitad() : COLUMNAS).map((l) => texto(l, { ...extra, align: "center" }));
 
 export const NOTA_NO_FISCAL = "NO ES DOCUMENTO FISCAL";
 
@@ -59,7 +59,7 @@ export function construirComprobanteEntrega(d: DatosComprobanteEntrega): Instruc
 
   // La referencia es lo que el repartidor lee con el casco puesto: letra GRANDE
   out.push({ op: "salto" }, texto("DIRECCIÓN:", { bold: true }));
-  out.push(...envolver(d.referencia, COLUMNAS_DOBLE).map((l) => texto(l, { size: "doble", bold: true })));
+  out.push(...envolver(d.referencia, mitad()).map((l) => texto(l, { size: "doble", bold: true })));
   out.push({ op: "linea" });
 
   out.push(texto("Detalle:", { bold: true }));
