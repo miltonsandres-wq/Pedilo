@@ -10,7 +10,7 @@ vi.mock("@/app/admin/tutorial/actions", () => ({
 
 import { TutorialOnboarding } from "@/components/admin/TutorialOnboarding";
 import { EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
-import { PASOS_DEMO, estadoEnTic, ticsHastaResultado, TICS_CLIC, TICS_RESULTADO } from "@/lib/tutorial/demo";
+import { PASOS_DEMO, estadoEnTic, ticsHastaResultado, TICS_CLIC, TICS_NAV, TICS_RESULTADO, MENU_ADMIN } from "@/lib/tutorial/demo";
 
 const T = "negocio-1";
 
@@ -38,9 +38,10 @@ describe("estadoEnTic (la animación de la demo)", () => {
 
   it("empieza con todo vacío y va escribiendo campo por campo", () => {
     const e0 = estadoEnTic(paso, 0);
-    expect(e0.fase).toBe("llenando");
+    expect(e0.fase).toBe("nav"); // primero el cursor entra al menú
+    expect(estadoEnTic(paso, TICS_NAV).fase).toBe("llenando");
     expect(e0.escritos.every((n) => n === 0)).toBe(true);
-    const enMedio = estadoEnTic(paso, 8 + 4); // pausa del primer campo + 4 letras
+    const enMedio = estadoEnTic(paso, TICS_NAV + 8 + 4); // pausa del primer campo + 4 letras
     expect(enMedio.campo).toBe(0);
     expect(enMedio.escritos[0]).toBe(4);
   });
@@ -55,8 +56,15 @@ describe("estadoEnTic (la animación de la demo)", () => {
     expect(estadoEnTic(paso, t + TICS_CLIC + TICS_RESULTADO).terminado).toBe(true);
   });
 
-  it("cubre los 5 pasos principales: equipo, categoría, producto, mesa y cobro", () => {
-    expect(PASOS_DEMO.map((p) => p.id)).toEqual(["equipo", "categoria", "producto", "mesa", "cobro"]);
+  it("cubre el panel, el delivery y lo nuevo (delivery externo e impresión)", () => {
+    const ids = PASOS_DEMO.map((p) => p.id);
+    for (const id of ["equipo", "categoria", "producto", "mesa", "delivery-config", "delivery-zona", "delivery-repartidor", "cobro", "pedido-delivery", "despacho", "externo", "impresion"]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it("cada paso del panel apunta a una opción real del menú", () => {
+    for (const p of PASOS_DEMO.filter((x) => x.app === "admin")) expect(MENU_ADMIN).toContain(p.item);
   });
 });
 
@@ -91,13 +99,13 @@ describe("TutorialOnboarding (demo simulada)", () => {
       fireEvent.click(screen.getByRole("button", { name: /Ver demo/ }));
       expect(demo()).toBeTruthy();
       expect(screen.getByText("Simulación")).toBeTruthy();
-      expect(screen.getByTestId("campo-demo-0").textContent).toBe("");
+      expect(screen.getByTestId("menu-demo")).toBeTruthy(); // se ve el menú del panel real
 
-      await avanzar(14);
+      await avanzar(TICS_NAV + 14);
       expect(screen.getByTestId("campo-demo-0").textContent).toMatch(/^Caj/);
 
       const fin = ticsHastaResultado(PASOS_DEMO[0]) + 1;
-      await avanzar((fin - 14));
+      await avanzar(fin - 14);
       expect(screen.getByTestId("resultado-demo").textContent).toContain("Cajero 1");
       expect(completarTutorial).not.toHaveBeenCalled();
     } finally {
@@ -113,7 +121,7 @@ describe("TutorialOnboarding (demo simulada)", () => {
       fireEvent.click(screen.getByRole("button", { name: /Ver demo/ }));
       const total = ticsHastaResultado(PASOS_DEMO[0]) + TICS_RESULTADO + 5;
       await avanzar(total);
-      expect(screen.getByText(/paso 2 de 5/)).toBeTruthy();
+      expect(screen.getByText(/paso 2 de 12/)).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -124,9 +132,9 @@ describe("TutorialOnboarding (demo simulada)", () => {
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await user.click(await screen.findByRole("button", { name: /Ver demo/ }));
     await user.click(screen.getByRole("button", { name: /Siguiente/ }));
-    expect(screen.getByText(/paso 2 de 5/)).toBeTruthy();
+    expect(screen.getByText(/paso 2 de 12/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Anterior/ }));
-    expect(screen.getByText(/paso 1 de 5/)).toBeTruthy();
+    expect(screen.getByText(/paso 1 de 12/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Pausar demo" }));
     expect(screen.getByRole("button", { name: "Reproducir demo" })).toBeTruthy();
   });

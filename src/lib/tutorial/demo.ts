@@ -1,8 +1,9 @@
 /**
  * Demo del tutorial: una presentación SIMULADA (no toca la base de datos) que
- * llena sola los formularios de ejemplo mientras explica cada paso. Todo el
- * estado de la animación sale de un contador de «tics» (`estadoEnTic`), así es
- * una función pura y fácil de probar.
+ * recorre el panel del dueño y el POS del cajero como en la app real: el cursor
+ * entra al menú, abre la pantalla, llena sola los formularios de ejemplo y
+ * explica cada paso. Todo el estado de la animación sale de un contador de
+ * «tics» (`estadoEnTic`), así es una función pura y fácil de probar.
  */
 
 export interface CampoDemo {
@@ -12,11 +13,33 @@ export interface CampoDemo {
   nota?: string;
 }
 
+export type AppDemo = "admin" | "pos";
+
+/** Menú lateral del panel del dueño (mismos nombres que el real). */
+export const MENU_ADMIN = [
+  "Resumen",
+  "Sucursales",
+  "Equipo de trabajo",
+  "Menú digital",
+  "Inventario",
+  "Mesas / Layout",
+  "Formas de pago",
+  "Delivery",
+  "Facturación fiscal",
+  "Reportes",
+];
+/** Pestañas del POS del cajero. */
+export const MENU_POS = ["Mesas", "Delivery", "Facturas"];
+
 export interface PasoDemo {
   id: string;
   titulo: string;
-  /** Pantalla del panel que se simula (migas de pan). */
-  pantalla: string;
+  /** Qué pantalla se simula: el panel del dueño (con menú lateral) o el POS del cajero. */
+  app: AppDemo;
+  /** Opción del menú donde ocurre el paso. */
+  item: string;
+  /** El cursor entra primero a esa opción del menú (false si sigue en la misma pantalla del paso anterior). */
+  navega: boolean;
   intro: string;
   campos: CampoDemo[];
   boton: string;
@@ -29,7 +52,9 @@ export const PASOS_DEMO: PasoDemo[] = [
   {
     id: "equipo",
     titulo: "Crea a tu equipo",
-    pantalla: "Panel › Equipo de trabajo",
+    app: "admin",
+    item: "Equipo de trabajo",
+    navega: true,
     intro: "Primero registramos a quienes van a usar el POS: cajeros, meseros y cocina.",
     campos: [
       { etiqueta: "Nombre", valor: "Cajero 1", nota: "El nombre que verás en los reportes." },
@@ -44,7 +69,9 @@ export const PASOS_DEMO: PasoDemo[] = [
   {
     id: "categoria",
     titulo: "Crea una categoría",
-    pantalla: "Panel › Menú digital",
+    app: "admin",
+    item: "Menú digital",
+    navega: true,
     intro: "Las categorías ordenan tu menú: bebidas, platos fuertes, postres…",
     campos: [{ etiqueta: "Categoría", valor: "Bebidas", nota: "Escribe el nombre y toca «Agregar»." }],
     boton: "Agregar",
@@ -54,7 +81,9 @@ export const PASOS_DEMO: PasoDemo[] = [
   {
     id: "producto",
     titulo: "Crea un producto",
-    pantalla: "Panel › Menú digital › Nuevo producto",
+    app: "admin",
+    item: "Menú digital",
+    navega: false,
     intro: "Cada producto lleva precio e impuesto, y se asigna a una categoría.",
     campos: [
       { etiqueta: "Nombre", valor: "Coca-Cola" },
@@ -70,7 +99,9 @@ export const PASOS_DEMO: PasoDemo[] = [
   {
     id: "mesa",
     titulo: "Crea una mesa",
-    pantalla: "Panel › Mesas / Layout › Nueva mesa",
+    app: "admin",
+    item: "Mesas / Layout",
+    navega: true,
     intro: "Las mesas se ven en el plano del POS y cada una tiene su QR para la carta digital.",
     campos: [
       { etiqueta: "Nombre", valor: "Mesa 1" },
@@ -82,10 +113,61 @@ export const PASOS_DEMO: PasoDemo[] = [
     explicacionFinal: "Mesa creada. Después puedes arrastrarla en el plano.",
   },
   {
+    id: "delivery-config",
+    titulo: "Activa tu delivery",
+    app: "admin",
+    item: "Delivery",
+    navega: true,
+    intro: "Con el delivery tus clientes piden desde tu menú público y tú los recibes en el POS.",
+    campos: [
+      { etiqueta: "Código del restaurante", valor: "mi-restaurante", nota: "Es la dirección de tu menú público para pedir." },
+      { etiqueta: "Pedido mínimo (L)", valor: "100" },
+      { etiqueta: "Tiempo estimado de entrega (min)", valor: "40" },
+      { etiqueta: "Métodos de pago que aceptas", valor: "Efectivo, Transferencia", nota: "Ahí mismo pones tu cuenta para transferencias y tu horario." },
+    ],
+    boton: "Guardar configuración",
+    resultado: { titulo: "Delivery activo", detalle: "Menú público: /mi-restaurante · mínimo L 100" },
+    explicacionFinal: "Delivery configurado. Ahora definimos a dónde entregas y quién lleva los pedidos.",
+  },
+  {
+    id: "delivery-zona",
+    titulo: "Zonas de entrega",
+    app: "admin",
+    item: "Delivery",
+    navega: false,
+    intro: "Cada zona tiene su tarifa de envío; el cliente la ve antes de pedir.",
+    campos: [
+      { etiqueta: "Nueva zona", valor: "Col. Trejo" },
+      { etiqueta: "Tarifa (L)", valor: "30", nota: "Se suma a la cuenta como servicio de envío." },
+    ],
+    boton: "Agregar zona",
+    resultado: { titulo: "Col. Trejo", detalle: "Tarifa L 30.00 · activa" },
+    explicacionFinal: "Zona creada. Puedes agregar todas las que necesites.",
+  },
+  {
+    id: "delivery-repartidor",
+    titulo: "Agrega a tu repartidor",
+    app: "admin",
+    item: "Delivery",
+    navega: false,
+    intro: "Los repartidores no necesitan correo: entran a su app con un PIN.",
+    campos: [
+      { etiqueta: "Nuevo repartidor", valor: "Carlos" },
+      { etiqueta: "Teléfono", valor: "9999-0000" },
+      { etiqueta: "PIN (4 a 6 dígitos)", valor: "1234", nota: "Con este PIN abre su app en el celular y comparte su ubicación mientras trabaja." },
+      { etiqueta: "Monto por entrega (L)", valor: "25", nota: "Sirve para la liquidación diaria del repartidor." },
+    ],
+    boton: "Agregar repartidor",
+    resultado: { titulo: "Carlos", detalle: "PIN configurado · L 25.00 por entrega" },
+    explicacionFinal: "Repartidor listo. Ahora veamos cómo llega y se despacha un pedido.",
+  },
+  {
     id: "cobro",
     titulo: "Cobra una cuenta",
-    pantalla: "POS › Mesa 1 › Cobrar",
-    intro: "Así cobra el cajero: elige la forma de pago y confirma.",
+    app: "pos",
+    item: "Mesas",
+    navega: true,
+    intro: "Ahora en el POS del cajero. Así se cobra una mesa: elige la forma de pago y confirma.",
     campos: [
       { etiqueta: "Cuenta", valor: "2 × Coca-Cola · L 60.00" },
       { etiqueta: "Forma de pago", valor: "Efectivo", nota: "El cajero solo ve las formas de pago que activaste." },
@@ -93,10 +175,70 @@ export const PASOS_DEMO: PasoDemo[] = [
     ],
     boton: "Cobrar",
     resultado: { titulo: "Cobro registrado", detalle: "Cambio L 40.00 · recibo listo para imprimir" },
+    explicacionFinal: "Cobrado. Si facturas con CAI, la factura sale sola.",
+  },
+  {
+    id: "pedido-delivery",
+    titulo: "Recibe un pedido de delivery",
+    app: "pos",
+    item: "Delivery",
+    navega: true,
+    intro: "Cuando un cliente pide desde tu menú público, el pedido llega aquí con una alerta de sonido.",
+    campos: [
+      { etiqueta: "Pedido nuevo", valor: "#12 · Col. Trejo · L 180.00", nota: "Ves el detalle, la dirección en el mapa y cómo va a pagar." },
+      { etiqueta: "Decisión", valor: "Aceptar", nota: "Puedes aceptar o rechazar. También puedes crear pedidos por teléfono o pausar los pedidos." },
+    ],
+    boton: "Aceptar pedido",
+    resultado: { titulo: "Pedido #12 aceptado", detalle: "Enviado a cocina" },
+    explicacionFinal: "Aceptado: cocina lo prepara y el cliente ya ve el avance.",
+  },
+  {
+    id: "despacho",
+    titulo: "Despacha con tu repartidor",
+    app: "pos",
+    item: "Delivery",
+    navega: false,
+    intro: "Cuando el pedido está listo, lo asignas a un repartidor.",
+    campos: [{ etiqueta: "Repartidor", valor: "Carlos", nota: "Al despachar se emite la factura o el comprobante del pedido." }],
+    boton: "Despachar",
+    resultado: { titulo: "En camino con Carlos", detalle: "El cliente lo sigue en vivo: mapa y hora estimada" },
+    explicacionFinal:
+      "El cliente recibe un enlace de seguimiento y Carlos ve el pedido en su app. Al final del día liquidas a los repartidores en «Liquidación».",
+  },
+  {
+    id: "externo",
+    titulo: "Cobra un delivery externo",
+    app: "pos",
+    item: "Mesas",
+    navega: true,
+    intro: "Para pedidos de plataformas externas, el cajero elige «Delivery externo» al cobrar. No se configura nada.",
+    campos: [
+      { etiqueta: "Tipo de cobro", valor: "Delivery externo", nota: "Se cobra sin factura CAI: sale un recibo no fiscal." },
+      { etiqueta: "Detalle", valor: "2 × Coca-Cola · Subtotal L 60.00", nota: "El recibo incluye el restaurante, el detalle y el subtotal." },
+    ],
+    boton: "Cobrar",
+    resultado: { titulo: "Recibo no fiscal", detalle: "Delivery externo · L 60.00" },
+    explicacionFinal: "Cobro registrado con recibo no fiscal.",
+  },
+  {
+    id: "impresion",
+    titulo: "Imprime tu ticket",
+    app: "pos",
+    item: "Mesas",
+    navega: false,
+    intro: "Antes de imprimir ves una vista previa del ticket, tal como saldrá en el papel.",
+    campos: [
+      { etiqueta: "Papel", valor: "80 mm", nota: "Sirve también para impresoras de 58 mm." },
+      { etiqueta: "Imprimir con", valor: "Navegador", nota: "Sin instalar nada: navegador, Bluetooth, USB o RawBT en el celular." },
+    ],
+    boton: "Imprimir",
+    resultado: { titulo: "Ticket enviado", detalle: "Vista previa lista · papel 80 mm" },
     explicacionFinal: "¡Eso es todo! Tu negocio ya sabe vender. Esto fue solo una demo: nada se guardó.",
   },
 ];
 
+/** Tics que tarda el cursor en entrar a la opción del menú. */
+export const TICS_NAV = 16;
 /** Tics de pausa antes de empezar a escribir cada campo. */
 export const PAUSA_CAMPO = 8;
 /** Tics que dura el «clic» en el botón. */
@@ -104,7 +246,7 @@ export const TICS_CLIC = 10;
 /** Tics que se queda el resultado en pantalla antes de pasar solo al siguiente paso. */
 export const TICS_RESULTADO = 45;
 
-export type FaseDemo = "llenando" | "clic" | "resultado";
+export type FaseDemo = "nav" | "llenando" | "clic" | "resultado";
 
 export interface EstadoDemo {
   fase: FaseDemo;
@@ -116,16 +258,31 @@ export interface EstadoDemo {
   explicacion: string;
   /** El paso ya terminó y puede pasar al siguiente. */
   terminado: boolean;
+  /** 0–1: avance del cursor hacia la opción del menú (solo en la fase «nav»). */
+  progresoNav: number;
 }
 
-/** Duración de la parte de llenado + clic, en tics (sin el resultado). */
+/** Duración de la parte de navegación + llenado + clic, en tics (sin el resultado). */
 export function ticsHastaResultado(paso: PasoDemo): number {
-  return paso.campos.reduce((t, c) => t + PAUSA_CAMPO + c.valor.length, 0) + TICS_CLIC;
+  return (paso.navega ? TICS_NAV : 0) + paso.campos.reduce((t, c) => t + PAUSA_CAMPO + c.valor.length, 0) + TICS_CLIC;
 }
 
 export function estadoEnTic(paso: PasoDemo, tic: number): EstadoDemo {
   const escritos = paso.campos.map(() => 0);
   let resto = tic;
+  if (paso.navega) {
+    if (resto < TICS_NAV) {
+      return {
+        fase: "nav",
+        campo: 0,
+        escritos,
+        explicacion: `Entramos a «${paso.item}» desde el menú. ${paso.intro}`,
+        terminado: false,
+        progresoNav: resto / TICS_NAV,
+      };
+    }
+    resto -= TICS_NAV;
+  }
   for (let i = 0; i < paso.campos.length; i++) {
     const campo = paso.campos[i];
     if (resto < PAUSA_CAMPO + campo.valor.length) {
@@ -134,8 +291,9 @@ export function estadoEnTic(paso: PasoDemo, tic: number): EstadoDemo {
         fase: "llenando",
         campo: i,
         escritos,
-        explicacion: campo.nota ?? (i === 0 ? paso.intro : `Llenamos «${campo.etiqueta}».`),
+        explicacion: campo.nota ?? (i === 0 && !paso.navega ? paso.intro : `Llenamos «${campo.etiqueta}».`),
         terminado: false,
+        progresoNav: 1,
       };
     }
     escritos[i] = campo.valor.length;
@@ -143,7 +301,7 @@ export function estadoEnTic(paso: PasoDemo, tic: number): EstadoDemo {
   }
   const ultimo = paso.campos.length - 1;
   if (resto < TICS_CLIC) {
-    return { fase: "clic", campo: ultimo, escritos, explicacion: `Y tocamos «${paso.boton}».`, terminado: false };
+    return { fase: "clic", campo: ultimo, escritos, explicacion: `Y tocamos «${paso.boton}».`, terminado: false, progresoNav: 1 };
   }
   return {
     fase: "resultado",
@@ -151,5 +309,6 @@ export function estadoEnTic(paso: PasoDemo, tic: number): EstadoDemo {
     escritos,
     explicacion: paso.explicacionFinal,
     terminado: resto - TICS_CLIC >= TICS_RESULTADO,
+    progresoNav: 1,
   };
 }
