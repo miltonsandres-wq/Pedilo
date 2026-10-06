@@ -6,6 +6,7 @@ import { ImagePlus, Loader2, Store, Trash2 } from "lucide-react";
 import { actualizarLogoSucursal } from "@/app/admin/sucursales/actions";
 import { subirArchivo } from "@/lib/storage/acciones";
 import { Button } from "@/components/ui/Button";
+import { mensajeSubida, prepararImagen } from "@/lib/imagen/preparar";
 
 /**
  * Logo propio de UNA sucursal — se muestra en el menú digital del QR de sus
@@ -31,9 +32,11 @@ export function SucursalLogoUploader({
     setSubiendo(true);
     setError(null);
     try {
-      const ext = file.name.split(".").pop() ?? "png";
+      // Se achica en el navegador: las fotos del celular pesan varios MB y la subida tiene tope
+      const listo = await prepararImagen(file, { maxLado: 800 });
+      const ext = listo.name.split(".").pop() ?? "png";
       const formData = new FormData();
-      formData.append("archivo", file);
+      formData.append("archivo", listo);
 
       const resultado = await subirArchivo({
         bucket: "logos",
@@ -42,11 +45,12 @@ export function SucursalLogoUploader({
       });
       if (!resultado.ok) throw new Error(resultado.error);
 
-      await actualizarLogoSucursal(sucursalId, resultado.url);
+      const guardado = await actualizarLogoSucursal(sucursalId, resultado.url);
+      if (!guardado.ok) throw new Error(guardado.error);
       setPreview(resultado.url);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo subir el logo.");
+      setError(mensajeSubida(err, "No se pudo subir el logo."));
     } finally {
       setSubiendo(false);
     }

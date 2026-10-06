@@ -61,9 +61,14 @@ export async function desactivarSucursal(id: string) {
  * SucursalLogoUploader). El menú del QR (/carta/[token]) lo usa tal cual —
  * sin ningún logo "del negocio" al cual caer de respaldo.
  */
-export async function actualizarLogoSucursal(sucursalId: string, logoUrl: string | null) {
+export async function actualizarLogoSucursal(
+  sucursalId: string,
+  logoUrl: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAdmin();
   const supabase = await createClient();
-  await supabase.from("sucursales").update({ logo_url: logoUrl }).eq("id", sucursalId);
+  const { error } = await supabase.from("sucursales").update({ logo_url: logoUrl }).eq("id", sucursalId);
+  if (error) return { ok: false, error: "Se subió la imagen pero no se pudo guardar en la sucursal. Inténtalo de nuevo." };
   revalidatePath("/admin/sucursales");
+  return { ok: true };
 }

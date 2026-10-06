@@ -34,6 +34,9 @@ export async function subirArchivo(params: {
     return { ok: false, error: "No se recibió ningún archivo." };
   }
 
+  if (archivo.size > 4 * 1024 * 1024) return { ok: false, error: "La imagen pesa demasiado (máximo 4 MB)." };
+  if (archivo.type && !archivo.type.startsWith("image/")) return { ok: false, error: "Ese archivo no es una imagen." };
+
   const admin = createAdminClient();
   const path = `${sesion.tenant_id}/${params.carpeta}`;
 

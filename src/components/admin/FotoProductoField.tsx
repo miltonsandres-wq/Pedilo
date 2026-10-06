@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImageOff, ImagePlus, Link2, Loader2, X } from "lucide-react";
 import { subirArchivo } from "@/lib/storage/acciones";
+import { mensajeSubida, prepararImagen } from "@/lib/imagen/preparar";
 import { cn, inputClass, labelClass } from "@/lib/ui";
 
 /**
@@ -28,9 +29,10 @@ export function FotoProductoField({
     setSubiendo(true);
     setError(null);
     try {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const listo = await prepararImagen(file, { maxLado: 1200 }); // las fotos del celular pesan varios MB
+      const ext = listo.name.split(".").pop() ?? "jpg";
       const formData = new FormData();
-      formData.append("archivo", file);
+      formData.append("archivo", listo);
 
       const resultado = await subirArchivo({
         bucket: "productos",
@@ -41,7 +43,7 @@ export function FotoProductoField({
 
       setValor(resultado.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo subir la foto.");
+      setError(mensajeSubida(err, "No se pudo subir la foto."));
     } finally {
       setSubiendo(false);
     }
