@@ -3,6 +3,7 @@ import { MapPin, Phone } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CartaCliente } from "@/components/carta/CartaCliente";
 import { BrandMark } from "@/components/BrandMark";
+import { esPlatoDelDia } from "@/lib/menu/platosDelDia";
 
 /**
  * Menú público al que se llega escaneando el QR de una mesa. Sin sesión: usa
@@ -30,7 +31,7 @@ export default async function CartaPage({ params }: { params: Promise<{ token: s
     admin.from("categorias").select("id, nombre, orden").eq("tenant_id", mesa.tenant_id).order("orden"),
     admin
       .from("producto_sucursales")
-      .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo)")
+      .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo, plato_dia_fecha)")
       .eq("sucursal_id", mesa.sucursal_id),
   ]);
 
@@ -44,6 +45,7 @@ export default async function CartaPage({ params }: { params: Promise<{ token: s
       precio: Number(p.precio),
       foto_url: p.foto_url,
       categoria_id: p.categoria_id,
+      plato_dia: esPlatoDelDia(p.plato_dia_fecha),
     }));
 
   const logoUrl = sucursal?.logo_url;

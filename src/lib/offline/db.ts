@@ -34,6 +34,7 @@ export interface ProductoLocal {
   foto_url: string | null;
   disponible: boolean;
   tasa_isv?: string; // exento | 15 | 18 (ausente en cachés viejas = 15)
+  plato_dia_fecha?: string | null; // fecha (HN) en que es plato del día
 }
 
 export interface OrdenLocal {

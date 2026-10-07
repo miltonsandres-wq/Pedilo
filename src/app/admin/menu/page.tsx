@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UtensilsCrossed, Tag, Plus, ImageOff, FileUp } from "lucide-react";
+import { UtensilsCrossed, Tag, Plus, ImageOff, FileUp, Star, X } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Colapsable } from "@/components/ui/Colapsable";
 import { FotoProductoField } from "@/components/admin/FotoProductoField";
 import { cn } from "@/lib/ui";
-import { crearCategoria, crearProducto, actualizarProducto, eliminarProducto } from "./actions";
+import { esPlatoDelDia, hoyHN } from "@/lib/menu/platosDelDia";
+import { crearCategoria, crearProducto, actualizarProducto, eliminarProducto, ponerPlatoDelDia, quitarPlatoDelDia } from "./actions";
 
 export default async function MenuPage({
   searchParams,
@@ -46,6 +47,10 @@ export default async function MenuPage({
   const productosFiltrados = sucursalFiltro
     ? (productos ?? []).filter((p) => sucursalesPorProducto.get(p.id)?.includes(sucursalFiltro))
     : (productos ?? []);
+
+  const hoy = hoyHN();
+  const platosDeHoy = productosFiltrados.filter((p) => esPlatoDelDia(p.plato_dia_fecha, hoy));
+  const candidatos = productosFiltrados.filter((p) => !esPlatoDelDia(p.plato_dia_fecha, hoy));
 
   return (
     <div>
@@ -118,6 +123,57 @@ export default async function MenuPage({
               Agregar
             </Button>
           </form>
+        </div>
+      </Card>
+
+      <Card className="mb-6" >
+        <CardHeader
+          title="Platos del día"
+          subtitle="Los platos especiales de hoy salen primero en la carta del QR, en el menú de delivery y en el POS. Mañana se quitan solos."
+        />
+        <div className="p-5 pt-4" data-tour="platos-del-dia">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {platosDeHoy.map((p) => (
+              <form key={p.id} action={quitarPlatoDelDia.bind(null, p.id)}>
+                <button
+                  type="submit"
+                  title="Quitar de los platos del día"
+                  className="group flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 py-1 pl-3 pr-2 text-xs font-medium text-amber-900 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-500 group-hover:fill-red-200 group-hover:text-red-500" strokeWidth={2} />
+                  {p.nombre} · L. {Number(p.precio).toFixed(2)}
+                  <X className="h-3 w-3 opacity-50 group-hover:opacity-100" strokeWidth={2} />
+                </button>
+              </form>
+            ))}
+            {platosDeHoy.length === 0 && <p className="text-sm text-ink-400">Hoy no hay platos del día.</p>}
+          </div>
+          {candidatos.length > 0 ? (
+            <form action={ponerPlatoDelDia} className="flex flex-wrap gap-2">
+              <select
+                name="producto_id"
+                required
+                defaultValue=""
+                aria-label="Producto para el plato del día"
+                className="min-w-56 flex-1 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              >
+                <option value="" disabled>
+                  Elige un producto…
+                </option>
+                {candidatos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} — L. {Number(p.precio).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              <Button variant="dark" size="sm" type="submit">
+                <Star className="h-3.5 w-3.5" strokeWidth={2} />
+                Poner como plato del día
+              </Button>
+            </form>
+          ) : (
+            <p className="text-xs text-ink-400">Primero crea productos para poder elegirlos como plato del día.</p>
+          )}
         </div>
       </Card>
 

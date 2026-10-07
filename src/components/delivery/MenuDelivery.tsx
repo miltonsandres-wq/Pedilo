@@ -70,6 +70,7 @@ export function MenuDeliveryCliente({ menu }: { menu: MenuDelivery }) {
   const unidades = totalUnidades(carrito);
   const sub = subtotal(carrito, menu.productos);
   const sinCategoria = menu.productos.filter((p) => !p.categoria_id);
+  const platosDelDia = menu.productos.filter((p) => p.plato_dia);
 
   return (
     <div>
@@ -83,6 +84,10 @@ export function MenuDeliveryCliente({ menu }: { menu: MenuDelivery }) {
         </div>
       )}
 
+      {platosDelDia.length > 0 && (
+        <Seccion titulo="⭐ Platos del día" items={platosDelDia} carrito={carrito} activo={menu.abierto}
+          onCambiar={(id, d) => setCarrito((c) => cambiarCantidad(c, id, d))} />
+      )}
       {menu.categorias.map((cat) => {
         const items = menu.productos.filter((p) => p.categoria_id === cat.id);
         return items.length ? (

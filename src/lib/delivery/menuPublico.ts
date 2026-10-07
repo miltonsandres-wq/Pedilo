@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { esPlatoDelDia } from "@/lib/menu/platosDelDia";
 import { tenantTieneDelivery } from "./habilitado";
 import { diaHonduras, textoHorario } from "./horario";
 import type { MetodoPago } from "./validaciones";
@@ -18,6 +19,8 @@ export interface ProductoPublico {
   precio: number;
   foto_url: string | null;
   categoria_id: string | null;
+  /** Es plato del día de hoy: sale primero, en su propia sección. */
+  plato_dia: boolean;
 }
 
 export interface MenuDelivery {
@@ -52,7 +55,7 @@ export async function cargarMenuDelivery(slug: string): Promise<MenuDelivery | n
       admin.from("categorias").select("id, nombre, orden").eq("tenant_id", config.tenant_id).order("orden"),
       admin
         .from("producto_sucursales")
-        .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo)")
+        .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo, plato_dia_fecha)")
         .eq("sucursal_id", config.sucursal_id),
       admin
         .from("delivery_zonas")
@@ -75,6 +78,7 @@ export async function cargarMenuDelivery(slug: string): Promise<MenuDelivery | n
       precio: Number(p.precio),
       foto_url: p.foto_url,
       categoria_id: p.categoria_id,
+      plato_dia: esPlatoDelDia(p.plato_dia_fecha),
     }));
 
   const estaAbierto = abierto === true;

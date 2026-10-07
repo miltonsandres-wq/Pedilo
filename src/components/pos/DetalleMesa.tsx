@@ -43,6 +43,7 @@ import { SelectField } from "@/components/ui/Field";
 import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
 import { esRtnValido, normalizarRtn } from "@/lib/fiscal/formato";
 import { imprimirPrecuenta } from "@/lib/fiscal/impresion";
+import { esPlatoDelDia } from "@/lib/menu/platosDelDia";
 import { cn } from "@/lib/ui";
 
 export function DetalleMesa({
@@ -499,13 +500,21 @@ function FormularioAgregarItem({
   productos,
 }: {
   ordenId: string;
-  productos: { id: string; nombre: string; precio: number }[];
+  productos: { id: string; nombre: string; precio: number; plato_dia_fecha?: string | null }[];
 }) {
   const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [nota, setNota] = useState("");
 
   const productoElegido = productos.find((p) => p.id === productoId);
+  // Los platos del día de HOY van primero para que el mesero/cajero los encuentre al instante
+  const platosDelDia = productos.filter((p) => esPlatoDelDia(p.plato_dia_fecha));
+  const resto = productos.filter((p) => !esPlatoDelDia(p.plato_dia_fecha));
+  const opcion = (p: (typeof productos)[number]) => (
+    <option key={p.id} value={p.id}>
+      {p.nombre} — L. {p.precio.toFixed(2)}
+    </option>
+  );
 
   async function agregar() {
     const producto = productos.find((p) => p.id === productoId);
@@ -533,11 +542,17 @@ function FormularioAgregarItem({
           className="min-w-40 flex-1 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
         >
           <option value="">Selecciona un producto</option>
-          {productos.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre} — L. {p.precio.toFixed(2)}
-            </option>
-          ))}
+          {platosDelDia.length > 0 && (
+            <optgroup label="⭐ Platos del día">
+              {platosDelDia.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre} — L. {p.precio.toFixed(2)}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {platosDelDia.length > 0 && <optgroup label="Menú">{resto.map(opcion)}</optgroup>}
+          {platosDelDia.length === 0 && resto.map(opcion)}
         </select>
         <input
           type="number"

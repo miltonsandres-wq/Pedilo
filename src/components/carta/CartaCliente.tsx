@@ -13,6 +13,8 @@ export interface ProductoMenu {
   precio: number;
   foto_url: string | null;
   categoria_id: string | null;
+  /** Es plato del día de hoy: sale primero, en su propia sección. */
+  plato_dia?: boolean;
 }
 
 // El menú del QR no muestra precios a propósito — lo que se cobra al final
@@ -66,9 +68,13 @@ export function CartaCliente({
   }
 
   const sinCategoria = productos.filter((p) => !p.categoria_id);
+  const platosDelDia = productos.filter((p) => p.plato_dia);
 
   return (
     <div>
+      {platosDelDia.length > 0 && (
+        <Seccion titulo="⭐ Platos del día" items={platosDelDia} carrito={carrito} onCambiar={cambiarCantidad} />
+      )}
       {categorias.map((cat) => {
         const items = productos.filter((p) => p.categoria_id === cat.id);
         if (items.length === 0) return null;

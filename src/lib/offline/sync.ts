@@ -206,6 +206,7 @@ async function pullInicial(sucursalId: string, tenantId: string) {
         foto_url: r.productos!.foto_url,
         disponible: r.productos!.disponible,
         tasa_isv: r.productos!.tasa_isv,
+        plato_dia_fecha: r.productos!.plato_dia_fecha,
       }));
     await db.productos.bulkPut(productos);
   }

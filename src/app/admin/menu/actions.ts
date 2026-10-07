@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { hoyHN } from "@/lib/menu/platosDelDia";
 
 const TASAS_ISV = ["exento", "15", "18"] as const;
 
@@ -84,5 +85,22 @@ export async function eliminarProducto(id: string) {
   await requireAdmin();
   const supabase = await createClient();
   await supabase.from("productos").update({ activo: false }).eq("id", id);
+  revalidatePath("/admin/menu");
+}
+
+/** Marca un producto como plato del día de HOY (mañana deja de serlo solo). */
+export async function ponerPlatoDelDia(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("producto_id") ?? "");
+  if (!id) return;
+  const supabase = await createClient();
+  await supabase.from("productos").update({ plato_dia_fecha: hoyHN() }).eq("id", id);
+  revalidatePath("/admin/menu");
+}
+
+export async function quitarPlatoDelDia(id: string) {
+  await requireAdmin();
+  const supabase = await createClient();
+  await supabase.from("productos").update({ plato_dia_fecha: null }).eq("id", id);
   revalidatePath("/admin/menu");
 }

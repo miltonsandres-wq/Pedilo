@@ -1069,6 +1069,7 @@ export type Database = {
       }
       productos: {
         Row: {
+          plato_dia_fecha: string | null
           activo: boolean
           categoria_id: string | null
           created_at: string
@@ -1083,6 +1084,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          plato_dia_fecha?: string | null
           activo?: boolean
           categoria_id?: string | null
           created_at?: string
@@ -1097,6 +1099,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          plato_dia_fecha?: string | null
           activo?: boolean
           categoria_id?: string | null
           created_at?: string
