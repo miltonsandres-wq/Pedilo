@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/Card";
 import { ImportarMenuPdf } from "@/components/admin/ImportarMenuPdf";
 
+// Leer el menú con la IA puede tardar: en Vercel se amplía el tiempo máximo de la función (y de sus acciones)
+export const maxDuration = 60;
+
 export default async function ImportarMenuPage() {
   const sesion = await requireAdmin();
   const supabase = await createClient();

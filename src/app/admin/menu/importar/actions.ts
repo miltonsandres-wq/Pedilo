@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { extraerTextoPdf } from "@/lib/ia/extraerTextoPdf";
-import { extraerMenuDeTexto, type ItemMenuExtraido } from "@/lib/ia/extraerMenu";
+import { extraerMenuDeArchivo, type ItemMenuExtraido, type TipoArchivoMenu } from "@/lib/ia/extraerMenu";
+
+const TIPOS: TipoArchivoMenu[] = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+/** Vercel acepta hasta 4.5 MB por petición. */
+const MAX_BYTES = 4 * 1024 * 1024;
 
 export interface ResultadoExtraccion {
   ok: boolean;
@@ -22,28 +25,28 @@ export async function extraerBorradorDeMenu(formData: FormData): Promise<Resulta
 
   const archivo = formData.get("pdf");
   if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: "Selecciona un archivo PDF." };
+    return { ok: false, error: "Selecciona el PDF o la foto de tu menú." };
   }
-  if (archivo.type !== "application/pdf") {
-    return { ok: false, error: "El archivo debe ser un PDF." };
+  const tipo = TIPOS.find((t) => t === archivo.type);
+  if (!tipo) return { ok: false, error: "El archivo debe ser un PDF o una foto (JPG, PNG o WebP)." };
+  if (archivo.size > MAX_BYTES) {
+    return { ok: false, error: "El archivo pesa más de 4 MB. Comprímelo o súbelo por partes (por ejemplo, 5 a 10 páginas a la vez)." };
   }
 
   try {
-    const buffer = Buffer.from(await archivo.arrayBuffer());
-    const texto = await extraerTextoPdf(buffer);
-
-    if (!texto.trim()) {
-      return { ok: false, error: "No se pudo leer texto de ese PDF (¿es una imagen escaneada?)." };
-    }
-
-    const items = await extraerMenuDeTexto(texto);
+    const items = await extraerMenuDeArchivo(Buffer.from(await archivo.arrayBuffer()), tipo);
     if (items.length === 0) {
-      return { ok: false, error: "No se reconoció ningún platillo en el PDF." };
+      return { ok: false, error: "No se reconoció ningún platillo. Prueba con otro archivo o con una foto más nítida del menú." };
     }
-
     return { ok: true, items };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error al procesar el PDF." };
+    console.error("[importar-menu]", err);
+    const m = err instanceof Error ? err.message : "";
+    if (/ANTHROPIC_API_KEY/.test(m)) return { ok: false, error: m };
+    if (/timed? ?out|timeout|abort/i.test(m)) return { ok: false, error: "La lectura tardó demasiado. Prueba con un archivo más corto o más liviano." };
+    if (/credit|billing|401|403|authentication|permission/i.test(m)) return { ok: false, error: "No se pudo usar la IA: revisa la clave y el saldo de ANTHROPIC_API_KEY." };
+    if (/overloaded|529|rate/i.test(m)) return { ok: false, error: "La IA está ocupada. Inténtalo de nuevo en un minuto." };
+    return { ok: false, error: "No se pudo leer el menú. Inténtalo de nuevo o prueba con otro archivo." };
   }
 }
 
@@ -55,7 +58,7 @@ export interface ItemAConfirmar extends ItemMenuExtraido {
 export async function confirmarImportacion(
   items: ItemAConfirmar[],
   sucursalIds: string[]
-): Promise<{ ok: boolean; creados: number; error?: string }> {
+): Promise<{ ok: boolean; creados: number; omitidos?: number; error?: string }> {
   const sesion = await requireAdmin();
   const supabase = await createClient();
 
@@ -85,8 +88,18 @@ export async function confirmarImportacion(
     for (const c of nuevas ?? []) categoriaIdPorNombre.set(c.nombre.toLowerCase(), c.id);
   }
 
+  // Si el menú ya tiene un platillo con ese nombre, no se duplica al importar de nuevo
+  const { data: existentes } = await supabase.from("productos").select("nombre").eq("tenant_id", sesion.tenant_id);
+  const yaExisten = new Set((existentes ?? []).map((p) => p.nombre.trim().toLowerCase()));
+
   let creados = 0;
+  let omitidos = 0;
   for (const item of aIncluir) {
+    if (yaExisten.has(item.nombre.trim().toLowerCase())) {
+      omitidos += 1;
+      continue;
+    }
+    yaExisten.add(item.nombre.trim().toLowerCase());
     const categoria_id = categoriaIdPorNombre.get(item.categoria.toLowerCase()) ?? null;
     const { data: producto, error } = await supabase
       .from("productos")
@@ -110,5 +123,5 @@ export async function confirmarImportacion(
   }
 
   revalidatePath("/admin/menu");
-  return { ok: true, creados };
+  return { ok: true, creados, omitidos };
 }

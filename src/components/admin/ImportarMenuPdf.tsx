@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileUp, Loader2, Sparkles, Trash2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { prepararImagen } from "@/lib/imagen/preparar";
 import {
   extraerBorradorDeMenu,
   confirmarImportacion,
@@ -21,7 +22,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
     sucursales.map((s) => s.id)
   );
   const [guardando, setGuardando] = useState(false);
-  const [resultado, setResultado] = useState<{ creados: number } | null>(null);
+  const [resultado, setResultado] = useState<{ creados: number; omitidos: number } | null>(null);
 
   async function subir(file: File) {
     setCargando(true);
@@ -29,16 +30,29 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
     setItems(null);
     setResultado(null);
 
-    const formData = new FormData();
-    formData.set("pdf", file);
-    const res = await extraerBorradorDeMenu(formData);
+    try {
+      // Una foto del celular pesa varios MB: se achica antes de enviarla (los PDF van tal cual)
+      const archivo = file.type.startsWith("image/") ? await prepararImagen(file, { maxLado: 2200, maxBytes: 3 * 1024 * 1024 }) : file;
+      if (archivo.size > 4 * 1024 * 1024) {
+        setError("El archivo pesa más de 4 MB. Comprímelo o súbelo por partes (por ejemplo, 5 a 10 páginas a la vez).");
+        return;
+      }
+      const formData = new FormData();
+      formData.set("pdf", archivo);
+      const res = await extraerBorradorDeMenu(formData);
 
-    if (!res.ok || !res.items) {
-      setError(res.error ?? "No se pudo procesar el PDF.");
-    } else {
-      setItems(res.items.map((i) => ({ ...i, incluir: true })));
+      if (!res.ok || !res.items) {
+        setError(res.error ?? "No se pudo leer el menú.");
+      } else {
+        setItems(res.items.map((i) => ({ ...i, incluir: i.precio > 0 })));
+      }
+    } catch (e) {
+      // Sin esto, un corte de red o un tiempo agotado dejaba la pantalla «cargando» para siempre
+      setError(e instanceof Error && e.message.length < 140 ? e.message : "No se pudo completar la lectura. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setCargando(false);
+      if (inputRef.current) inputRef.current.value = ""; // permite volver a elegir el mismo archivo
     }
-    setCargando(false);
   }
 
   function actualizar(idx: number, cambios: Partial<ItemAConfirmar>) {
@@ -51,7 +65,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
     const res = await confirmarImportacion(items, sucursalesElegidas);
     setGuardando(false);
     if (res.ok) {
-      setResultado({ creados: res.creados });
+      setResultado({ creados: res.creados, omitidos: res.omitidos ?? 0 });
       setItems(null);
       router.refresh();
     } else {
@@ -62,8 +76,8 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
   return (
     <Card>
       <CardHeader
-        title="Importar menú desde PDF"
-        subtitle="Sube el menú que ya tienes en PDF: la IA arma un borrador de categorías y platillos para que lo revises antes de publicarlo."
+        title="Importar menú desde PDF o foto"
+        subtitle="Sube tu menú en PDF o una foto: la IA lee las categorías, platillos y precios y los llena por ti. Revisa el borrador y publícalo con un clic."
       />
       <div className="p-5">
         {!items && (
@@ -71,7 +85,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -86,13 +100,14 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
               {cargando ? (
                 <>
                   <Loader2 className="h-6 w-6 animate-spin text-brand-600" strokeWidth={2} />
-                  <span className="text-sm font-medium">Leyendo el PDF y armando el borrador...</span>
-                  <span className="text-xs text-ink-400">Puede tardar unos segundos</span>
+                  <span className="text-sm font-medium">Leyendo tu menú y armando el borrador...</span>
+                  <span className="text-xs text-ink-400">Puede tardar hasta un minuto</span>
                 </>
               ) : (
                 <>
                   <FileUp className="h-6 w-6" strokeWidth={2} />
-                  <span className="text-sm font-medium">Subir PDF del menú</span>
+                  <span className="text-sm font-medium">Subir PDF o foto del menú</span>
+                  <span className="text-xs text-ink-400">PDF, JPG, PNG o WebP · hasta 4 MB</span>
                 </>
               )}
             </button>
@@ -107,6 +122,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-libre-bg px-3 py-2 text-sm text-libre-text">
             <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
             Se importaron {resultado.creados} platillos. Ya están en el menú.
+            {resultado.omitidos > 0 && ` (${resultado.omitidos} ya existían y no se repitieron)`}
           </div>
         )}
 
