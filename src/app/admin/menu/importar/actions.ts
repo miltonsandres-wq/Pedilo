@@ -64,7 +64,7 @@ export interface ItemAConfirmar extends ItemMenuExtraido {
 export async function confirmarImportacion(
   items: ItemAConfirmar[],
   sucursalIds: string[]
-): Promise<{ ok: boolean; creados: number; omitidos?: number; error?: string }> {
+): Promise<{ ok: boolean; creados: number; omitidos?: number; fallidos?: number; detalle?: string; error?: string }> {
   const sesion = await requireAdmin();
   const supabase = await createClient();
 
@@ -95,11 +95,17 @@ export async function confirmarImportacion(
   }
 
   // Si el menú ya tiene un platillo con ese nombre, no se duplica al importar de nuevo
-  const { data: existentes } = await supabase.from("productos").select("nombre").eq("tenant_id", sesion.tenant_id);
+  const { data: existentes } = await supabase
+    .from("productos")
+    .select("nombre")
+    .eq("tenant_id", sesion.tenant_id)
+    .eq("activo", true); // los eliminados no cuentan: se pueden volver a importar
   const yaExisten = new Set((existentes ?? []).map((p) => p.nombre.trim().toLowerCase()));
 
   let creados = 0;
   let omitidos = 0;
+  let fallidos = 0;
+  let primerError: string | null = null;
   for (const item of aIncluir) {
     if (yaExisten.has(item.nombre.trim().toLowerCase())) {
       omitidos += 1;
@@ -119,15 +125,29 @@ export async function confirmarImportacion(
       .select("id")
       .single();
 
-    if (error || !producto) continue;
+    if (error || !producto) {
+      fallidos += 1;
+      primerError ??= error?.message ?? "No se pudo guardar el platillo.";
+      continue;
+    }
 
-    await supabase
+    // Sin sucursal el platillo no sale en el POS ni en la carta: si no se pudo asignar, se deshace
+    const { error: errSuc } = await supabase
       .from("producto_sucursales")
       .insert(sucursalIds.map((sucursal_id) => ({ producto_id: producto.id, sucursal_id })));
+    if (errSuc) {
+      await supabase.from("productos").delete().eq("id", producto.id);
+      fallidos += 1;
+      primerError ??= errSuc.message;
+      continue;
+    }
 
     creados += 1;
   }
 
   revalidatePath("/admin/menu");
-  return { ok: true, creados, omitidos };
+  if (creados === 0 && fallidos > 0) {
+    return { ok: false, creados, omitidos, fallidos, error: `No se pudo importar ningún platillo. ${primerError ?? ""}`.trim() };
+  }
+  return { ok: true, creados, omitidos, fallidos, detalle: primerError ?? undefined };
 }

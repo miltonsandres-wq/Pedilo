@@ -15,11 +15,11 @@ import { crearCategoria, crearProducto, actualizarProducto, eliminarProducto, po
 export default async function MenuPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sucursal?: string }>;
+  searchParams: Promise<{ sucursal?: string; error?: string }>;
 }) {
   const sesion = await requireAdmin();
   const supabase = await createClient();
-  const { sucursal: sucursalFiltro } = await searchParams;
+  const { sucursal: sucursalFiltro, error: errorAccion } = await searchParams;
 
   const [{ data: categorias }, { data: productos }, { data: sucursales }, { data: prodSuc }] =
     await Promise.all([
@@ -66,6 +66,12 @@ export default async function MenuPage({
           </Link>
         }
       />
+
+      {errorAccion && (
+        <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorAccion}
+        </p>
+      )}
 
       {!unaSola && (
       <div className="mb-6 flex flex-wrap gap-2">

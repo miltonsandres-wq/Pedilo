@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -88,19 +89,28 @@ export async function eliminarProducto(id: string) {
   revalidatePath("/admin/menu");
 }
 
+/** Mensaje claro cuando falla: lo más común es que falte aplicar la migración 0033 en Supabase. */
+function mensajePlatoDelDia(detalle: string): string {
+  return /plato_dia_fecha|column|schema cache/i.test(detalle)
+    ? "No se pudo guardar el plato del día: falta aplicar la migración 0033_platos_del_dia.sql en Supabase."
+    : `No se pudo guardar el plato del día: ${detalle}`;
+}
+
 /** Marca un producto como plato del día de HOY (mañana deja de serlo solo). */
 export async function ponerPlatoDelDia(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("producto_id") ?? "");
   if (!id) return;
   const supabase = await createClient();
-  await supabase.from("productos").update({ plato_dia_fecha: hoyHN() }).eq("id", id);
+  const { error } = await supabase.from("productos").update({ plato_dia_fecha: hoyHN() }).eq("id", id);
+  if (error) redirect(`/admin/menu?error=${encodeURIComponent(mensajePlatoDelDia(error.message))}`);
   revalidatePath("/admin/menu");
 }
 
 export async function quitarPlatoDelDia(id: string) {
   await requireAdmin();
   const supabase = await createClient();
-  await supabase.from("productos").update({ plato_dia_fecha: null }).eq("id", id);
+  const { error } = await supabase.from("productos").update({ plato_dia_fecha: null }).eq("id", id);
+  if (error) redirect(`/admin/menu?error=${encodeURIComponent(mensajePlatoDelDia(error.message))}`);
   revalidatePath("/admin/menu");
 }

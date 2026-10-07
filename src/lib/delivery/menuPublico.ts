@@ -55,7 +55,7 @@ export async function cargarMenuDelivery(slug: string): Promise<MenuDelivery | n
       admin.from("categorias").select("id, nombre, orden").eq("tenant_id", config.tenant_id).order("orden"),
       admin
         .from("producto_sucursales")
-        .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo, plato_dia_fecha)")
+        .select("productos(*)")
         .eq("sucursal_id", config.sucursal_id),
       admin
         .from("delivery_zonas")

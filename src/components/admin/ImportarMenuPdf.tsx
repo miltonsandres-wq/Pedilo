@@ -22,7 +22,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
     sucursales.map((s) => s.id)
   );
   const [guardando, setGuardando] = useState(false);
-  const [resultado, setResultado] = useState<{ creados: number; omitidos: number } | null>(null);
+  const [resultado, setResultado] = useState<{ creados: number; omitidos: number; fallidos: number; detalle?: string } | null>(null);
 
   async function subir(file: File) {
     setCargando(true);
@@ -65,7 +65,7 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
     const res = await confirmarImportacion(items, sucursalesElegidas);
     setGuardando(false);
     if (res.ok) {
-      setResultado({ creados: res.creados, omitidos: res.omitidos ?? 0 });
+      setResultado({ creados: res.creados, omitidos: res.omitidos ?? 0, fallidos: res.fallidos ?? 0, detalle: res.detalle });
       setItems(null);
       router.refresh();
     } else {
@@ -123,6 +123,12 @@ export function ImportarMenuPdf({ sucursales }: { sucursales: { id: string; nomb
             <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
             Se importaron {resultado.creados} platillos. Ya están en el menú.
             {resultado.omitidos > 0 && ` (${resultado.omitidos} ya existían y no se repitieron)`}
+          </div>
+        )}
+
+        {resultado && resultado.fallidos > 0 && (
+          <div role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {resultado.fallidos} platillos no se pudieron guardar{resultado.detalle ? `: ${resultado.detalle}` : "."}
           </div>
         )}
 

@@ -31,7 +31,7 @@ export default async function CartaPage({ params }: { params: Promise<{ token: s
     admin.from("categorias").select("id, nombre, orden").eq("tenant_id", mesa.tenant_id).order("orden"),
     admin
       .from("producto_sucursales")
-      .select("productos(id, nombre, descripcion, precio, foto_url, categoria_id, disponible, activo, plato_dia_fecha)")
+      .select("productos(*)")
       .eq("sucursal_id", mesa.sucursal_id),
   ]);
 
