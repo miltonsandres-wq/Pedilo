@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database.types";
 import { resumirLiquidaciones, type ResumenDeliveryCierre } from "@/lib/delivery/reportes";
 import { separarCierre, type CierreSeparado } from "./separarCierre";
+import { fechaLocalHN } from "@/lib/fiscal/formato";
+import { rangoDiaHN } from "@/lib/ventas/ventasDelDia";
 
 /**
  * El cierre diario NO es una tabla: es una consulta que suma los `pagos`
@@ -128,11 +130,10 @@ export async function obtenerCierreDiario(
   };
 }
 
-/** Rango [00:00, 23:59:59] del día dado (o hoy) en ISO, hora local del servidor. */
-export function rangoDelDia(fecha = new Date()) {
-  const desde = new Date(fecha);
-  desde.setHours(0, 0, 0, 0);
-  const hasta = new Date(fecha);
-  hasta.setHours(23, 59, 59, 999);
-  return { desde: desde.toISOString(), hasta: hasta.toISOString() };
+/**
+ * Rango [00:00, 23:59:59.999] del día dado (o hoy) en ISO, en HORA DE HONDURAS. Antes usaba la hora del
+ * servidor (UTC en Vercel), y lo cobrado de noche caía en el día equivocado. Acepta una fecha "YYYY-MM-DD".
+ */
+export function rangoDelDia(fecha: Date | string = new Date()) {
+  return rangoDiaHN(typeof fecha === "string" ? fecha : fechaLocalHN(fecha));
 }

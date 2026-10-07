@@ -162,3 +162,45 @@ describe("canal del pedido y ticket sin factura (migración 0036)", () => {
     expect(u.rows[0].puede_ticket_sin_factura).toBe(false);
   });
 });
+
+describe("cierres diarios (migración 0037)", () => {
+  const cierre = (usuario: string, fecha: string, sucursal = S_A, cerradoPor = usuario) =>
+    comoUsuario(pg, usuario, () =>
+      pg.query(
+        "insert into public.cierres_diarios (tenant_id, sucursal_id, fecha, total_cobrado, total_ordenes, datos, cerrado_por) values ($1,$2,$3,100,2,'{}'::jsonb,$4) returning id",
+        [T_A, sucursal, fecha, cerradoPor]
+      )
+    );
+
+  it("el administrador cierra el día y queda quién lo cerró", async () => {
+    const r = await cierre(ADMIN_A, "2026-10-01");
+    expect(r.rows).toHaveLength(1);
+  });
+
+  it("un solo cierre por sucursal y día", async () => {
+    await cierre(ADMIN_A, "2026-10-02");
+    await expect(cierre(ADMIN_A, "2026-10-02")).rejects.toThrow();
+    await expect(cierre(ADMIN_A, "2026-10-02", S_A2)).resolves.toBeTruthy(); // otra sucursal sí
+  });
+
+  it("el cajero NO puede cerrar el día ni ver los cierres", async () => {
+    await expect(cierre(CAJERO_A, "2026-10-03")).rejects.toThrow();
+    const n = await comoUsuario(pg, CAJERO_A, async () => (await pg.query<{ n: number }>("select count(*)::int as n from public.cierres_diarios")).rows[0].n);
+    expect(n).toBe(0);
+  });
+
+  it("no se puede cerrar a nombre de otro", async () => {
+    await expect(cierre(ADMIN_A, "2026-10-04", S_A, CAJERO_A)).rejects.toThrow();
+  });
+
+  it("otro negocio no ve los cierres y nadie los cambia ni los borra", async () => {
+    const n = await comoUsuario(pg, ADMIN_B, async () => (await pg.query<{ n: number }>("select count(*)::int as n from public.cierres_diarios")).rows[0].n);
+    expect(n).toBe(0);
+    const antes = (await pg.query<{ n: number }>("select count(*)::int as n from public.cierres_diarios")).rows[0].n;
+    await comoUsuario(pg, ADMIN_A, () => pg.query("update public.cierres_diarios set total_cobrado = 0").catch(() => null));
+    await comoUsuario(pg, ADMIN_A, () => pg.query("delete from public.cierres_diarios").catch(() => null));
+    const despues = await pg.query<{ n: number; total: number }>("select count(*)::int as n, coalesce(max(total_cobrado),0)::float as total from public.cierres_diarios");
+    expect(despues.rows[0].n).toBe(antes);
+    expect(despues.rows[0].total).toBe(100);
+  });
+});

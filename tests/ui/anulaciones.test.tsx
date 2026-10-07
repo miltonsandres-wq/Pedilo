@@ -88,7 +88,7 @@ describe("dónde aparece la acción", () => {
 
   const venta = (over: Partial<VentaDia> = {}): VentaDia => ({
     ordenId: "O9", sucursalId: "S1", mesa: "Mesa 1", numeroDia: 9, hora: "2026-10-07T15:00:00Z", cliente: "—", tipo: "sin_factura", canal: "local",
-    documentoId: null, numeroFactura: null, formasPago: ["efectivo"], total: 80, anulada: false, motivoAnulacion: null, solicitud: null, ...over,
+    documentoId: null, numeroFactura: null, formasPago: ["efectivo"], pagos: [{ forma: "efectivo", monto: 80 }], total: 80, anulada: false, motivoAnulacion: null, solicitud: null, ...over,
   });
 
   it("cobros sin CAI de hoy: el cajero puede pedir anularlos; los ya anulados no", () => {

@@ -61,6 +61,8 @@ export interface VentaDia {
   documentoId: string | null;
   numeroFactura: string | null;
   formasPago: string[];
+  /** Cada pago de la venta (método y monto), para sumar por método de pago. */
+  pagos: { forma: string; monto: number }[];
   total: number;
   /** La factura está anulada o se aprobó anular este cobro. */
   anulada: boolean;
@@ -100,6 +102,7 @@ export function clasificarVentas(datos: {
       documentoId: factura?.id ?? null,
       numeroFactura: factura?.numero_completo ?? null,
       formasPago: formas,
+      pagos: datos.pagos.filter((p) => p.orden_id === o.id).map((p) => ({ forma: p.forma_pago, monto: Number(p.monto) })),
       total: Number(factura?.total ?? o.total),
       anulada,
       motivoAnulacion: factura?.anulada_motivo ?? aprobada?.motivo ?? null,

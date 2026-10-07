@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      cierres_diarios: {
+        Row: {
+          cerrado_at: string
+          cerrado_por: string | null
+          datos: Json
+          fecha: string
+          id: string
+          notas: string | null
+          sucursal_id: string
+          tenant_id: string
+          total_cobrado: number
+          total_ordenes: number
+        }
+        Insert: {
+          cerrado_at?: string
+          cerrado_por?: string | null
+          datos: Json
+          fecha: string
+          id?: string
+          notas?: string | null
+          sucursal_id: string
+          tenant_id: string
+          total_cobrado?: number
+          total_ordenes?: number
+        }
+        Update: {
+          cerrado_at?: string
+          cerrado_por?: string | null
+          datos?: Json
+          fecha?: string
+          id?: string
+          notas?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          total_cobrado?: number
+          total_ordenes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cierres_diarios_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cierres_diarios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cai_rangos: {
         Row: {
           cai: string

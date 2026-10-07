@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database.types";
 import { clasificarVentas, rangoDiaHN, type VentaDia } from "./ventasDelDia";
+import { enLotes } from "./lotes";
 
 /**
  * Trae las ventas cobradas ese día (hora de Honduras) y las clasifica. Usa el cliente con la sesión
@@ -12,6 +13,15 @@ export async function cargarVentasDelDia(
   params: { fecha: string; sucursalId?: string }
 ): Promise<VentaDia[]> {
   const { desde, hasta } = rangoDiaHN(params.fecha);
+  return cargarVentasEnRango(supabase, { desde, hasta, sucursalId: params.sucursalId });
+}
+
+/** Igual, para cualquier rango de instantes (ISO): sirve para los reportes de varios días. */
+export async function cargarVentasEnRango(
+  supabase: SupabaseClient<Database>,
+  params: { desde: string; hasta: string; sucursalId?: string }
+): Promise<VentaDia[]> {
+  const { desde, hasta } = params;
 
   let q = supabase
     .from("ordenes")
@@ -26,16 +36,25 @@ export async function cargarVentasDelDia(
 
   const ids = pagadas.map((o) => o.id);
   const mesaIds = [...new Set(pagadas.map((o) => o.mesa_id).filter((m): m is string => !!m))];
-  const [{ data: pagos }, { data: facturas }, { data: solicitudes }, { data: mesas }] = await Promise.all([
-    supabase.from("pagos").select("orden_id, forma_pago, monto").in("orden_id", ids),
-    supabase
-      .from("documentos_fiscales")
-      .select("id, orden_id, numero_completo, cliente_nombre, cliente_rtn, total, estado, anulada_motivo")
-      .eq("clase", "factura")
-      .in("orden_id", ids),
-    supabase.from("solicitudes_anulacion").select("id, orden_id, estado, motivo, respuesta, created_at").in("orden_id", ids),
-    mesaIds.length ? supabase.from("mesas").select("id, nombre").in("id", mesaIds) : Promise.resolve({ data: [] as { id: string; nombre: string }[] }),
+  const lotes = enLotes(ids);
+  const [pagosL, facturasL, solicitudesL, mesasL] = await Promise.all([
+    Promise.all(lotes.map((l) => supabase.from("pagos").select("orden_id, forma_pago, monto").in("orden_id", l))),
+    Promise.all(
+      lotes.map((l) =>
+        supabase
+          .from("documentos_fiscales")
+          .select("id, orden_id, numero_completo, cliente_nombre, cliente_rtn, total, estado, anulada_motivo")
+          .eq("clase", "factura")
+          .in("orden_id", l)
+      )
+    ),
+    Promise.all(lotes.map((l) => supabase.from("solicitudes_anulacion").select("id, orden_id, estado, motivo, respuesta, created_at").in("orden_id", l))),
+    Promise.all(enLotes(mesaIds).map((l) => supabase.from("mesas").select("id, nombre").in("id", l))),
   ]);
+  const pagos = pagosL.flatMap((r) => r.data ?? []);
+  const facturas = facturasL.flatMap((r) => r.data ?? []);
+  const solicitudes = solicitudesL.flatMap((r) => r.data ?? []);
+  const mesas = mesasL.flatMap((r) => r.data ?? []);
 
   return clasificarVentas({
     ordenes: pagadas.map((o) => ({ ...o, total: Number(o.total), pagada_at: o.pagada_at })),
