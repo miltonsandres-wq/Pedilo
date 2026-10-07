@@ -46,7 +46,13 @@ export async function extraerBorradorDeMenu(formData: FormData): Promise<Resulta
     if (/timed? ?out|timeout|abort/i.test(m)) return { ok: false, error: "La lectura tardó demasiado. Prueba con un archivo más corto o más liviano." };
     if (/credit|billing|401|403|authentication|permission/i.test(m)) return { ok: false, error: "No se pudo usar la IA: revisa la clave y el saldo de ANTHROPIC_API_KEY." };
     if (/overloaded|529|rate/i.test(m)) return { ok: false, error: "La IA está ocupada. Inténtalo de nuevo en un minuto." };
-    return { ok: false, error: "No se pudo leer el menú. Inténtalo de nuevo o prueba con otro archivo." };
+    // Se deja el detalle técnico visible: así se sabe qué falló (modelo, clave, formato…) sin abrir los registros
+    const status = (err as { status?: number } | null)?.status;
+    const detalle = m.replace(/\s+/g, " ").slice(0, 220);
+    return {
+      ok: false,
+      error: `No se pudo leer el menú${status ? ` (error ${status})` : ""}. ${detalle || "Inténtalo de nuevo o prueba con otro archivo."}`,
+    };
   }
 }
 
