@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarItemsMenu } from "@/lib/ia/normalizarMenu";
+import { leerJsonDeTexto, normalizarItemsMenu } from "@/lib/ia/normalizarMenu";
 
 describe("normalizarItemsMenu (lo que devuelve la IA)", () => {
   it("pone «General» si falta la categoría y descarta filas sin nombre", () => {
@@ -35,5 +35,19 @@ describe("normalizarItemsMenu (lo que devuelve la IA)", () => {
   it("si no es una lista, no devuelve nada", () => {
     expect(normalizarItemsMenu(undefined)).toEqual([]);
     expect(normalizarItemsMenu({ items: [] })).toEqual([]);
+  });
+});
+
+describe("leerJsonDeTexto (cuando la IA responde con texto)", () => {
+  it("lee un objeto con items, con o sin bloque de código", () => {
+    expect(leerJsonDeTexto('{"items":[{"nombre":"A","precio":1}]}')).toHaveLength(1);
+    const conBloque = ["```json", '{"items":[{"nombre":"A","precio":1}]}', "```"].join("\n");
+    expect(leerJsonDeTexto(conBloque)).toHaveLength(1);
+  });
+  it("lee una lista suelta y texto alrededor", () => {
+    expect(leerJsonDeTexto('Aquí está: [{"nombre":"A","precio":1},{"nombre":"B","precio":2}] listo')).toHaveLength(2);
+  });
+  it("si no hay JSON válido devuelve null", () => {
+    expect(leerJsonDeTexto("no pude leerlo")).toBeNull();
   });
 });

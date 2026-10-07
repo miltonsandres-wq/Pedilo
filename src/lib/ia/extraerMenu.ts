@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { normalizarItemsMenu, type ItemMenuExtraido } from "./normalizarMenu";
+import { leerJsonDeTexto, normalizarItemsMenu, type ItemMenuExtraido } from "./normalizarMenu";
 
 export type { ItemMenuExtraido };
 
@@ -11,7 +11,8 @@ const MODELO = "claude-sonnet-5-5";
 
 const PROMPT_SISTEMA = `Eres un asistente que digitaliza menús de restaurante. Recibes el menú como PDF
 o como foto (puede ser un diseño con columnas, fotos, escaneado o con precios pegados al nombre).
-Lee TODO el menú, de principio a fin, y registra cada platillo o bebida con la herramienta "registrar_menu".
+Lee TODO el menú, de principio a fin, y registra cada platillo o bebida llamando a la herramienta "registrar_menu"
+(si no puedes usarla, responde SOLO con el JSON {"items": [...]} sin texto adicional).
 
 Reglas:
 - "categoria": el encabezado de sección bajo el que aparece el platillo (ej. "Entradas", "Platos fuertes",
@@ -71,11 +72,16 @@ export async function extraerMenuDeArchivo(datos: Buffer, tipo: TipoArchivoMenu)
     max_tokens: 12_000,
     system: PROMPT_SISTEMA,
     tools: [HERRAMIENTA],
-    tool_choice: { type: "tool", name: HERRAMIENTA.name },
+    // Este modelo no admite forzar la herramienta (tool_choice «tool»): se le pide por instrucción y, si responde con texto, se lee el JSON
     messages: [{ role: "user", content: [archivo, { type: "text", text: "Digitaliza este menú." }] }],
   });
 
   const llamada = response.content.find((b) => b.type === "tool_use");
-  const entrada = llamada && llamada.type === "tool_use" ? (llamada.input as { items?: unknown }) : null;
-  return normalizarItemsMenu(entrada?.items);
+  if (llamada && llamada.type === "tool_use") {
+    return normalizarItemsMenu((llamada.input as { items?: unknown }).items);
+  }
+
+  // Respondió con texto: se busca el JSON (una lista, o un objeto con «items»)
+  const texto = response.content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
+  return normalizarItemsMenu(leerJsonDeTexto(texto));
 }

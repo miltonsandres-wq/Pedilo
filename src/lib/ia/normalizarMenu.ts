@@ -54,3 +54,20 @@ function aPrecio(v: unknown): number {
   const n = Number(t);
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
 }
+
+/** Saca el JSON de una respuesta en texto (con o sin bloque ```). Devuelve la lista de platillos o null. */
+export function leerJsonDeTexto(texto: string): unknown {
+  const limpio = texto.replace(/```(?:json)?/gi, "").trim();
+  const candidatos = [limpio, limpio.slice(limpio.indexOf("{"), limpio.lastIndexOf("}") + 1), limpio.slice(limpio.indexOf("["), limpio.lastIndexOf("]") + 1)];
+  for (const c of candidatos) {
+    if (!c) continue;
+    try {
+      const v = JSON.parse(c);
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === "object" && Array.isArray((v as { items?: unknown }).items)) return (v as { items: unknown[] }).items;
+    } catch {
+      /* se prueba el siguiente */
+    }
+  }
+  return null;
+}
