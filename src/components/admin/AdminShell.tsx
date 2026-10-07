@@ -19,12 +19,15 @@ export function AdminShell({
   usuarioNombre,
   usuarioEmail,
   deliveryHabilitado = false,
+  anulacionesPendientes = 0,
   children,
 }: {
   usuarioNombre: string;
   usuarioEmail: string | null;
   /** La plataforma habilitó el delivery para este negocio: si no, no aparece en el menú. */
   deliveryHabilitado?: boolean;
+  /** Anulaciones pedidas por la caja que el admin todavía no aprueba (aviso en el menú). */
+  anulacionesPendientes?: number;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -117,7 +120,7 @@ export function AdminShell({
               <X className="h-5 w-5" strokeWidth={2} />
             </button>
             {marca}
-            <AdminNav onNavigate={() => setAbierto(false)} delivery={deliveryHabilitado} />
+            <AdminNav onNavigate={() => setAbierto(false)} delivery={deliveryHabilitado} anulacionesPendientes={anulacionesPendientes} />
             {pie}
           </aside>
         </div>
@@ -128,7 +131,7 @@ export function AdminShell({
           del alto del contenido de la página. */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-ink-950 p-4 text-white lg:flex">
         {marca}
-        <AdminNav delivery={deliveryHabilitado} />
+        <AdminNav delivery={deliveryHabilitado} anulacionesPendientes={anulacionesPendientes} />
         {pie}
       </aside>
 

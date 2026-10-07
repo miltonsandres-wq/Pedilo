@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { obtenerCierreDiario, rangoDelDia } from "@/lib/reportes/cierreDiario";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import Link from "next/link";
 
 export default async function ReportesPage({
   searchParams,
@@ -35,6 +36,14 @@ export default async function ReportesPage({
     <div>
       <PageHeader
         title="Cierre diario"
+        action={
+          <Link href={`/admin/facturas?fecha=${fecha.toISOString().slice(0, 10)}`}>
+            <Button variant="secondary" size="sm">
+              <Receipt className="h-3.5 w-3.5" strokeWidth={2} />
+              Ver facturas del día
+            </Button>
+          </Link>
+        }
         subtitle={(sucursales ?? []).length > 1 ? "Comparación entre sucursales — se calcula al vuelo desde los pagos del día, no es una tabla." : "Cierre del día — se calcula al vuelo desde los pagos."}
       />
 

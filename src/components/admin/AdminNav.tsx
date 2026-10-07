@@ -13,6 +13,7 @@ import {
   FileText,
   Users,
   Bike,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
@@ -25,11 +26,21 @@ const NAV = [
   { href: "/admin/mesas", label: "Mesas / Layout", icon: LayoutGrid },
   { href: "/admin/formas-pago", label: "Formas de pago", icon: Wallet },
   { href: "/admin/delivery", label: "Delivery", icon: Bike },
+  { href: "/admin/facturas", label: "Facturas del día", icon: Receipt },
   { href: "/admin/fiscal", label: "Facturación fiscal", icon: FileText },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
-export function AdminNav({ onNavigate, delivery = false }: { onNavigate?: () => void; delivery?: boolean }) {
+export function AdminNav({
+  onNavigate,
+  delivery = false,
+  anulacionesPendientes = 0,
+}: {
+  onNavigate?: () => void;
+  delivery?: boolean;
+  /** Solicitudes de anulación de caja esperando que el admin las apruebe. */
+  anulacionesPendientes?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -50,6 +61,14 @@ export function AdminNav({ onNavigate, delivery = false }: { onNavigate?: () => 
           >
             <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
             {item.label}
+            {item.href === "/admin/facturas" && anulacionesPendientes > 0 && (
+              <span
+                className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+                aria-label={`${anulacionesPendientes} anulaciones por aprobar`}
+              >
+                {anulacionesPendientes}
+              </span>
+            )}
           </Link>
         );
       })}

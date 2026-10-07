@@ -11,6 +11,7 @@ import { formatearFechaHora } from "@/lib/fiscal/formato";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import type { RolUsuario } from "@/lib/types/helpers";
+import { SolicitarAnulacion, type SolicitudResumen } from "./SolicitarAnulacion";
 
 const ETIQUETA_CLASE: Record<string, string> = {
   factura: "Factura",
@@ -29,10 +30,13 @@ export function ListaDocumentos({
   sucursalId,
   usuarioId,
   rol,
+  solicitudes = {},
 }: {
   sucursalId: string;
   usuarioId: string;
   rol: RolUsuario;
+  /** Última solicitud de anulación de cada orden (la decide el administrador). */
+  solicitudes?: Record<string, SolicitudResumen>;
 }) {
   const docs = useLiveQuery(
     async () =>
@@ -133,6 +137,9 @@ export function ListaDocumentos({
                     <FilePlus2 className="h-3.5 w-3.5" strokeWidth={2} />
                     Nota de crédito
                   </Button>
+                )}
+                {rol === "cajero" && d.clase === "factura" && d.estado === "emitida" && !nota && (
+                  <SolicitarAnulacion ordenId={d.orden_id} documentoId={d.id} solicitud={solicitudes[d.orden_id]} />
                 )}
                 {m && <span className={m.ok ? "text-xs text-libre-text" : "text-xs text-red-600"}>{m.texto}</span>}
               </div>

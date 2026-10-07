@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock("@/app/pos/documentos/actions", () => ({ solicitarAnulacion: vi.fn() }));
 vi.mock("@/lib/supabase/client", async () => ({ createClient: (await import("./supabaseSinRed")).clienteSinRed }));
 const imprimir = vi.fn();
 vi.mock("@/lib/fiscal/impresion", () => ({

@@ -27,8 +27,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .single();
   const tutorialCompletado = tenant ? !!tenant.tutorial_completado_at : true;
 
+  // Anulaciones que la caja pidió y esperan aprobación (si la tabla aún no existe, simplemente no hay aviso)
+  const { count: anulacionesPendientes } = await supabase
+    .from("solicitudes_anulacion")
+    .select("id", { count: "exact", head: true })
+    .eq("estado", "pendiente");
+
   return (
-    <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email} deliveryHabilitado={tenant?.delivery_habilitado === true}>
+    <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email} deliveryHabilitado={tenant?.delivery_habilitado === true}
+      anulacionesPendientes={anulacionesPendientes ?? 0}
+    >
       <TutorialOnboarding completado={tutorialCompletado} tenantId={sesion.tenant_id} />
       <AlertasFiscalesAdmin tenantId={sesion.tenant_id} />
       {children}

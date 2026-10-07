@@ -1130,6 +1130,72 @@ export type Database = {
           },
         ]
       }
+      solicitudes_anulacion: {
+        Row: {
+          created_at: string
+          documento_id: string | null
+          estado: string
+          id: string
+          monto: number
+          motivo: string
+          orden_id: string
+          referencia: string
+          respuesta: string | null
+          resuelta_at: string | null
+          resuelta_por: string | null
+          solicitada_por: string | null
+          sucursal_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          documento_id?: string | null
+          estado?: string
+          id?: string
+          monto: number
+          motivo: string
+          orden_id: string
+          referencia: string
+          respuesta?: string | null
+          resuelta_at?: string | null
+          resuelta_por?: string | null
+          solicitada_por?: string | null
+          sucursal_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          documento_id?: string | null
+          estado?: string
+          id?: string
+          monto?: number
+          motivo?: string
+          orden_id?: string
+          referencia?: string
+          respuesta?: string | null
+          resuelta_at?: string | null
+          resuelta_por?: string | null
+          solicitada_por?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitudes_anulacion_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_anulacion_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sucursales: {
         Row: {
           activo: boolean
