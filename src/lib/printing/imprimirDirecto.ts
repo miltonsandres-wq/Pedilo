@@ -25,7 +25,7 @@ export async function imprimirDirecto(ticket: TicketArmado, agenteUrl: string | 
   const preferido = leerModoPreferido();
   const modo = preferido && cap[preferido] ? preferido : "navegador";
   const columnas = leerAnchoPapel();
-  const r = await imprimirConModo(modo, ticket.construir(columnas), columnas);
+  const r = await imprimirConModo(modo, ticket.construir(columnas), columnas, ticket.logoUrl);
   if (r.ok) guardarModoPreferido(modo);
   return r;
 }

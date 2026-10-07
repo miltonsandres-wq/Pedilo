@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Plus, Printer } from "lucide-react";
+import { Plus, Printer, QrCode } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PlanoMesas } from "@/components/PlanoMesas";
-import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/Card";
 import { MensajeFlyerForm } from "@/components/admin/MensajeFlyerForm";
 import { Field, SelectField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
@@ -117,27 +117,6 @@ export default async function MesasPage({
             </form>
           </Colapsable>
 
-          <Card className="mb-6">
-            <CardHeader
-              title="Flyer del QR para imprimir"
-              subtitle="Cada mesa sale con el logo del restaurante de fondo, un mensaje llamativo y su QR. Edita el mensaje de esta sucursal y imprímelos."
-            />
-            <div className="space-y-4 p-5 pt-4">
-              <MensajeFlyerForm key={sucursalId} sucursalId={sucursalId} mensajeInicial={sucursalActual?.mensaje_flyer ?? null} />
-              {(mesas ?? []).length > 0 ? (
-                <Link
-                  href={`/admin/mesas/flyer?sucursal=${sucursalId}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-2 text-sm font-medium text-white hover:bg-ink-800"
-                >
-                  <Printer className="h-4 w-4" strokeWidth={2} />
-                  Ver e imprimir los flyers de todas las mesas
-                </Link>
-              ) : (
-                <p className="text-xs text-ink-400">Crea mesas para poder imprimir sus flyers.</p>
-              )}
-            </div>
-          </Card>
-
           <div className="space-y-2">
             {(mesas ?? []).map((m) => (
               <Colapsable
@@ -186,6 +165,35 @@ export default async function MesasPage({
               </Colapsable>
             ))}
           </div>
+
+          <Colapsable
+            className="mt-6 rounded-2xl"
+            resumen={
+              <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                <QrCode className="h-4 w-4 text-brand-600" strokeWidth={2} />
+                Código QR para mesas
+              </span>
+            }
+          >
+            <p className="mb-4 text-sm text-ink-500">
+              Cada mesa tiene su código QR para ver el menú y pedir desde el celular. Imprime un flyer por mesa: lleva el logo del
+              restaurante de fondo, un mensaje llamativo y su QR. Edita el mensaje de esta sucursal y listo.
+            </p>
+            <div className="space-y-4">
+              <MensajeFlyerForm key={sucursalId} sucursalId={sucursalId} mensajeInicial={sucursalActual?.mensaje_flyer ?? null} />
+              {(mesas ?? []).length > 0 ? (
+                <Link
+                  href={`/admin/mesas/flyer?sucursal=${sucursalId}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-2 text-sm font-medium text-white hover:bg-ink-800"
+                >
+                  <Printer className="h-4 w-4" strokeWidth={2} />
+                  Ver e imprimir los flyers de todas las mesas
+                </Link>
+              ) : (
+                <p className="text-xs text-ink-400">Crea mesas para poder imprimir sus flyers.</p>
+              )}
+            </div>
+          </Colapsable>
         </>
       )}
     </div>

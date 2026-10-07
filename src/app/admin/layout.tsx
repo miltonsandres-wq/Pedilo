@@ -22,10 +22,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // (p. ej. la migración 0019 todavía no está aplicada) no se muestra nada.
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("tutorial_completado_at, delivery_habilitado")
+    .select("tutorial_completado_at, delivery_habilitado, nombre, logo_url")
     .eq("id", sesion.tenant_id)
     .single();
   const tutorialCompletado = tenant ? !!tenant.tutorial_completado_at : true;
+
+  // Logo del negocio para el panel: el del negocio o, si no, el de la primera sucursal que tenga uno
+  let logoUrl = tenant?.logo_url ?? null;
+  if (!logoUrl) {
+    const { data: conLogo } = await supabase
+      .from("sucursales")
+      .select("logo_url")
+      .eq("tenant_id", sesion.tenant_id)
+      .not("logo_url", "is", null)
+      .order("created_at")
+      .limit(1);
+    logoUrl = conLogo?.[0]?.logo_url ?? null;
+  }
 
   // Anulaciones que la caja pidió y esperan aprobación (si la tabla aún no existe, simplemente no hay aviso)
   const { count: anulacionesPendientes } = await supabase
@@ -36,6 +49,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email} deliveryHabilitado={tenant?.delivery_habilitado === true}
       anulacionesPendientes={anulacionesPendientes ?? 0}
+      negocioNombre={tenant?.nombre}
+      logoUrl={logoUrl}
     >
       <TutorialOnboarding completado={tutorialCompletado} tenantId={sesion.tenant_id} />
       <AlertasFiscalesAdmin tenantId={sesion.tenant_id} />

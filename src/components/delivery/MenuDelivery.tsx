@@ -186,7 +186,7 @@ function Seccion({
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-ink-900">{p.nombre}</p>
-                {p.descripcion && <p className="line-clamp-2 text-xs text-ink-500">{p.descripcion}</p>}
+                {p.descripcion && <p className="mt-0.5 whitespace-pre-line text-xs leading-snug text-ink-500">{p.descripcion}</p>}
                 <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink-800">{formatearLempiras(p.precio)}</p>
               </div>
               {!activo ? null : cantidad === 0 ? (

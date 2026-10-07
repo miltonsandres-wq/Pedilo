@@ -57,7 +57,7 @@ export function ImpresionTicket({
     const r =
       modo === "agente"
         ? await servicioImpresion.enviarImpresion({ instrucciones: ticket.construir(ANCHO_80MM), logoPngBase64: ticket.logoPngBase64 }, agenteUrl!)
-        : await imprimirConModo(modo, instrucciones, columnas);
+        : await imprimirConModo(modo, instrucciones, columnas, ticket.logoUrl);
     setTrabajando(null);
     if (r.ok) {
       if (modo !== "agente") {

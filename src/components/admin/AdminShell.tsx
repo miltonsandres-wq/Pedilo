@@ -9,6 +9,23 @@ import { BrandMark } from "@/components/BrandMark";
 import { CerrarSesionBoton } from "@/components/CerrarSesionBoton";
 import { EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
 
+/** Logo del negocio (sobre fondo blanco para que se vea con cualquier color) o, si no hay, la marca de Pedilo. */
+function LogoPanel({ logoUrl, className }: { logoUrl: string | null; className: string }) {
+  if (logoUrl) {
+    return (
+      <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 ${className}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl} alt="Logo del negocio" className="h-full w-full object-contain" />
+      </div>
+    );
+  }
+  return (
+    <div className={`flex shrink-0 items-center justify-center rounded-lg bg-brand-600 ${className}`}>
+      <BrandMark className="h-1/2 w-1/2 text-white" />
+    </div>
+  );
+}
+
 /**
  * El sidebar fijo de 256px solo cabe en pantallas grandes. En celular se
  * esconde detrás de una barra superior + botón de menú, y aparece como un
@@ -20,6 +37,8 @@ export function AdminShell({
   usuarioEmail,
   deliveryHabilitado = false,
   anulacionesPendientes = 0,
+  negocioNombre,
+  logoUrl = null,
   children,
 }: {
   usuarioNombre: string;
@@ -28,6 +47,9 @@ export function AdminShell({
   deliveryHabilitado?: boolean;
   /** Anulaciones pedidas por la caja que el admin todavía no aprueba (aviso en el menú). */
   anulacionesPendientes?: number;
+  /** Nombre y logo del negocio: si hay logo, se muestra en el panel en lugar de la marca de Pedilo. */
+  negocioNombre?: string;
+  logoUrl?: string | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -35,11 +57,9 @@ export function AdminShell({
 
   const marca = (
     <div className="mb-6 flex items-center gap-2.5 px-1">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600">
-        <BrandMark className="h-5 w-5 text-white" />
-      </div>
+      <LogoPanel logoUrl={logoUrl} className="h-10 w-10" />
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-tight">Pedilo</p>
+        <p className="truncate text-sm font-semibold leading-tight">{logoUrl ? (negocioNombre ?? "Mi negocio") : "Pedilo"}</p>
         <p className="text-[11px] text-ink-400">Panel del dueño</p>
       </div>
     </div>
@@ -89,10 +109,8 @@ export function AdminShell({
       {/* Barra superior — solo en móvil/tablet */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-800 bg-ink-950 px-4 py-3 text-white lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600">
-            <BrandMark className="h-4 w-4 text-white" />
-          </div>
-          <span className="truncate text-sm font-semibold">Pedilo</span>
+          <LogoPanel logoUrl={logoUrl} className="h-8 w-8" />
+          <span className="truncate text-sm font-semibold">{logoUrl ? (negocioNombre ?? "Mi negocio") : "Pedilo"}</span>
         </div>
         <button
           onClick={() => setAbierto(true)}

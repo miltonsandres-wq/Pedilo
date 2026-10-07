@@ -201,6 +201,7 @@ export default async function MenuPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink-900">{p.nombre}</p>
                   <p className="text-xs text-ink-500">L. {Number(p.precio).toFixed(2)}</p>
+                  {p.descripcion && <p className="line-clamp-1 text-xs text-ink-400">{p.descripcion}</p>}
                 </div>
                 <Badge tone={p.disponible ? "success" : "danger"}>
                   {p.disponible ? "disponible" : "agotado"}

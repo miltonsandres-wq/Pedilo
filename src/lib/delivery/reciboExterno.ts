@@ -5,7 +5,7 @@ import { leerConfigFiscal } from "@/lib/fiscal/emision";
 import type { ResultadoArmado } from "@/lib/fiscal/impresion";
 import { servicioImpresion } from "@/lib/printing/enviarComanda";
 import { conAnchoTicket, construirReciboDeliveryExterno, type EmisorImprimible } from "@/lib/printing/documentoTexto";
-import { logoImpresionCacheado } from "@/lib/printing/logo";
+import { logoImpresionCacheado, logoImpresionUrlCacheado } from "@/lib/printing/logo";
 import type { ResultadoImpresion } from "@/lib/printing/types";
 
 /**
@@ -48,6 +48,7 @@ export async function armarReciboDeliveryExterno(
       titulo: "Recibo",
       construir: (columnas) => conAnchoTicket(columnas, () => construirReciboDeliveryExterno(datos)),
       logoPngBase64: await logoImpresionCacheado(),
+      logoUrl: await logoImpresionUrlCacheado(),
     },
   };
 }

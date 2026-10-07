@@ -41,7 +41,7 @@ export function capacidadesImpresion(): CapacidadesImpresion {
 
 // --- navegador ---------------------------------------------------------------
 
-export function imprimirPorNavegador(instrucciones: Instruccion[], columnas = 48): Promise<ResultadoImpresion> {
+export function imprimirPorNavegador(instrucciones: Instruccion[], columnas = 48, logoFondoUrl?: string | null): Promise<ResultadoImpresion> {
   return new Promise((resolve) => {
     try {
       // iframe oculto (no ventana emergente: los bloqueadores la cortarían)
@@ -55,7 +55,7 @@ export function imprimirPorNavegador(instrucciones: Instruccion[], columnas = 48
         return resolve({ ok: false, error: "El navegador no permite imprimir desde aquí." });
       }
       doc.open();
-      doc.write(ticketAHtml(instrucciones, { columnas }));
+      doc.write(ticketAHtml(instrucciones, { columnas, logoFondoUrl }));
       doc.close();
       const limpiar = () => window.setTimeout(() => marco.remove(), 1_000);
       marco.contentWindow.addEventListener("afterprint", limpiar);
@@ -196,10 +196,11 @@ export function imprimirPorRawBt(instrucciones: Instruccion[], columnas = 48): R
   }
 }
 
-export function imprimirConModo(modo: ModoImpresion, instrucciones: Instruccion[], columnas: number): Promise<ResultadoImpresion> {
+/** `logoFondoUrl`: logo del negocio como marca de agua (solo lo usa la impresión por el diálogo del navegador). */
+export function imprimirConModo(modo: ModoImpresion, instrucciones: Instruccion[], columnas: number, logoFondoUrl?: string | null): Promise<ResultadoImpresion> {
   switch (modo) {
     case "navegador":
-      return imprimirPorNavegador(instrucciones, columnas);
+      return imprimirPorNavegador(instrucciones, columnas, logoFondoUrl);
     case "bluetooth":
       return imprimirPorBluetooth(instrucciones, columnas);
     case "usb":

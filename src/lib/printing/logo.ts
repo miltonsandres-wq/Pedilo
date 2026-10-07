@@ -92,3 +92,9 @@ export async function logoImpresionCacheado(): Promise<string | null> {
   const c = (await db.config.get(CLAVE_LOGO))?.valor as LogoCacheado | undefined;
   return c?.png ?? null;
 }
+
+/** La URL del logo del negocio (para ponerlo de fondo en lo que se imprime con el navegador), o null. */
+export async function logoImpresionUrlCacheado(): Promise<string | null> {
+  const c = (await db.config.get(CLAVE_LOGO))?.valor as LogoCacheado | undefined;
+  return c?.url ?? null;
+}

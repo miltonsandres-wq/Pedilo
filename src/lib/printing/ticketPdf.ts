@@ -28,7 +28,8 @@ function seguro(texto: string, fuente: PDFFont): string {
   return salida;
 }
 
-export async function instruccionesAPdf(instrucciones: Instruccion[]): Promise<Uint8Array> {
+/** `logoFondoPng`: logo del negocio (PNG) que se dibuja de marca de agua detrás del texto. */
+export async function instruccionesAPdf(instrucciones: Instruccion[], opciones: { logoFondoPng?: Uint8Array | null } = {}): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const normal = await doc.embedFont(StandardFonts.Courier);
   const negrita = await doc.embedFont(StandardFonts.CourierBold);
@@ -50,6 +51,21 @@ export async function instruccionesAPdf(instrucciones: Instruccion[]): Promise<U
   const alto = (l: Linea | { vacio: number }) => ("vacio" in l ? l.vacio : l.escala) * TAM * INTERLINEADO;
   const altoTotal = lineas.reduce((acc, l) => acc + alto(l), 0) + 2 * MARGEN;
   const pagina = doc.addPage([ANCHO_PT, Math.max(altoTotal, 120)]);
+
+  // Marca de agua: el logo centrado, muy suave, antes del texto para que quede detrás
+  if (opciones.logoFondoPng) {
+    try {
+      const logo = await doc.embedPng(opciones.logoFondoPng);
+      const maxAncho = ANCHO_PT * 0.7;
+      const maxAlto = pagina.getHeight() * 0.6;
+      const escala = Math.min(maxAncho / logo.width, maxAlto / logo.height);
+      const w = logo.width * escala;
+      const h = logo.height * escala;
+      pagina.drawImage(logo, { x: (ANCHO_PT - w) / 2, y: (pagina.getHeight() - h) / 2, width: w, height: h, opacity: 0.12 });
+    } catch {
+      /* sin marca de agua la factura sale igual */
+    }
+  }
 
   let y = pagina.getHeight() - MARGEN;
   for (const l of lineas) {

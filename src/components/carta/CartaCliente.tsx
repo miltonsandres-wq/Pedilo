@@ -194,7 +194,7 @@ function Seccion({
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-ink-900">{p.nombre}</p>
-                {p.descripcion && <p className="truncate text-xs text-ink-500">{p.descripcion}</p>}
+                {p.descripcion && <p className="mt-0.5 whitespace-pre-line text-xs leading-snug text-ink-500">{p.descripcion}</p>}
               </div>
               {cantidad === 0 ? (
                 <Button size="sm" onClick={() => onCambiar(p.id, 1)}>

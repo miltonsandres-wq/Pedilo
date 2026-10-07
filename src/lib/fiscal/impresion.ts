@@ -7,7 +7,7 @@ import {
   type DocumentoImprimible,
   type EmisorImprimible,
 } from "@/lib/printing/documentoTexto";
-import { logoImpresionCacheado } from "@/lib/printing/logo";
+import { logoImpresionCacheado, logoImpresionUrlCacheado } from "@/lib/printing/logo";
 import type { Instruccion, ResultadoImpresion } from "@/lib/printing/types";
 import { leerConfigFiscal } from "./emision";
 
@@ -114,6 +114,8 @@ export interface TicketArmado {
   titulo: string;
   construir(columnas: number): Instruccion[];
   logoPngBase64: string | null;
+  /** Logo del negocio: se imprime de fondo (marca de agua) cuando se usa el diálogo de impresión del navegador. */
+  logoUrl?: string | null;
 }
 
 export type ResultadoArmado<T = object> = ({ ok: true; ticket: TicketArmado } & T) | { ok: false; error: string };
@@ -141,6 +143,7 @@ export async function armarFactura(
       titulo: doc.clase === "factura" ? "Factura" : "Nota",
       construir: (columnas) => conAnchoTicket(columnas, () => construirFactura(comoImprimible(doc), opcionesFactura)),
       logoPngBase64: await logoImpresionCacheado(),
+      logoUrl: await logoImpresionUrlCacheado(),
     },
   };
 }
@@ -180,6 +183,7 @@ export async function armarPrecuenta(ordenId: string, mesaNombre: string): Promi
       titulo: "Pre-cuenta",
       construir: (columnas) => conAnchoTicket(columnas, () => construirPrecuenta(datos)),
       logoPngBase64: await logoImpresionCacheado(),
+      logoUrl: await logoImpresionUrlCacheado(),
     },
   };
 }
