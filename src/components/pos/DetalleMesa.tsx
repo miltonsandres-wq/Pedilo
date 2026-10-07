@@ -35,7 +35,8 @@ import {
 } from "@/lib/pos/acciones";
 import { ETIQUETA_FORMA_PAGO, FORMA_DELIVERY_EXTERNO, type FormaPago, type RolUsuario } from "@/lib/types/helpers";
 import { armarReciboDeliveryExterno, armarReciboSinCai } from "@/lib/delivery/reciboExterno";
-import { agenteImpresionUrl, armarPrecuenta, type TicketArmado } from "@/lib/fiscal/impresion";
+import { agenteImpresionUrl, armarFactura, armarPrecuenta, marcarFacturaImpresa, type TicketArmado } from "@/lib/fiscal/impresion";
+import { imprimirDirecto } from "@/lib/printing/imprimirDirecto";
 import { ImpresionTicket } from "./ImpresionTicket";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Field";
@@ -596,7 +597,7 @@ export function FormularioCobro({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tras un cobro SIN factura CAI (delivery externo o negocio sin CAI) se ofrece imprimir el recibo antes de cerrar
-  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; externo: boolean; error?: string } | null>(null);
+  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; externo: boolean; error?: string; aviso?: string } | null>(null);
 
   // Facturación fiscal: solo aparece si el negocio la tiene activa
   const config = useLiveQuery(() => leerConfigFiscal(), [], undefined);
@@ -625,7 +626,8 @@ export function FormularioCobro({
     else if (!esRtnValido(clienteRtn)) faltante = `El RTN debe tener 14 dígitos (lleva ${digitosRtn.length}).`;
   }
 
-  async function confirmar() {
+  /** `imprimir`: cobra y manda el comprobante a imprimir en el mismo paso (sin pantallas intermedias). */
+  async function confirmar(imprimir = true) {
     setError(null);
     setEnviando(true);
     try {
@@ -645,14 +647,32 @@ export function FormularioCobro({
             }
           : undefined,
       });
-      // Cobro SIN factura CAI (delivery externo, o negocio que no factura con CAI): se ofrece imprimir
-      // el recibo no fiscal. Con CAI, la factura la ofrece la pantalla siguiente. Un pago parcial con
-      // CAI todavía no tiene factura: no hay nada que imprimir.
+      // Cobro SIN factura CAI (delivery externo, o negocio que no factura con CAI): recibo no fiscal.
       if (externo || (!documentoId && !factura)) {
+        if (!imprimir) return onCobrado(null);
         const armado = externo ? await armarReciboDeliveryExterno(ordenId, referencia) : await armarReciboSinCai(ordenId);
         const agente = await agenteImpresionUrl();
-        setReciboExterno({ ticket: armado.ok ? armado.ticket : null, agente, externo, error: armado.ok ? undefined : armado.error });
+        if (armado.ok) {
+          const r = await imprimirDirecto(armado.ticket, agente);
+          if (r.ok) return onCobrado(null);
+          // El cobro ya quedó registrado: si no salió el papel, se ofrece reintentar con el botón
+          setReciboExterno({ ticket: armado.ticket, agente, externo, aviso: r.error ?? "No se pudo imprimir." });
+          return;
+        }
+        setReciboExterno({ ticket: null, agente, externo, error: armado.error });
         return;
+      }
+      // Cobro con factura CAI: se imprime la factura (original: cliente). Si no sale, la pantalla
+      // siguiente (/pos?factura=…) deja el botón para imprimirla. Un pago parcial no tiene factura aún.
+      if (documentoId && imprimir) {
+        const armada = await armarFactura(documentoId, { copia: "cliente" });
+        if (armada.ok) {
+          const r = await imprimirDirecto(armada.ticket, await agenteImpresionUrl());
+          if (r.ok) {
+            void marcarFacturaImpresa(documentoId);
+            return onCobrado(null);
+          }
+        }
       }
       onCobrado(documentoId);
     } catch (e) {
@@ -674,6 +694,11 @@ export function FormularioCobro({
             <p className="mt-1 text-sm text-ink-500">
               {reciboExterno.externo ? "Delivery externo · sin factura CAI" : "Sin factura CAI · recibo no fiscal"}
             </p>
+            {reciboExterno.aviso && (
+              <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                No se pudo imprimir: {reciboExterno.aviso} Puedes reintentar con el botón.
+              </p>
+            )}
           </div>
           <div className="mt-4">
             {reciboExterno.ticket ? (
@@ -863,17 +888,16 @@ export function FormularioCobro({
           </p>
         )}
 
-        <div className="flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={onCerrar}>
+        <Button size="lg" className="w-full" disabled={enviando || !!bloqueo || !!faltante} onClick={() => void confirmar(true)}>
+          <Printer className="h-4 w-4" strokeWidth={2} />
+          {enviando ? "Cobrando..." : factura ? "Cobrar e imprimir factura (CAI)" : externo ? "Cobrar e imprimir recibo (delivery externo)" : "Cobrar e imprimir recibo (sin CAI)"}
+        </Button>
+        <div className="mt-2 flex gap-2">
+          <Button variant="secondary" size="sm" className="flex-1" onClick={onCerrar} disabled={enviando}>
             Cancelar
           </Button>
-          <Button
-            size="lg"
-            className="flex-1"
-            disabled={enviando || !!bloqueo || !!faltante}
-            onClick={() => void confirmar()}
-          >
-            {enviando ? "Cobrando..." : "Confirmar"}
+          <Button variant="secondary" size="sm" className="flex-1" disabled={enviando || !!bloqueo || !!faltante} onClick={() => void confirmar(false)}>
+            Cobrar sin imprimir
           </Button>
         </div>
       </div>

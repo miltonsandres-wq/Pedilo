@@ -7,12 +7,19 @@ import userEvent from "@testing-library/user-event";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/lib/supabase/client", async () => ({ createClient: (await import("./supabaseSinRed")).clienteSinRed }));
 
+const imprimirDirecto = vi.fn();
+vi.mock("@/lib/printing/imprimirDirecto", () => ({ imprimirDirecto: (...a: unknown[]) => imprimirDirecto(...a) }));
+
 import { db } from "@/lib/offline/db";
 import { FormularioCobro } from "@/components/pos/DetalleMesa";
 import { configFiscal, limpiarDb, rangoCai, sembrarFiscal, sembrarOrden } from "./fixtures";
 
 afterEach(cleanup);
-beforeEach(limpiarDb);
+beforeEach(async () => {
+  await limpiarDb();
+  imprimirDirecto.mockReset();
+  imprimirDirecto.mockResolvedValue({ ok: false, error: "sin impresora en la prueba" }); // así se ve la pantalla de reintento
+});
 
 async function abrirCobro(formas: ("efectivo" | "tarjeta" | "transferencia" | "delivery_externo")[] = ["efectivo", "tarjeta"]) {
   const { ordenId, mesaId } = await sembrarOrden();
@@ -63,9 +70,9 @@ describe("opción «Delivery externo» en el cobro del cajero", () => {
     const { user, onCobrado, ordenId } = await abrirCobro();
 
     await user.click(await screen.findByRole("button", { name: "Delivery externo" }));
-    expect((screen.getByRole("button", { name: /Confirmar/ }) as HTMLButtonElement).disabled).toBe(false); // sin bloqueo por CAI
+    expect((screen.getByRole("button", { name: /Cobrar e imprimir/ }) as HTMLButtonElement).disabled).toBe(false); // sin bloqueo por CAI
     await user.type(screen.getByRole("textbox", { name: /Empresa de reparto/ }), "PedidosYa #8841");
-    await user.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await user.click(screen.getByRole("button", { name: /Cobrar e imprimir/ }));
 
     expect(await screen.findByText("Cobro registrado")).toBeTruthy();
     expect(screen.getByText(/sin factura CAI/)).toBeTruthy();
@@ -87,7 +94,7 @@ describe("opción «Delivery externo» en el cobro del cajero", () => {
     await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
     const { user } = await abrirCobro();
     await user.click(screen.getByRole("button", { name: "Delivery externo" }));
-    await user.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await user.click(screen.getByRole("button", { name: /Cobrar e imprimir/ }));
 
     expect(await screen.findByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Impresora de la sucursal/ })).toBeNull();

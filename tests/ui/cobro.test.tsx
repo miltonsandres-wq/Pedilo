@@ -7,12 +7,19 @@ import userEvent from "@testing-library/user-event";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/lib/supabase/client", async () => ({ createClient: (await import("./supabaseSinRed")).clienteSinRed }));
 
+const imprimirDirecto = vi.fn();
+vi.mock("@/lib/printing/imprimirDirecto", () => ({ imprimirDirecto: (...a: unknown[]) => imprimirDirecto(...a) }));
+
 import { db } from "@/lib/offline/db";
 import { FormularioCobro } from "@/components/pos/DetalleMesa";
 import { configFiscal, limpiarDb, rangoCai, sembrarFiscal, sembrarOrden } from "./fixtures";
 
 afterEach(cleanup);
-beforeEach(limpiarDb);
+beforeEach(async () => {
+  await limpiarDb();
+  imprimirDirecto.mockReset();
+  imprimirDirecto.mockResolvedValue({ ok: true });
+});
 
 async function abrirCobro(total = 230) {
   const { ordenId, mesaId } = await sembrarOrden();
@@ -28,21 +35,37 @@ async function abrirCobro(total = 230) {
   return { user, onCobrado, onCerrar, ordenId };
 }
 
-const confirmar = () => screen.getByRole("button", { name: /Confirmar|Cobrando/ });
+const confirmar = () => screen.getByRole("button", { name: /Cobrar sin imprimir|Cobrando/ });
 
 describe("cobro sin facturación fiscal", () => {
-  it("no muestra nada fiscal, cobra y ofrece imprimir el recibo sin CAI", async () => {
+  it("no muestra nada fiscal y cobra sin imprimir", async () => {
     const { user, onCobrado, ordenId } = await abrirCobro();
     expect(screen.queryByText("Factura con RTN")).toBeNull();
     await user.click(confirmar());
-    expect(await screen.findByText("Cobro registrado")).toBeTruthy();
-    expect(screen.getByText(/Sin factura CAI/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
-    expect(screen.queryByText("RECIBO")).toBeNull(); // sin vista previa
-    await user.click(screen.getByRole("button", { name: "Listo" }));
-    expect(onCobrado).toHaveBeenCalledWith(null);
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+    expect(imprimirDirecto).not.toHaveBeenCalled();
     expect((await db.ordenes.get(ordenId))?.estado).toBe("pagada");
     expect(await db.documentos_fiscales.count()).toBe(0);
+  });
+
+  it("«Cobrar e imprimir recibo (sin CAI)»: cobra y manda a imprimir el recibo en el mismo paso", async () => {
+    const { user, onCobrado, ordenId } = await abrirCobro();
+    await user.click(screen.getByRole("button", { name: /Cobrar e imprimir recibo/ }));
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+    expect(imprimirDirecto).toHaveBeenCalledTimes(1);
+    expect(imprimirDirecto.mock.calls[0][0].titulo).toBe("Recibo");
+    expect((await db.ordenes.get(ordenId))?.estado).toBe("pagada");
+  });
+
+  it("si no sale el papel, el cobro queda registrado y se ofrece reintentar con el botón Imprimir", async () => {
+    imprimirDirecto.mockResolvedValue({ ok: false, error: "Impresora apagada." });
+    const { user, onCobrado, ordenId } = await abrirCobro();
+    await user.click(screen.getByRole("button", { name: /Cobrar e imprimir recibo/ }));
+    expect(await screen.findByText("Cobro registrado")).toBeTruthy();
+    expect(screen.getByText(/Impresora apagada/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
+    expect(onCobrado).not.toHaveBeenCalled();
+    expect((await db.ordenes.get(ordenId))?.estado).toBe("pagada");
   });
 });
 
@@ -161,5 +184,26 @@ describe("cobro con facturación fiscal", () => {
     expect(onCobrado).not.toHaveBeenCalled();
     expect(await db.pagos.count()).toBe(0);
     void user;
+  });
+});
+
+describe("«Cobrar e imprimir factura (CAI)»", () => {
+  it("cobra, emite la factura y la manda a imprimir en el mismo paso", async () => {
+    await sembrarFiscal(configFiscal());
+    const { user, onCobrado } = await abrirCobro();
+    await user.click(await screen.findByRole("button", { name: /Cobrar e imprimir factura/ }));
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+    expect(imprimirDirecto).toHaveBeenCalledTimes(1);
+    expect(imprimirDirecto.mock.calls[0][0].titulo).toMatch(/Factura|FACTURA/i);
+    expect(await db.documentos_fiscales.count()).toBe(1);
+  });
+
+  it("si no sale el papel, sigue a la pantalla de la factura (con su botón de imprimir)", async () => {
+    await sembrarFiscal(configFiscal());
+    imprimirDirecto.mockResolvedValue({ ok: false, error: "Impresora apagada." });
+    const { user, onCobrado } = await abrirCobro();
+    await user.click(await screen.findByRole("button", { name: /Cobrar e imprimir factura/ }));
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledTimes(1));
+    expect(onCobrado.mock.calls[0][0]).toBeTruthy(); // id de la factura: la pantalla siguiente deja imprimirla
   });
 });
