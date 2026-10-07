@@ -34,7 +34,7 @@ import {
   enviarACocina,
 } from "@/lib/pos/acciones";
 import { ETIQUETA_FORMA_PAGO, FORMA_DELIVERY_EXTERNO, type FormaPago, type RolUsuario } from "@/lib/types/helpers";
-import { armarReciboDeliveryExterno, imprimirReciboDeliveryExterno } from "@/lib/delivery/reciboExterno";
+import { armarReciboDeliveryExterno, armarReciboSinCai } from "@/lib/delivery/reciboExterno";
 import { agenteImpresionUrl, armarPrecuenta, type TicketArmado } from "@/lib/fiscal/impresion";
 import { ImpresionTicket } from "./ImpresionTicket";
 import { Button } from "@/components/ui/Button";
@@ -111,6 +111,8 @@ export function DetalleMesa({
   const hayPendientesPorImprimir = (items ?? []).some((i) => !i.impreso);
   const esCajero = rol === "cajero";
   const esMesero = rol === "mesero";
+  // El cajero también toma el pedido (en un local pequeño no hay mesero): agrega, edita y envía a cocina
+  const puedeTomarPedido = esCajero || esMesero;
 
   return (
     <div className="mx-auto max-w-lg pb-24">
@@ -163,7 +165,7 @@ export function DetalleMesa({
               item={item}
               ordenId={orden.id}
               editablePrecio={esCajero}
-              editableMesero={esMesero}
+              editableMesero={puedeTomarPedido}
             />
           ))}
           {(items ?? []).length === 0 && (
@@ -176,13 +178,7 @@ export function DetalleMesa({
         </div>
       </div>
 
-      {esMesero && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} />}
-
-      {esCajero && (
-        <p className="mb-4 rounded-2xl border border-dashed border-ink-200 bg-white p-4 text-center text-xs text-ink-400">
-          El mesero agrega los platillos desde su pantalla. Aquí solo cobras cuando estén listos.
-        </p>
-      )}
+      {puedeTomarPedido && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} />}
 
       {(items ?? []).length > 0 && (
         <div className="mb-2 text-center">
@@ -229,7 +225,7 @@ export function DetalleMesa({
       {/* Barra de acciones fija abajo — táctil, siempre visible */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-ink-100 bg-white/95 p-3 backdrop-blur">
         <div className="mx-auto flex max-w-lg gap-2">
-          {esMesero && (
+          {puedeTomarPedido && (
             <Button
               variant="dark"
               size="lg"
@@ -248,7 +244,7 @@ export function DetalleMesa({
               disabled={orden.total === 0}
               onClick={() => setMostrarCobro(true)}
             >
-              {orden.total === 0 ? "Esperando pedido..." : `Cobrar · L. ${orden.total.toFixed(2)}`}
+              {orden.total === 0 ? "Agrega productos para cobrar" : `Cobrar · L. ${orden.total.toFixed(2)}`}
             </Button>
           )}
         </div>
@@ -258,7 +254,7 @@ export function DetalleMesa({
         <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink-950/40 p-0 sm:items-center sm:p-4">
           <div className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
             <h2 className="mb-3 text-base font-semibold text-ink-900">Pre-cuenta</h2>
-            <ImpresionTicket ticket={vistaPrecuenta.ticket} />
+            <ImpresionTicket ticket={vistaPrecuenta.ticket} etiqueta="Imprimir pre-cuenta" />
             <Button size="lg" variant="secondary" className="mt-4 w-full" onClick={() => setVistaPrecuenta(null)}>
               Cerrar
             </Button>
@@ -599,8 +595,8 @@ export function FormularioCobro({
   const [referencia, setReferencia] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Tras cobrar con delivery externo se muestra el recibo (vista previa + imprimir) antes de cerrar
-  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; auto: { ok: boolean; error?: string } | null; error?: string } | null>(null);
+  // Tras un cobro SIN factura CAI (delivery externo o negocio sin CAI) se ofrece imprimir el recibo antes de cerrar
+  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; externo: boolean; error?: string } | null>(null);
 
   // Facturación fiscal: solo aparece si el negocio la tiene activa
   const config = useLiveQuery(() => leerConfigFiscal(), [], undefined);
@@ -649,13 +645,13 @@ export function FormularioCobro({
             }
           : undefined,
       });
-      if (externo) {
-        // El cobro ya quedó registrado. Recibo (no fiscal): vista previa siempre; si la sucursal
-        // tiene agente de impresión, además sale solo.
-        const armado = await armarReciboDeliveryExterno(ordenId, referencia);
+      // Cobro SIN factura CAI (delivery externo, o negocio que no factura con CAI): se ofrece imprimir
+      // el recibo no fiscal. Con CAI, la factura la ofrece la pantalla siguiente. Un pago parcial con
+      // CAI todavía no tiene factura: no hay nada que imprimir.
+      if (externo || (!documentoId && !factura)) {
+        const armado = externo ? await armarReciboDeliveryExterno(ordenId, referencia) : await armarReciboSinCai(ordenId);
         const agente = await agenteImpresionUrl();
-        const auto = agente ? await imprimirReciboDeliveryExterno(ordenId, referencia) : null;
-        setReciboExterno({ ticket: armado.ok ? armado.ticket : null, agente, auto, error: armado.ok ? undefined : armado.error });
+        setReciboExterno({ ticket: armado.ok ? armado.ticket : null, agente, externo, error: armado.ok ? undefined : armado.error });
         return;
       }
       onCobrado(documentoId);
@@ -675,21 +671,22 @@ export function FormularioCobro({
         <div className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
           <div className="text-center">
             <h2 className="text-base font-semibold text-ink-900">Cobro registrado</h2>
-            <p className="mt-1 text-sm text-ink-500">Delivery externo · sin factura CAI</p>
-            {reciboExterno.auto && (
-              <p role="status" className={cn("mt-3 rounded-lg px-3 py-2 text-sm", reciboExterno.auto.ok ? "bg-libre-bg text-libre-text" : "bg-red-50 text-red-700")}>
-                {reciboExterno.auto.ok ? "Recibo enviado a la impresora de la sucursal." : `No se pudo imprimir en la impresora de la sucursal: ${reciboExterno.auto.error ?? "error"}. Usa otra opción.`}
-              </p>
-            )}
+            <p className="mt-1 text-sm text-ink-500">
+              {reciboExterno.externo ? "Delivery externo · sin factura CAI" : "Sin factura CAI · recibo no fiscal"}
+            </p>
           </div>
           <div className="mt-4">
             {reciboExterno.ticket ? (
-              <ImpresionTicket ticket={reciboExterno.ticket} agenteUrl={reciboExterno.agente} />
+              <ImpresionTicket
+                ticket={reciboExterno.ticket}
+                agenteUrl={reciboExterno.agente}
+                etiqueta={reciboExterno.externo ? "Imprimir recibo (delivery externo)" : "Imprimir recibo (sin CAI)"}
+              />
             ) : (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{reciboExterno.error ?? "No se pudo armar el recibo."}</p>
             )}
           </div>
-          <Button size="lg" className="mt-4 w-full" onClick={() => onCobrado(null)}>
+          <Button size="lg" variant="secondary" className="mt-4 w-full" onClick={() => onCobrado(null)}>
             Listo
           </Button>
         </div>

@@ -22,13 +22,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // (p. ej. la migración 0019 todavía no está aplicada) no se muestra nada.
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("tutorial_completado_at")
+    .select("tutorial_completado_at, delivery_habilitado")
     .eq("id", sesion.tenant_id)
     .single();
   const tutorialCompletado = tenant ? !!tenant.tutorial_completado_at : true;
 
   return (
-    <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email}>
+    <AdminShell usuarioNombre={sesion.nombre} usuarioEmail={sesion.email} deliveryHabilitado={tenant?.delivery_habilitado === true}>
       <TutorialOnboarding completado={tutorialCompletado} tenantId={sesion.tenant_id} />
       <AlertasFiscalesAdmin tenantId={sesion.tenant_id} />
       {children}

@@ -15,7 +15,11 @@ import type { ResultadoImpresion } from "@/lib/printing/types";
  * cualquier vía (agente, navegador, Bluetooth, USB); `imprimir…` lo manda al
  * agente de la sucursal.
  */
-export async function armarReciboDeliveryExterno(ordenId: string, referencia?: string | null): Promise<ResultadoArmado> {
+export async function armarReciboDeliveryExterno(
+  ordenId: string,
+  referencia?: string | null,
+  subtitulo?: string
+): Promise<ResultadoArmado> {
   const orden = await db.ordenes.get(ordenId);
   if (!orden) return { ok: false, error: "No se encontró la orden." };
   const items = await db.orden_items.where("orden_id").equals(ordenId).sortBy("created_at");
@@ -29,6 +33,7 @@ export async function armarReciboDeliveryExterno(ordenId: string, referencia?: s
     numeroDia: orden.numero_dia,
     fecha: new Date(),
     referencia,
+    subtitulo,
     lineas: items.map((i) => ({
       nombre: i.nombre_producto,
       cantidad: i.cantidad,
@@ -60,3 +65,6 @@ export async function imprimirReciboDeliveryExterno(ordenId: string, referencia?
     sucursal.agenteImpresionUrl
   );
 }
+
+/** Recibo de un cobro normal en un negocio SIN facturación CAI (no fiscal), listo para imprimir. */
+export const armarReciboSinCai = (ordenId: string) => armarReciboDeliveryExterno(ordenId, null, "Cobro sin factura CAI");

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, CreditCard, Plus, Wallet, DollarSign, ArrowRight } from "lucide-react";
+import { Bike, Building2, CreditCard, Plus, Wallet, DollarSign, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Field, SelectField, TextareaField } from "@/components/ui/Field";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import {
   actualizarSuscripcion,
   marcarPagado,
+  alternarDelivery,
   registrarPago,
   crearFormaPago,
   actualizarFormaPago,
@@ -64,7 +65,14 @@ export default async function PlataformaPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={alternarDelivery.bind(null, tenant.id, !tenant.delivery_habilitado)}>
+                    <Button type="submit" size="sm" variant={tenant.delivery_habilitado ? "secondary" : "primary"}>
+                      <Bike className="h-3.5 w-3.5" strokeWidth={2} />
+                      {tenant.delivery_habilitado ? "Deshabilitar delivery" : "Habilitar delivery"}
+                    </Button>
+                  </form>
+                  {tenant.delivery_habilitado && <Badge tone="success">Delivery habilitado</Badge>}
                   <Badge tone="neutral">
                     {cantidadSucursales}/{tenant.max_sucursales} sucursales
                   </Badge>

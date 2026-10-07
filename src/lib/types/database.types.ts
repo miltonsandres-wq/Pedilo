@@ -1173,6 +1173,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          delivery_habilitado: boolean
           configuracion_inicial_at: string | null
           tutorial_completado_at: string | null
           activo: boolean
@@ -1196,6 +1197,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          delivery_habilitado?: boolean
           configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
           activo?: boolean
@@ -1219,6 +1221,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          delivery_habilitado?: boolean
           configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
           activo?: boolean

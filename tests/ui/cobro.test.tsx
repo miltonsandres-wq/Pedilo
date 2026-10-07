@@ -31,11 +31,16 @@ async function abrirCobro(total = 230) {
 const confirmar = () => screen.getByRole("button", { name: /Confirmar|Cobrando/ });
 
 describe("cobro sin facturación fiscal", () => {
-  it("no muestra nada fiscal y cobra como siempre", async () => {
+  it("no muestra nada fiscal, cobra y ofrece imprimir el recibo sin CAI", async () => {
     const { user, onCobrado, ordenId } = await abrirCobro();
     expect(screen.queryByText("Factura con RTN")).toBeNull();
     await user.click(confirmar());
-    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+    expect(await screen.findByText("Cobro registrado")).toBeTruthy();
+    expect(screen.getByText(/Sin factura CAI/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
+    expect(screen.queryByText("RECIBO")).toBeNull(); // sin vista previa
+    await user.click(screen.getByRole("button", { name: "Listo" }));
+    expect(onCobrado).toHaveBeenCalledWith(null);
     expect((await db.ordenes.get(ordenId))?.estado).toBe("pagada");
     expect(await db.documentos_fiscales.count()).toBe(0);
   });

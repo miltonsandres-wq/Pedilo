@@ -18,10 +18,13 @@ import { EVENTO_ABRIR_TUTORIAL } from "@/lib/tutorial/eventos";
 export function AdminShell({
   usuarioNombre,
   usuarioEmail,
+  deliveryHabilitado = false,
   children,
 }: {
   usuarioNombre: string;
   usuarioEmail: string | null;
+  /** La plataforma habilitó el delivery para este negocio: si no, no aparece en el menú. */
+  deliveryHabilitado?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -114,7 +117,7 @@ export function AdminShell({
               <X className="h-5 w-5" strokeWidth={2} />
             </button>
             {marca}
-            <AdminNav onNavigate={() => setAbierto(false)} />
+            <AdminNav onNavigate={() => setAbierto(false)} delivery={deliveryHabilitado} />
             {pie}
           </aside>
         </div>
@@ -125,7 +128,7 @@ export function AdminShell({
           del alto del contenido de la página. */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-ink-950 p-4 text-white lg:flex">
         {marca}
-        <AdminNav />
+        <AdminNav delivery={deliveryHabilitado} />
         {pie}
       </aside>
 

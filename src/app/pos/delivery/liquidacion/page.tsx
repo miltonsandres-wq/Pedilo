@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { requireSucursal } from "@/lib/auth/session";
+import { requireDeliverySucursal } from "@/lib/delivery/habilitado";
 import { LiquidacionPanel } from "@/components/pos/delivery/LiquidacionPanel";
 
 export default async function LiquidacionPage() {
-  const sesion = await requireSucursal();
+  const sesion = await requireDeliverySucursal();
   // Es plata: solo quien cobra en caja
   if (sesion.rol !== "cajero") redirect("/pos/delivery");
   return <LiquidacionPanel sucursalId={sesion.sucursal_id} />;

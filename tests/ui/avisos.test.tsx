@@ -21,6 +21,10 @@ vi.mock("@/lib/fiscal/impresion", () => ({
   armarFactura: (id: string, o?: unknown) => armar(id, o),
 }));
 
+// Impresión directa a la impresora de la sucursal (agente)
+const enviarImpresion = vi.fn();
+vi.mock("@/lib/printing/enviarComanda", () => ({ servicioImpresion: { enviarImpresion: (...a: unknown[]) => enviarImpresion(...a) } }));
+
 // La lista de dispositivos viene de Supabase
 const dispositivosRemotos = vi.fn();
 vi.mock("@/lib/supabase/client", () => ({
@@ -45,6 +49,7 @@ beforeEach(async () => {
   await limpiarDb();
   vincular.mockReset();
   imprimir.mockReset();
+  enviarImpresion.mockReset();
   agente.mockReset();
   agente.mockResolvedValue("https://agente.local");
   armar.mockReset();
@@ -179,48 +184,52 @@ describe("FacturaEmitidaModal", () => {
       sync_estado: "pendiente", sync_detalle: null, impreso_at: null, ...over,
     }) as unknown as DocumentoFiscalLocal;
 
-  it("con agente: imprime el original apenas abre, una sola vez, y confirma; además muestra la vista previa", async () => {
+  it("ofrece «Imprimir factura (con CAI)», SIN vista previa y SIN imprimir sola", async () => {
     await db.documentos_fiscales.add(doc());
-    imprimir.mockResolvedValue({ ok: true });
     render(<FacturaEmitidaModal documentoId="F1" />);
 
     expect(await screen.findByText("001-001-01-00000042")).toBeTruthy();
     expect(screen.getByText(/Ana López/)).toBeTruthy();
-    expect(await screen.findByText("Impresa")).toBeTruthy();
-    expect(imprimir).toHaveBeenCalledTimes(1);
-    expect(imprimir).toHaveBeenCalledWith("F1", { copia: "cliente" });
-    expect(await screen.findByText("FACTURA DE PRUEBA")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Imprimir factura/ })).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(screen.queryByText("FACTURA DE PRUEBA")).toBeNull(); // nada de vista previa
+    expect(screen.queryByText(/Vista previa/)).toBeNull();
+    expect(imprimir).not.toHaveBeenCalled();
+    expect(enviarImpresion).not.toHaveBeenCalled();
   });
 
-  it("SIN agente configurado: no intenta imprimir solo, pero muestra la vista previa y las formas de imprimir", async () => {
+  it("con agente: al presionar el botón se manda a imprimir a la impresora de la sucursal", async () => {
+    await db.documentos_fiscales.add(doc());
+    enviarImpresion.mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<FacturaEmitidaModal documentoId="F1" />);
+
+    await user.click(await screen.findByRole("button", { name: /Imprimir factura/ }));
+    await waitFor(() => expect(enviarImpresion).toHaveBeenCalledTimes(1));
+    expect(enviarImpresion.mock.calls[0][1]).toBe("https://agente.local");
+    expect(await screen.findByText("Enviado a la impresora.")).toBeTruthy();
+  });
+
+  it("SIN agente configurado: el botón principal usa la impresora del equipo", async () => {
     agente.mockResolvedValue(null);
     await db.documentos_fiscales.add(doc());
     render(<FacturaEmitidaModal documentoId="F1" />);
 
-    expect(await screen.findByText("FACTURA DE PRUEBA")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Imprimir/ })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Imprimir factura/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Impresora de la sucursal/ })).toBeNull();
     await new Promise((r) => setTimeout(r, 80));
     expect(imprimir).not.toHaveBeenCalled();
-    expect(screen.queryByText(/No se pudo imprimir/)).toBeNull();
   });
 
-  it("no reimprime solo si el original ya salió (p. ej. al recargar la página)", async () => {
-    await db.documentos_fiscales.add(doc({ impreso_at: new Date().toISOString() }));
-    render(<FacturaEmitidaModal documentoId="F1" />);
-    await screen.findByText("001-001-01-00000042");
-    await new Promise((r) => setTimeout(r, 80));
-    expect(imprimir).not.toHaveBeenCalled();
-  });
-
-  it("si falla la impresora de la sucursal lo dice, aclara que la factura ya quedó emitida y ofrece otra forma de imprimir", async () => {
+  it("si falla la impresora de la sucursal muestra el error y deja otra forma de imprimir", async () => {
     await db.documentos_fiscales.add(doc());
-    imprimir.mockResolvedValueOnce({ ok: false, error: "connect ECONNREFUSED" });
+    enviarImpresion.mockResolvedValueOnce({ ok: false, error: "connect ECONNREFUSED" });
+    const user = userEvent.setup();
     render(<FacturaEmitidaModal documentoId="F1" />);
 
-    expect(await screen.findByText(/No se pudo imprimir en la impresora de la sucursal: connect ECONNREFUSED/)).toBeTruthy();
-    expect(screen.getByText(/La factura ya quedó emitida/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Imprimir$/ })).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: /Imprimir factura/ }));
+    expect(await screen.findByText(/connect ECONNREFUSED/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Impresora del equipo/ })).toBeTruthy();
   });
 
   it("«Copia: Emisor» arma la copia del emisor y «Listo» cierra volviendo al mapa", async () => {

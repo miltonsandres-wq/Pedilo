@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Bike, CircleX, Clock, PackageCheck } from "lucide-react";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireDeliveryAdmin } from "@/lib/delivery/habilitado";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,7 +16,7 @@ export default async function ReporteDeliveryPage({
 }: {
   searchParams: Promise<{ desde?: string; hasta?: string; sucursal?: string }>;
 }) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const q = await searchParams;
   const supabase = await createClient();
 

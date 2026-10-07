@@ -27,6 +27,17 @@ export async function actualizarSuscripcion(tenantId: string, formData: FormData
 }
 
 /**
+ * Habilita o deshabilita el módulo de delivery de un negocio. Mientras esté deshabilitado el
+ * negocio no ve nada de delivery (menú del panel, POS, menú público ni app del repartidor).
+ */
+export async function alternarDelivery(tenantId: string, habilitar: boolean) {
+  await requireSuperAdmin();
+  const admin = createAdminClient();
+  await admin.from("tenants").update({ delivery_habilitado: habilitar }).eq("id", tenantId);
+  revalidatePath("/plataforma");
+}
+
+/**
  * Atajo para el caso común: "ya me pagó la mensualidad" — activa, corre el
  * vencimiento un mes y registra el ingreso (por el precio actual del tenant)
  * en pagos_plataforma para que aparezca en /plataforma/ingresos.

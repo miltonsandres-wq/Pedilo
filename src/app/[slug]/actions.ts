@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { slugTieneDelivery } from "@/lib/delivery/habilitado";
 import {
   procesarPedidoPublico,
   type ClienteAdminMinimo,
@@ -20,6 +21,7 @@ async function ipDelCliente() {
  * lib/delivery/crearPedidoPublico.ts y los precios los recalcula la base.
  */
 export async function crearPedidoDelivery(slug: string, pedido: PedidoPublico): Promise<ResultadoPedidoPublico> {
+  if (!(await slugTieneDelivery(slug))) return { ok: false, error: "Este restaurante no recibe pedidos a domicilio." } as ResultadoPedidoPublico;
   const admin = createAdminClient() as unknown as ClienteAdminMinimo;
   return procesarPedidoPublico(admin, slug, await ipDelCliente(), pedido);
 }
@@ -55,7 +57,7 @@ export async function subirComprobante(
   if (ok === false) return { ok: false, error: "Demasiados intentos. Espera unos minutos." };
 
   const { data: config } = await admin.from("delivery_config").select("tenant_id, sucursal_id").eq("slug", slug).maybeSingle();
-  if (!config) return { ok: false, error: "Este restaurante no existe." };
+  if (!config || !(await slugTieneDelivery(slug))) return { ok: false, error: "Este restaurante no existe." };
 
   const ruta = `${config.tenant_id}/${config.sucursal_id}/${crypto.randomUUID()}.${ext}`;
   const { error } = await admin.storage.from("comprobantes-transferencia").upload(ruta, archivo, {

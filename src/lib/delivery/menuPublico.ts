@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tenantTieneDelivery } from "./habilitado";
 import { diaHonduras, textoHorario } from "./horario";
 import type { MetodoPago } from "./validaciones";
 
@@ -43,7 +44,7 @@ export async function cargarMenuDelivery(slug: string): Promise<MenuDelivery | n
   const admin = createAdminClient();
 
   const { data: config } = await admin.from("delivery_config").select("*").eq("slug", slug).maybeSingle();
-  if (!config) return null;
+  if (!config || !(await tenantTieneDelivery(config.tenant_id))) return null;
 
   const [{ data: sucursal }, { data: categorias }, { data: prodSuc }, { data: zonas }, { data: abierto }] =
     await Promise.all([

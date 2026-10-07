@@ -57,7 +57,7 @@ describe("opción «Delivery externo» en el cobro del cajero", () => {
     expect(screen.getByText("Empresa de reparto / # de pedido (opcional)")).toBeTruthy();
   });
 
-  it("cobra SIN factura aunque el CAI esté agotado, deja la orden pagada y muestra el recibo con vista previa", async () => {
+  it("cobra SIN factura aunque el CAI esté agotado, deja la orden pagada y ofrece imprimir el recibo (sin vista previa)", async () => {
     await sembrarFiscal(configFiscal(), [rangoCai({ siguiente: 101, hasta: 100, estado: "agotado" })]);
     await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
     const { user, onCobrado, ordenId } = await abrirCobro();
@@ -69,11 +69,10 @@ describe("opción «Delivery externo» en el cobro del cajero", () => {
 
     expect(await screen.findByText("Cobro registrado")).toBeTruthy();
     expect(screen.getByText(/sin factura CAI/)).toBeTruthy();
-    // vista previa del recibo: restaurante, referencia, subtotal
-    expect(await screen.findByText("RECIBO")).toBeTruthy();
-    expect(screen.getByText(/PedidosYa #8841/)).toBeTruthy();
-    expect(screen.getByText(/SUBTOTAL L\./)).toBeTruthy();
-    expect(screen.getByText("NO ES DOCUMENTO FISCAL")).toBeTruthy();
+    // sin vista previa: solo el botón para imprimir el recibo
+    expect(await screen.findByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
+    expect(screen.queryByText("RECIBO")).toBeNull();
+    expect(screen.queryByText("NO ES DOCUMENTO FISCAL")).toBeNull();
 
     expect((await db.ordenes.get(ordenId))?.estado).toBe("pagada");
     expect(await db.documentos_fiscales.count()).toBe(0);
@@ -90,7 +89,7 @@ describe("opción «Delivery externo» en el cobro del cajero", () => {
     await user.click(screen.getByRole("button", { name: "Delivery externo" }));
     await user.click(screen.getByRole("button", { name: /Confirmar/ }));
 
-    expect(await screen.findByRole("button", { name: /Imprimir$/ })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Imprimir recibo/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Impresora de la sucursal/ })).toBeNull();
     expect(screen.getByRole("button", { name: "80 mm" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "58 mm" }));

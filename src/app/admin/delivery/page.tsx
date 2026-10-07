@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireDeliveryAdmin } from "@/lib/delivery/habilitado";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -19,7 +19,7 @@ export default async function AdminDeliveryPage({
 }: {
   searchParams: Promise<{ sucursal?: string; ok?: string; error?: string }>;
 }) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const { sucursal: sucursalParam, ok, error } = await searchParams;
   const supabase = await createClient();
 

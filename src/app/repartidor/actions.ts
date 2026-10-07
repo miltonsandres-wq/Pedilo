@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tenantTieneDelivery } from "@/lib/delivery/habilitado";
 import { firmarJwtRepartidor } from "@/lib/repartidor/jwt";
 import { slugValido } from "@/lib/delivery/rutas";
 
@@ -32,8 +33,8 @@ export async function resolverRestaurante(slug: string): Promise<{ ok: true; res
   const { data: permitido } = await admin.rpc("delivery_rate_limit_hit", { p_clave: `repbusca:${await ip()}`, p_max: 40, p_ventana_seg: 600 });
   if (permitido === false) return { ok: false, error: "Demasiados intentos. Espera unos minutos." };
 
-  const { data: config } = await admin.from("delivery_config").select("sucursal_id").eq("slug", codigo).maybeSingle();
-  if (!config) return { ok: false, error: "No encontramos ese restaurante." };
+  const { data: config } = await admin.from("delivery_config").select("sucursal_id, tenant_id").eq("slug", codigo).maybeSingle();
+  if (!config || !(await tenantTieneDelivery(config.tenant_id))) return { ok: false, error: "No encontramos ese restaurante." };
   const [{ data: sucursal }, { data: reps }] = await Promise.all([
     admin.from("sucursales").select("nombre").eq("id", config.sucursal_id).single(),
     admin.from("repartidores").select("id, nombre").eq("sucursal_id", config.sucursal_id).eq("activo", true).order("nombre"),
@@ -68,10 +69,10 @@ export async function iniciarSesionRepartidor(params: {
 
   const { data: config } = await admin
     .from("delivery_config")
-    .select("sucursal_id, radio_llegada_m, velocidad_moto_kmh")
+    .select("sucursal_id, tenant_id, radio_llegada_m, velocidad_moto_kmh")
     .eq("slug", slug)
     .maybeSingle();
-  if (!config) return { ok: false, error: "No encontramos ese restaurante." };
+  if (!config || !(await tenantTieneDelivery(config.tenant_id))) return { ok: false, error: "No encontramos ese restaurante." };
 
   // El repartidor tiene que ser de ESE restaurante
   const { data: rep } = await admin.from("repartidores").select("id, sucursal_id").eq("id", params.repartidorId).maybeSingle();

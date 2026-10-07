@@ -8,9 +8,11 @@ import { BrandMark } from "@/components/BrandMark";
 import { AvisosFiscales } from "@/components/pos/AvisosFiscales";
 import { EnlaceFacturas } from "@/components/pos/EnlaceFacturas";
 import { AlertaDelivery } from "@/components/pos/delivery/AlertaDelivery";
+import { tenantTieneDelivery } from "@/lib/delivery/habilitado";
 
 export default async function PosLayout({ children }: { children: React.ReactNode }) {
   const sesion = await requireSucursal();
+  const delivery = await tenantTieneDelivery(sesion.tenant_id);
 
   return (
     <div className="min-h-screen bg-ink-50">
@@ -33,7 +35,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
           >
             <ChefHat className="h-4 w-4" strokeWidth={2} />
           </Link>
-          <AlertaDelivery sucursalId={sesion.sucursal_id} />
+          {delivery && <AlertaDelivery sucursalId={sesion.sucursal_id} />}
           <EnlaceFacturas />
           <SyncIndicator />
           <CerrarSesionBoton />

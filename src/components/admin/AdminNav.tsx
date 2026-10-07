@@ -29,12 +29,12 @@ const NAV = [
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
-export function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
+export function AdminNav({ onNavigate, delivery = false }: { onNavigate?: () => void; delivery?: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav className="space-y-0.5">
-      {NAV.map((item) => {
+      {NAV.filter((item) => delivery || item.href !== "/admin/delivery").map((item) => {
         const activo = item.href === "/admin" ? pathname === "/admin" : pathname?.startsWith(item.href);
         const Icon = item.icon;
         return (

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireDeliveryAdmin } from "@/lib/delivery/habilitado";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { horarioDesdeFormulario } from "@/lib/delivery/horario";
@@ -27,7 +27,7 @@ const numero = (f: FormData, k: string, defecto: number) => {
 };
 
 export async function guardarConfigDelivery(formData: FormData) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const sucursalId = texto(formData, "sucursal_id");
   const supabase = await sucursalPropia(sucursalId, sesion.tenant_id);
 
@@ -78,7 +78,7 @@ export async function guardarConfigDelivery(formData: FormData) {
 }
 
 export async function guardarZona(formData: FormData) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const sucursalId = texto(formData, "sucursal_id");
   const supabase = await sucursalPropia(sucursalId, sesion.tenant_id);
   const id = texto(formData, "id");
@@ -99,7 +99,7 @@ export async function guardarZona(formData: FormData) {
 }
 
 export async function eliminarZona(formData: FormData) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const sucursalId = texto(formData, "sucursal_id");
   const supabase = await sucursalPropia(sucursalId, sesion.tenant_id);
   // Los pedidos viejos conservan el nombre de la zona (snapshot); la FK queda en null
@@ -110,7 +110,7 @@ export async function eliminarZona(formData: FormData) {
 }
 
 export async function guardarRepartidor(formData: FormData) {
-  const sesion = await requireAdmin();
+  const sesion = await requireDeliveryAdmin();
   const sucursalId = texto(formData, "sucursal_id");
   const supabase = await sucursalPropia(sucursalId, sesion.tenant_id);
   const id = texto(formData, "id");

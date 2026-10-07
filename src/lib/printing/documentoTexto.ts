@@ -306,6 +306,8 @@ export interface DatosReciboExterno {
   fecha: Date;
   /** Empresa de reparto y/o # de pedido de esa empresa (lo que escribe el cajero). */
   referencia?: string | null;
+  /** Leyenda bajo «RECIBO». Por omisión «Delivery externo»; en un cobro normal sin CAI va «Cobro sin factura CAI». */
+  subtitulo?: string;
   lineas: LineaImprimible[];
   subtotal: number;
 }
@@ -322,7 +324,7 @@ export function construirReciboDeliveryExterno(d: DatosReciboExterno): Instrucci
 
   out.push({ op: "salto" });
   out.push(...centrado("RECIBO", { bold: true, size: "doble" }));
-  out.push(...centrado("Delivery externo", { bold: true }));
+  out.push(...centrado(d.subtitulo ?? "Delivery externo", { bold: true }));
   out.push({ op: "salto" });
 
   if (d.numeroDia != null) out.push(...campo("Orden:", `#${d.numeroDia}`));
