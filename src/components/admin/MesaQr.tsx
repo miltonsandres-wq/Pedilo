@@ -1,4 +1,5 @@
-import { QrCode, ExternalLink, RotateCw } from "lucide-react";
+import Link from "next/link";
+import { QrCode, ExternalLink, Printer, RotateCw } from "lucide-react";
 import { obtenerOrigen, qrComoDataUrl, urlCartaMesa } from "@/lib/qr";
 import { regenerarQrMesa } from "@/app/admin/mesas/actions";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +32,10 @@ export async function MesaQr({ mesaId, qrToken }: { mesaId: string; qrToken: str
               <ExternalLink className="h-3 w-3" strokeWidth={2} />
               Abrir
             </a>
+            <Link href={`/admin/mesas/flyer?mesa=${mesaId}`} className="flex items-center gap-1 text-xs text-brand-700 hover:underline">
+              <Printer className="h-3 w-3" strokeWidth={2} />
+              Flyer
+            </Link>
             <form action={regenerarQrMesa.bind(null, mesaId)}>
               <Button type="submit" variant="ghost" size="sm" className="!px-1.5 !py-0.5 text-xs">
                 <RotateCw className="h-3 w-3" strokeWidth={2} />

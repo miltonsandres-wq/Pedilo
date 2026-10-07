@@ -1204,6 +1204,7 @@ export type Database = {
           direccion: string | null
           id: string
           logo_url: string | null
+          mensaje_flyer: string | null
           nombre: string
           telefono: string | null
           tenant_id: string
@@ -1215,6 +1216,7 @@ export type Database = {
           direccion?: string | null
           id?: string
           logo_url?: string | null
+          mensaje_flyer?: string | null
           nombre: string
           telefono?: string | null
           tenant_id: string
@@ -1226,6 +1228,7 @@ export type Database = {
           direccion?: string | null
           id?: string
           logo_url?: string | null
+          mensaje_flyer?: string | null
           nombre?: string
           telefono?: string | null
           tenant_id?: string

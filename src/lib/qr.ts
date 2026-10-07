@@ -11,3 +11,8 @@ export function urlCartaMesa(origen: string, qrToken: string) {
 export async function qrComoDataUrl(texto: string) {
   return QRCode.toDataURL(texto, { margin: 1, width: 240, color: { dark: "#14171e" } });
 }
+
+/** QR en alta resolución para IMPRIMIR (el de 240 px se ve borroso en papel). */
+export async function qrParaImprimir(texto: string) {
+  return QRCode.toDataURL(texto, { margin: 1, width: 900, errorCorrectionLevel: "M", color: { dark: "#14171e" } });
+}

@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PlanoMesas } from "@/components/PlanoMesas";
-import { PageHeader } from "@/components/ui/Card";
+import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
+import { MensajeFlyerForm } from "@/components/admin/MensajeFlyerForm";
 import { Field, SelectField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -23,7 +24,7 @@ export default async function MesasPage({
 
   const { data: sucursales } = await supabase
     .from("sucursales")
-    .select("id, nombre")
+    .select("id, nombre, mensaje_flyer")
     .eq("tenant_id", sesion.tenant_id)
     .eq("activo", true)
     .order("nombre");
@@ -38,6 +39,8 @@ export default async function MesasPage({
         .eq("activa", true)
         .order("nombre")
     : { data: [] };
+
+  const sucursalActual = (sucursales ?? []).find((s) => s.id === sucursalId);
 
   return (
     <div>
@@ -113,6 +116,27 @@ export default async function MesasPage({
               </Button>
             </form>
           </Colapsable>
+
+          <Card className="mb-6">
+            <CardHeader
+              title="Flyer del QR para imprimir"
+              subtitle="Cada mesa sale con el logo del restaurante de fondo, un mensaje llamativo y su QR. Edita el mensaje de esta sucursal y imprímelos."
+            />
+            <div className="space-y-4 p-5 pt-4">
+              <MensajeFlyerForm key={sucursalId} sucursalId={sucursalId} mensajeInicial={sucursalActual?.mensaje_flyer ?? null} />
+              {(mesas ?? []).length > 0 ? (
+                <Link
+                  href={`/admin/mesas/flyer?sucursal=${sucursalId}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-2 text-sm font-medium text-white hover:bg-ink-800"
+                >
+                  <Printer className="h-4 w-4" strokeWidth={2} />
+                  Ver e imprimir los flyers de todas las mesas
+                </Link>
+              ) : (
+                <p className="text-xs text-ink-400">Crea mesas para poder imprimir sus flyers.</p>
+              )}
+            </div>
+          </Card>
 
           <div className="space-y-2">
             {(mesas ?? []).map((m) => (
