@@ -167,9 +167,9 @@ export const PASOS_DEMO: PasoDemo[] = [
     app: "pos",
     item: "Mesas",
     navega: true,
-    intro: "El canal del pedido se elige al crearlo: salón (tocas la mesa), para llevar, delivery o plataforma.",
+    intro: "Al abrir la mesa eliges de dónde es el pedido en una lista: restaurante, para llevar, delivery o plataforma. Luego sigue el flujo normal.",
     campos: [
-      { etiqueta: "Canal", valor: "Plataforma", nota: "Para llevar y plataforma no necesitan mesa. El delivery tiene su propio tablero." },
+      { etiqueta: "¿De dónde es el pedido?", valor: "Plataforma", nota: "Para llevar y plataforma no ocupan la mesa. Delivery te lleva a su propio flujo." },
       { etiqueta: "Plataforma / # de pedido", valor: "PedidosYa #8841", nota: "Queda en el pedido y en el ticket." },
       { etiqueta: "Nombre del cliente", valor: "Carlos" },
     ],

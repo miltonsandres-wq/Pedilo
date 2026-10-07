@@ -17,11 +17,14 @@ export function MapaMesas({
   tenantId,
   usuarioId,
   rol,
+  deliveryHabilitado = false,
 }: {
   sucursalId: string;
   tenantId: string;
   usuarioId: string;
   rol: RolUsuario;
+  /** La plataforma habilitó el delivery para este negocio: si no, no se ofrece. */
+  deliveryHabilitado?: boolean;
 }) {
   const router = useRouter();
   const [mesaParaAbrir, setMesaParaAbrir] = useState<MesaLocal | null>(null);
@@ -93,13 +96,15 @@ export function MapaMesas({
             <Package className="h-3.5 w-3.5" strokeWidth={2} />
             Plataforma
           </Button>
-          <Link
-            href="/pos/delivery"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
-          >
-            <Bike className="h-3.5 w-3.5" strokeWidth={2} />
-            Delivery
-          </Link>
+          {deliveryHabilitado && (
+            <Link
+              href="/pos/delivery"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
+            >
+              <Bike className="h-3.5 w-3.5" strokeWidth={2} />
+              Delivery
+            </Link>
+          )}
           <span className="text-xs text-ink-400">Para pedidos de salón, toca una mesa.</span>
         </div>
       )}
@@ -200,6 +205,8 @@ export function MapaMesas({
           tenantId={tenantId}
           usuarioId={usuarioId}
           esMesero={esMesero}
+          puedeElegirOrigen={puedeCrearPedidos}
+          deliveryHabilitado={deliveryHabilitado}
           onCerrar={() => setMesaParaAbrir(null)}
         />
       )}
@@ -207,12 +214,16 @@ export function MapaMesas({
   );
 }
 
+type OrigenPedido = "local" | "para_llevar" | "plataforma" | "delivery";
+
 function ModalNuevoCliente({
   mesa,
   sucursalId,
   tenantId,
   usuarioId,
   esMesero,
+  puedeElegirOrigen,
+  deliveryHabilitado,
   onCerrar,
 }: {
   mesa: MesaLocal;
@@ -220,24 +231,44 @@ function ModalNuevoCliente({
   tenantId: string;
   usuarioId: string;
   esMesero: boolean;
+  /** El cajero/admin elige de dónde es el pedido; el mesero siempre atiende el restaurante. */
+  puedeElegirOrigen: boolean;
+  deliveryHabilitado: boolean;
   onCerrar: () => void;
 }) {
+  const router = useRouter();
+  const [origen, setOrigen] = useState<OrigenPedido>("local");
+  const [referencia, setReferencia] = useState("");
   const [nombre, setNombre] = useState("");
   const [personas, setPersonas] = useState(Math.min(mesa.capacidad, 2));
   const [guardando, setGuardando] = useState(false);
 
   async function confirmar() {
+    // Delivery: se atiende en su propio flujo (zona, dirección, repartidor…)
+    if (origen === "delivery") {
+      router.push("/pos/delivery?nuevo=1");
+      return;
+    }
     setGuardando(true);
-    await abrirOrden({
-      mesaId: mesa.id,
+    if (origen === "local") {
+      await abrirOrden({ mesaId: mesa.id, sucursalId, tenantId, usuarioId, clienteNombre: nombre || undefined, personas });
+      setGuardando(false);
+      onCerrar();
+      return;
+    }
+    // Para llevar / plataforma: pedido sin mesa (la mesa queda libre) y de ahí el flujo normal
+    const id = await abrirOrden({
+      mesaId: null,
+      canal: origen,
       sucursalId,
       tenantId,
       usuarioId,
       clienteNombre: nombre || undefined,
-      personas,
+      referenciaExterna: origen === "plataforma" ? referencia : undefined,
     });
     setGuardando(false);
     onCerrar();
+    router.push(`/pos/orden/${id}`);
   }
 
   return (
@@ -264,32 +295,77 @@ function ModalNuevoCliente({
           </p>
         )}
 
-        <label className="mb-1.5 block text-xs font-medium text-ink-500">Nombre del cliente</label>
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Ej. Familia Pérez"
-          autoFocus
-          className="mb-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        />
+        {puedeElegirOrigen && (
+          <>
+            <label htmlFor="origen-pedido" className="mb-1.5 block text-xs font-medium text-ink-500">¿De dónde es el pedido?</label>
+            <select
+              id="origen-pedido"
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value as OrigenPedido)}
+              className="mb-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm"
+            >
+              <option value="local">Restaurante (en {mesa.nombre})</option>
+              <option value="para_llevar">Para llevar</option>
+              {deliveryHabilitado && <option value="delivery">Delivery</option>}
+              <option value="plataforma">Plataforma (PedidosYa, Hugo…)</option>
+            </select>
+          </>
+        )}
 
-        <label className="mb-1.5 block text-xs font-medium text-ink-500">
-          Personas (capacidad de la mesa: {mesa.capacidad})
-        </label>
-        <input
-          type="number"
-          min={1}
-          value={personas}
-          onChange={(e) => setPersonas(Number(e.target.value))}
-          className="mb-5 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        />
+        {origen === "delivery" ? (
+          <p className="mb-5 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
+            El delivery se registra con la zona, la dirección y el teléfono del cliente, y lo despachas con tu repartidor. Te llevamos a esa pantalla.
+          </p>
+        ) : (
+          <>
+            {origen === "plataforma" && (
+              <>
+                <label htmlFor="ref-origen" className="mb-1.5 block text-xs font-medium text-ink-500">Plataforma / # de pedido</label>
+                <input
+                  id="ref-origen"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  placeholder="Ej. PedidosYa #8841"
+                  autoFocus
+                  className="mb-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm"
+                />
+              </>
+            )}
+            <label htmlFor="nombre-cliente-origen" className="mb-1.5 block text-xs font-medium text-ink-500">
+              Nombre del cliente{origen === "local" ? "" : " (opcional)"}
+            </label>
+            <input
+              id="nombre-cliente-origen"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder={origen === "local" ? "Ej. Familia Pérez" : "Ej. Carlos"}
+              autoFocus={origen !== "plataforma"}
+              className={`w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm ${origen === "local" ? "mb-3" : "mb-5"}`}
+            />
+
+            {origen === "local" && (
+              <>
+                <label className="mb-1.5 block text-xs font-medium text-ink-500">
+                  Personas (capacidad de la mesa: {mesa.capacidad})
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={personas}
+                  onChange={(e) => setPersonas(Number(e.target.value))}
+                  className="mb-5 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                />
+              </>
+            )}
+          </>
+        )}
 
         <div className="flex gap-2">
           <Button variant="secondary" size="lg" className="flex-1" onClick={onCerrar}>
             Cancelar
           </Button>
           <Button size="lg" className="flex-1" disabled={guardando} onClick={() => void confirmar()}>
-            {guardando ? "Abriendo..." : "Abrir mesa"}
+            {guardando ? "Abriendo..." : origen === "local" ? "Abrir mesa" : origen === "delivery" ? "Ir a delivery" : "Crear pedido"}
           </Button>
         </div>
       </div>

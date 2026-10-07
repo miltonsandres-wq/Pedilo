@@ -40,10 +40,21 @@ function useAhora(ms = 20_000) {
 
 const minutosDesde = (iso: string | null, ahora: number) => (iso ? Math.max(0, Math.floor((ahora - new Date(iso).getTime()) / 60_000)) : 0);
 
-export function TableroDelivery({ sucursalId, usuarioId, puedeDespachar }: { sucursalId: string; usuarioId: string; puedeDespachar: boolean }) {
+export function TableroDelivery({
+  sucursalId,
+  usuarioId,
+  puedeDespachar,
+  abrirPedidoTelefono = false,
+}: {
+  sucursalId: string;
+  usuarioId: string;
+  puedeDespachar: boolean;
+  /** Llega desde «Abrir mesa > Delivery»: abre directo el formulario del pedido por teléfono. */
+  abrirPedidoTelefono?: boolean;
+}) {
   const ahora = useAhora();
   const [dialogo, setDialogo] = useState<Dialogo>(null);
-  const [telefono, setTelefono] = useState(false);
+  const [telefono, setTelefono] = useState(abrirPedidoTelefono);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [sonido, setSonido] = useState(true);
   useEffect(() => setSonido(sonidoActivado()), []);

@@ -25,8 +25,8 @@ beforeEach(async () => {
   await db.mesas.add({ id: "M1", sucursal_id: "S1", nombre: "Mesa 1", capacidad: 4, zona: null, pos_x: null, pos_y: null, estado: "libre", activa: true });
 });
 
-const mapa = (rol: "cajero" | "mesero" | "admin") =>
-  render(<MapaMesas sucursalId="S1" tenantId="T1" usuarioId="U1" rol={rol} />);
+const mapa = (rol: "cajero" | "mesero" | "admin", deliveryHabilitado = true) =>
+  render(<MapaMesas sucursalId="S1" tenantId="T1" usuarioId="U1" rol={rol} deliveryHabilitado={deliveryHabilitado} />);
 
 describe("el canal del pedido se elige al CREARLO", () => {
   it("el cajero ve Para llevar, Plataforma y Delivery; el mesero no", async () => {
@@ -38,6 +38,12 @@ describe("el canal del pedido se elige al CREARLO", () => {
     mapa("mesero");
     await screen.findByText("Mesa 1");
     expect(screen.queryByRole("button", { name: /Para llevar/ })).toBeNull();
+  });
+
+  it("sin delivery habilitado por la plataforma no se ofrece el acceso a Delivery", async () => {
+    mapa("cajero", false);
+    await screen.findByRole("button", { name: /Para llevar/ });
+    expect(screen.queryByRole("link", { name: /Delivery/ })).toBeNull();
   });
 
   it("un pedido para llevar se crea SIN mesa, con su canal, y abre su pantalla", async () => {
@@ -114,5 +120,73 @@ describe("pedido sin mesa: tomar la orden y cobrar", () => {
     await waitFor(async () => expect((await db.ordenes.get("O1"))?.estado).toBe("pagada"));
     expect((await db.mesas.get("M1"))?.estado).toBe("libre");
     await waitFor(() => expect(push).toHaveBeenCalledWith("/pos"));
+  });
+});
+
+describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
+  const abrir = async (rol: "cajero" | "mesero" = "cajero", delivery = true) => {
+    const user = userEvent.setup();
+    mapa(rol, delivery);
+    await user.click(await screen.findByRole("button", { name: /Mesa 1/ }));
+    return user;
+  };
+
+  it("muestra la lista Restaurante / Para llevar / Delivery / Plataforma, con Restaurante por omisión", async () => {
+    await abrir();
+    const lista = (await screen.findByLabelText("¿De dónde es el pedido?")) as HTMLSelectElement;
+    expect(lista.value).toBe("local");
+    expect(Array.from(lista.options).map((o) => o.value)).toEqual(["local", "para_llevar", "delivery", "plataforma"]);
+  });
+
+  it("Restaurante sigue el flujo normal: abre la mesa con su cliente y personas", async () => {
+    const user = await abrir();
+    await user.type(await screen.findByLabelText(/Nombre del cliente/), "Familia Pérez");
+    await user.click(screen.getByRole("button", { name: "Abrir mesa" }));
+    await waitFor(async () => expect(await db.ordenes.count()).toBe(1));
+    expect(await db.ordenes.toArray()).toMatchObject([{ mesa_id: "M1", canal: "local", cliente_nombre: "Familia Pérez" }]);
+    expect((await db.mesas.get("M1"))?.estado).toBe("ocupada");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("Para llevar crea el pedido sin ocupar la mesa y sigue al flujo normal del pedido", async () => {
+    const user = await abrir();
+    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "para_llevar");
+    expect(screen.queryByLabelText(/Personas/)).toBeNull(); // sin personas ni mesa
+    await user.type(screen.getByLabelText(/Nombre del cliente/), "Carlos");
+    await user.click(screen.getByRole("button", { name: "Crear pedido" }));
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    const [orden] = await db.ordenes.toArray();
+    expect(orden).toMatchObject({ canal: "para_llevar", mesa_id: null, cliente_nombre: "Carlos" });
+    expect(push).toHaveBeenCalledWith(`/pos/orden/${orden.id}`);
+    expect((await db.mesas.get("M1"))?.estado).toBe("libre");
+  });
+
+  it("Plataforma pide la empresa / # de pedido", async () => {
+    const user = await abrir();
+    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "plataforma");
+    await user.type(screen.getByLabelText(/Plataforma \/ # de pedido/), "Hugo #12");
+    await user.click(screen.getByRole("button", { name: "Crear pedido" }));
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect((await db.ordenes.toArray())[0]).toMatchObject({ canal: "plataforma", mesa_id: null, referencia_externa: "Hugo #12" });
+  });
+
+  it("Delivery lleva al flujo de delivery (pedido por teléfono) y no crea ninguna orden aquí", async () => {
+    const user = await abrir();
+    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "delivery");
+    await user.click(screen.getByRole("button", { name: "Ir a delivery" }));
+    expect(push).toHaveBeenCalledWith("/pos/delivery?nuevo=1");
+    expect(await db.ordenes.count()).toBe(0);
+  });
+
+  it("sin delivery habilitado la opción Delivery no aparece", async () => {
+    await abrir("cajero", false);
+    const lista = (await screen.findByLabelText("¿De dónde es el pedido?")) as HTMLSelectElement;
+    expect(Array.from(lista.options).map((o) => o.value)).toEqual(["local", "para_llevar", "plataforma"]);
+  });
+
+  it("el mesero abre la mesa del restaurante, sin lista de origen", async () => {
+    await abrir("mesero");
+    await screen.findByRole("button", { name: "Abrir mesa" });
+    expect(screen.queryByLabelText("¿De dónde es el pedido?")).toBeNull();
   });
 });

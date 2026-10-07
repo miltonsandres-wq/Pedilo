@@ -1,4 +1,5 @@
 import { requireSucursal } from "@/lib/auth/session";
+import { tenantTieneDelivery } from "@/lib/delivery/habilitado";
 import { MapaMesas } from "@/components/pos/MapaMesas";
 import { FacturaEmitidaModal } from "@/components/pos/FacturaEmitidaModal";
 import type { RolUsuario } from "@/lib/types/helpers";
@@ -10,6 +11,7 @@ export default async function PosMapaPage({
 }) {
   const sesion = await requireSucursal();
   const { factura } = await searchParams;
+  const deliveryHabilitado = await tenantTieneDelivery(sesion.tenant_id);
   return (
     <>
       <MapaMesas
@@ -17,6 +19,7 @@ export default async function PosMapaPage({
         tenantId={sesion.tenant_id}
         usuarioId={sesion.id}
         rol={sesion.rol as RolUsuario}
+        deliveryHabilitado={deliveryHabilitado}
       />
       {factura && <FacturaEmitidaModal documentoId={factura} />}
     </>
