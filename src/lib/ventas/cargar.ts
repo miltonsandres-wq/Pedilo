@@ -15,7 +15,7 @@ export async function cargarVentasDelDia(
 
   let q = supabase
     .from("ordenes")
-    .select("id, sucursal_id, mesa_id, numero_dia, cliente_nombre, total, pagada_at")
+    .select("id, sucursal_id, mesa_id, numero_dia, cliente_nombre, total, pagada_at, canal")
     .eq("estado", "pagada")
     .gte("pagada_at", desde)
     .lte("pagada_at", hasta);

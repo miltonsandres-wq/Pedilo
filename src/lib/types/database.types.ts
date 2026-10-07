@@ -847,6 +847,8 @@ export type Database = {
       }
       ordenes: {
         Row: {
+          ticket_sin_factura: boolean
+          referencia_externa: string | null
           cancelada_at: string | null
           cliente_nombre: string | null
           created_at: string
@@ -866,6 +868,8 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          ticket_sin_factura?: boolean
+          referencia_externa?: string | null
           cancelada_at?: string | null
           cliente_nombre?: string | null
           created_at?: string
@@ -884,6 +888,8 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          ticket_sin_factura?: boolean
+          referencia_externa?: string | null
           cancelada_at?: string | null
           cliente_nombre?: string | null
           created_at?: string
@@ -1245,6 +1251,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          ticket_sin_factura_activo: boolean
           delivery_habilitado: boolean
           configuracion_inicial_at: string | null
           tutorial_completado_at: string | null
@@ -1269,6 +1276,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          ticket_sin_factura_activo?: boolean
           delivery_habilitado?: boolean
           configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
@@ -1293,6 +1301,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          ticket_sin_factura_activo?: boolean
           delivery_habilitado?: boolean
           configuracion_inicial_at?: string | null
           tutorial_completado_at?: string | null
@@ -1320,6 +1329,7 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          puede_ticket_sin_factura: boolean
           clave_cifrada: string | null
           activo: boolean
           created_at: string
@@ -1330,6 +1340,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          puede_ticket_sin_factura?: boolean
           clave_cifrada?: string | null
           activo?: boolean
           created_at?: string
@@ -1340,6 +1351,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          puede_ticket_sin_factura?: boolean
           clave_cifrada?: string | null
           activo?: boolean
           created_at?: string

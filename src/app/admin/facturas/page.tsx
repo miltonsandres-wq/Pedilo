@@ -11,6 +11,7 @@ import {
   type VentaDia,
 } from "@/lib/ventas/ventasDelDia";
 import { hoyHN } from "@/lib/menu/platosDelDia";
+import { etiquetaCanal } from "@/lib/pos/canales";
 import { Card, CardHeader, PageHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -19,9 +20,8 @@ import { resolverSolicitudAnulacion } from "./actions";
 
 const FILTROS: { valor: "todas" | TipoVenta | "anuladas"; etiqueta: string }[] = [
   { valor: "todas", etiqueta: "Todas" },
-  { valor: "con_cai", etiqueta: "Con CAI" },
-  { valor: "sin_cai", etiqueta: "Sin CAI" },
-  { valor: "sin_factura", etiqueta: "Sin factura" },
+  { valor: "con_cai", etiqueta: "Facturado (CAI)" },
+  { valor: "sin_factura", etiqueta: "Ticket sin factura" },
   { valor: "anuladas", etiqueta: "Anuladas" },
 ];
 
@@ -71,7 +71,7 @@ export default async function FacturasDelDiaPage({
     <div>
       <PageHeader
         title="Facturas del día"
-        subtitle="Todo lo cobrado ese día: con factura CAI, sin CAI y sin factura. Aquí apruebas las anulaciones que pide la caja."
+        subtitle="Todo lo cobrado ese día: facturado con CAI y tickets sin factura, por canal. Aquí apruebas las anulaciones que pide la caja."
       />
 
       {ok && <p role="status" className="mb-4 rounded-lg bg-libre-bg px-3 py-2 text-sm text-libre-text">{ok}</p>}
@@ -140,8 +140,8 @@ export default async function FacturasDelDiaPage({
         </Button>
       </form>
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {(["con_cai", "sin_cai", "sin_factura"] as const).map((t) => (
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {(["con_cai", "sin_factura"] as const).map((t) => (
           <Card key={t} className="p-4">
             <p className="text-xs font-medium text-ink-500">{ETIQUETA_TIPO_VENTA[t]}</p>
             <p className="text-xl font-semibold text-ink-900">{lempiras(resumen.porTipo[t].total)}</p>
@@ -155,7 +155,7 @@ export default async function FacturasDelDiaPage({
           <p className="text-xl font-semibold text-red-600">{lempiras(resumen.anuladas.total)}</p>
           <p className="text-xs text-ink-400">{resumen.anuladas.cantidad} {resumen.anuladas.cantidad === 1 ? "venta" : "ventas"}</p>
         </Card>
-        <Card className="col-span-2 p-4 lg:col-span-1">
+        <Card className="p-4">
           <p className="text-xs font-medium text-ink-500">Total del día (sin anuladas)</p>
           <p className="text-xl font-semibold text-ink-900">{lempiras(resumen.neto.total)}</p>
           <p className="text-xs text-ink-400">{resumen.neto.cantidad} cobros</p>
@@ -196,6 +196,7 @@ function FilaVenta({ v, sucursal }: { v: VentaDia; sucursal?: string }) {
           {v.numeroFactura ?? (v.numeroDia != null ? `Orden #${v.numeroDia}` : "Cobro")}
         </span>
         <Badge tone={v.tipo === "con_cai" ? "brand" : "neutral"}>{ETIQUETA_TIPO_VENTA[v.tipo]}</Badge>
+        {v.canal !== "local" && <Badge tone="neutral">{etiquetaCanal(v.canal)}</Badge>}
         {v.anulada && <Badge tone="danger">anulada</Badge>}
         {v.solicitud?.estado === "pendiente" && <Badge tone="warning">anulación pendiente</Badge>}
         {v.solicitud?.estado === "rechazada" && <Badge tone="neutral">anulación rechazada</Badge>}

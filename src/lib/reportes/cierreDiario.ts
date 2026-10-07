@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database.types";
 import { resumirLiquidaciones, type ResumenDeliveryCierre } from "@/lib/delivery/reportes";
+import { separarCierre, type CierreSeparado } from "./separarCierre";
 
 /**
  * El cierre diario NO es una tabla: es una consulta que suma los `pagos`
@@ -12,6 +13,8 @@ export interface CierreDiario {
   totalCobrado: number;
   totalOrdenes: number;
   porFormaPago: Record<string, number>;
+  /** Lo facturado (con CAI) por un lado y lo no facturado (tickets sin factura) por otro, cada uno por método de pago. */
+  separado: CierreSeparado;
   productosMasVendidos: { nombre: string; cantidad: number; subtotal: number }[];
   /** Delivery del día: entregas y liquidaciones de repartidores (el efectivo que entregaron en caja). */
   delivery: ResumenDeliveryCierre;
@@ -23,7 +26,7 @@ export async function obtenerCierreDiario(
 ): Promise<CierreDiario> {
   const { data: pagos } = await supabase
     .from("pagos")
-    .select("monto, forma_pago")
+    .select("orden_id, monto, forma_pago")
     .eq("sucursal_id", params.sucursalId)
     .gte("created_at", params.desde)
     .lte("created_at", params.hasta);
@@ -34,6 +37,24 @@ export async function obtenerCierreDiario(
     porFormaPago[p.forma_pago] = (porFormaPago[p.forma_pago] ?? 0) + Number(p.monto);
     totalCobrado += Number(p.monto);
   }
+
+  // Separación facturado / no facturado: una orden está facturada si tiene factura con CAI
+  const idsPagos = [...new Set((pagos ?? []).map((p) => p.orden_id))];
+  const facturaPorOrden = new Map<string, "emitida" | "anulada">();
+  const anuladasPorSolicitud = new Set<string>();
+  if (idsPagos.length > 0) {
+    const [{ data: facturas }, { data: aprobadas }] = await Promise.all([
+      supabase.from("documentos_fiscales").select("orden_id, estado").eq("clase", "factura").in("orden_id", idsPagos),
+      supabase.from("solicitudes_anulacion").select("orden_id").eq("estado", "aprobada").in("orden_id", idsPagos),
+    ]);
+    for (const f of facturas ?? []) facturaPorOrden.set(f.orden_id, f.estado === "anulada" ? "anulada" : "emitida");
+    for (const a of aprobadas ?? []) anuladasPorSolicitud.add(a.orden_id);
+  }
+  const separado = separarCierre(
+    (pagos ?? []).map((p) => ({ orden_id: p.orden_id, forma_pago: p.forma_pago, monto: Number(p.monto) })),
+    facturaPorOrden,
+    anuladasPorSolicitud
+  );
 
   // Cuenta TODAS las órdenes abiertas ese día (pagadas, canceladas, etc.) —
   // cada una consumió un número de orden al crearse, sin importar en qué
@@ -98,6 +119,7 @@ export async function obtenerCierreDiario(
     totalCobrado,
     totalOrdenes: totalOrdenes ?? 0,
     porFormaPago,
+    separado,
     productosMasVendidos,
     delivery: resumirLiquidaciones(entregados ?? 0, (liquidaciones ?? []).map((l) => ({
       total_efectivo_cobrado: Number(l.total_efectivo_cobrado), total_entregado_en_caja: Number(l.total_entregado_en_caja),

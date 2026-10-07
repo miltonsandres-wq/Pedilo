@@ -2,12 +2,13 @@ import { requireSucursal } from "@/lib/auth/session";
 import { DetalleMesa } from "@/components/pos/DetalleMesa";
 import type { RolUsuario } from "@/lib/types/helpers";
 
-export default async function MesaPage({ params }: { params: Promise<{ mesaId: string }> }) {
+/** Pedido SIN mesa (para llevar, plataforma): se abre por el id de la orden. */
+export default async function OrdenPage({ params }: { params: Promise<{ ordenId: string }> }) {
   const sesion = await requireSucursal();
-  const { mesaId } = await params;
+  const { ordenId } = await params;
   return (
     <DetalleMesa
-      mesaId={mesaId}
+      ordenId={ordenId}
       sucursalId={sesion.sucursal_id}
       usuarioId={sesion.id}
       rol={sesion.rol as RolUsuario}

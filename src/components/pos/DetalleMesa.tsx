@@ -34,7 +34,7 @@ import {
   enviarACocina,
 } from "@/lib/pos/acciones";
 import { ETIQUETA_FORMA_PAGO, FORMA_DELIVERY_EXTERNO, type FormaPago, type RolUsuario } from "@/lib/types/helpers";
-import { armarReciboDeliveryExterno, armarReciboSinCai } from "@/lib/delivery/reciboExterno";
+import { armarReciboSinCai } from "@/lib/delivery/reciboExterno";
 import { agenteImpresionUrl, armarFactura, armarPrecuenta, marcarFacturaImpresa, type TicketArmado } from "@/lib/fiscal/impresion";
 import { imprimirDirecto } from "@/lib/printing/imprimirDirecto";
 import { ImpresionTicket } from "./ImpresionTicket";
@@ -44,18 +44,26 @@ import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
 import { esRtnValido, normalizarRtn } from "@/lib/fiscal/formato";
 import { imprimirPrecuenta } from "@/lib/fiscal/impresion";
 import { esPlatoDelDia } from "@/lib/menu/platosDelDia";
+import { etiquetaCanal } from "@/lib/pos/canales";
 import { cn } from "@/lib/ui";
 
 export function DetalleMesa({
   mesaId,
+  ordenId,
   sucursalId,
   usuarioId,
   rol,
+  puedeTicketSinFactura = false,
 }: {
-  mesaId: string;
+  /** Pedido de salón: se abre por su mesa. */
+  mesaId?: string | null;
+  /** Pedido sin mesa (para llevar, plataforma): se abre por su id. */
+  ordenId?: string;
   sucursalId: string;
   usuarioId: string;
   rol: RolUsuario;
+  /** Este usuario puede cobrar con «ticket sin factura» (si el negocio lo activó). */
+  puedeTicketSinFactura?: boolean;
 }) {
   const router = useRouter();
   const [mostrarCobro, setMostrarCobro] = useState(false);
@@ -68,16 +76,25 @@ export function DetalleMesa({
     ok: false,
   });
 
-  const mesa = useLiveQuery(() => db.mesas.get(mesaId), [mesaId]);
+  const mesa = useLiveQuery(() => (mesaId ? db.mesas.get(mesaId) : undefined), [mesaId]);
   const orden = useLiveQuery(
-    () =>
-      db.ordenes
+    async () => {
+      const abierta = (o: { estado: string } | undefined) => !!o && (o.estado === "abierta" || o.estado === "enviada");
+      if (ordenId) {
+        const o = await db.ordenes.get(ordenId);
+        return abierta(o) ? o : undefined;
+      }
+      if (!mesaId) return undefined;
+      return db.ordenes
         .where("mesa_id")
         .equals(mesaId)
         .filter((o) => o.estado === "abierta" || o.estado === "enviada")
-        .first(),
-    [mesaId]
+        .first();
+    },
+    [mesaId, ordenId]
   );
+  // Lo que se muestra y se imprime como «lugar» del pedido: la mesa o, si no tiene, su canal
+  const lugar = mesa?.nombre ?? etiquetaCanal(orden?.canal);
   const items = useLiveQuery(
     () => (orden ? db.orden_items.where("orden_id").equals(orden.id).sortBy("created_at") : []),
     [orden?.id],
@@ -104,7 +121,7 @@ export function DetalleMesa({
           <ArrowLeft className="h-4 w-4" strokeWidth={2} /> Volver al mapa
         </button>
         <p className="text-sm text-ink-500">
-          Esta mesa no tiene una orden abierta. Vuelve al mapa y tócala para abrir una.
+          {ordenId ? "Este pedido ya no está abierto." : "Esta mesa no tiene una orden abierta. Vuelve al mapa y tócala para abrir una."}
         </p>
       </div>
     );
@@ -125,7 +142,7 @@ export function DetalleMesa({
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={2} /> Volver
         </button>
-        <span className="text-sm font-semibold text-ink-900">{mesa?.nombre}</span>
+        <span className="text-sm font-semibold text-ink-900">{lugar}</span>
         <span
           className={cn(
             "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
@@ -189,7 +206,7 @@ export function DetalleMesa({
             onClick={async () => {
               setPrecuenta({ imprimiendo: true, mensaje: null, ok: false });
               if (!(await agenteImpresionUrl())) {
-                const armado = await armarPrecuenta(orden.id, mesa?.nombre ?? "");
+                const armado = await armarPrecuenta(orden.id, lugar);
                 if (armado.ok) {
                   setVistaPrecuenta({ ticket: armado.ticket });
                   setPrecuenta({ imprimiendo: false, ok: true, mensaje: null });
@@ -198,7 +215,7 @@ export function DetalleMesa({
                 }
                 return;
               }
-              const r = await imprimirPrecuenta(orden.id, mesa?.nombre ?? "");
+              const r = await imprimirPrecuenta(orden.id, lugar);
               setPrecuenta({
                 imprimiendo: false,
                 ok: r.ok,
@@ -233,7 +250,7 @@ export function DetalleMesa({
               size="lg"
               className="flex-1"
               disabled={!hayPendientesPorImprimir}
-              onClick={() => void enviarACocina(orden.id, mesa?.nombre ?? "")}
+              onClick={() => void enviarACocina(orden.id, lugar)}
             >
               <ChefHat className="h-4 w-4" strokeWidth={2} />
               Enviar a cocina
@@ -267,10 +284,12 @@ export function DetalleMesa({
       {mostrarCobro && (
         <FormularioCobro
           ordenId={orden.id}
-          mesaId={mesaId}
+          mesaId={orden.mesa_id}
           usuarioId={usuarioId}
           total={orden.total}
           formasDisponibles={formasPago ?? []}
+          puedeTicketSinFactura={puedeTicketSinFactura}
+          referenciaInicial={orden.referencia_externa ?? ""}
           onCerrar={() => setMostrarCobro(false)}
           onCobrado={(documentoId) => router.push(documentoId ? `/pos?factura=${documentoId}` : "/pos")}
         />
@@ -279,7 +298,7 @@ export function DetalleMesa({
       {mostrarAnular && (
         <FormularioAnular
           ordenId={orden.id}
-          mesaId={mesaId}
+          mesaId={orden.mesa_id}
           onCerrar={() => setMostrarAnular(false)}
           onAnulada={() => router.push("/pos")}
         />
@@ -592,34 +611,43 @@ export function FormularioCobro({
   usuarioId,
   total,
   formasDisponibles,
+  puedeTicketSinFactura = false,
+  referenciaInicial = "",
   onCerrar,
   onCobrado,
 }: {
   ordenId: string;
-  mesaId: string;
+  mesaId: string | null;
   usuarioId: string;
   total: number;
   formasDisponibles: FormaPago[];
+  /** Este usuario tiene el permiso de cobrar con «ticket sin factura» (además de que el negocio lo active). */
+  puedeTicketSinFactura?: boolean;
+  /** Empresa de reparto / # de pedido, si el pedido es de una plataforma. */
+  referenciaInicial?: string;
   onCerrar: () => void;
   onCobrado: (documentoId: string | null) => void;
 }) {
   const [monto, setMonto] = useState(total);
-  // «Delivery externo» NO es una forma de pago configurable: es una opción del cajero al cobrar
+  // «Delivery externo» ya no es una forma de pago: el canal (plataforma, delivery…) se elige al crear el pedido
   const formasNormales = formasDisponibles.filter((f) => f !== FORMA_DELIVERY_EXTERNO);
-  const [modo, setModo] = useState<"normal" | "externo">("normal");
+  const [modo, setModo] = useState<"factura" | "ticket">("factura");
   const [formaPago, setFormaPago] = useState<FormaPago>(formasNormales[0] ?? "efectivo");
-  const [referencia, setReferencia] = useState("");
+  const [referencia, setReferencia] = useState(referenciaInicial);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tras un cobro SIN factura CAI (delivery externo o negocio sin CAI) se ofrece imprimir el recibo antes de cerrar
-  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; externo: boolean; error?: string; aviso?: string } | null>(null);
+  const [reciboExterno, setReciboExterno] = useState<{ ticket: TicketArmado | null; agente: string | null; error?: string; aviso?: string } | null>(null);
 
   // Facturación fiscal: solo aparece si el negocio la tiene activa
   const config = useLiveQuery(() => leerConfigFiscal(), [], undefined);
   const rangos = useLiveQuery(() => db.rangos_cai.toArray(), [], []);
-  // Delivery externo: sin factura CAI (solo recibo no fiscal), así que no aplica nada fiscal
-  const externo = modo === "externo";
-  const factura = !!config?.activa && !externo;
+  // Dos formas de cobrar: «Facturar» (con CAI) o «Ticket sin factura». El ticket solo existe si el dueño lo activó
+  // Y este usuario tiene el permiso; un negocio que no factura con CAI siempre entrega ticket.
+  const facturacionActiva = !!config?.activa;
+  const ticketPermitido = facturacionActiva && config?.ticketSinFactura === true && puedeTicketSinFactura;
+  const sinFactura = !facturacionActiva || (modo === "ticket" && ticketPermitido);
+  const factura = facturacionActiva && !sinFactura;
   const bloqueo = factura ? evaluarFacturacion(config, rangos ?? []) : null;
   const [conRtn, setConRtn] = useState(false);
   const [clienteNombre, setClienteNombre] = useState("");
@@ -651,7 +679,8 @@ export function FormularioCobro({
         mesaId,
         usuarioId,
         monto,
-        formaPago: externo ? FORMA_DELIVERY_EXTERNO : formaPago,
+        formaPago,
+        sinFactura,
         referencia: referencia || undefined,
         cliente: pideCliente ? { nombre: clienteNombre, rtn: clienteRtn } : undefined,
         exoneracion: factura && hayExoneracion
@@ -662,19 +691,19 @@ export function FormularioCobro({
             }
           : undefined,
       });
-      // Cobro SIN factura CAI (delivery externo, o negocio que no factura con CAI): recibo no fiscal.
-      if (externo || (!documentoId && !factura)) {
+      // Cobro SIN factura (ticket sin factura, o negocio que no factura con CAI): ticket no fiscal.
+      if (sinFactura || (!documentoId && !factura)) {
         if (!imprimir) return onCobrado(null);
-        const armado = externo ? await armarReciboDeliveryExterno(ordenId, referencia) : await armarReciboSinCai(ordenId);
+        const armado = await armarReciboSinCai(ordenId, referencia);
         const agente = await agenteImpresionUrl();
         if (armado.ok) {
           const r = await imprimirDirecto(armado.ticket, agente);
           if (r.ok) return onCobrado(null);
           // El cobro ya quedó registrado: si no salió el papel, se ofrece reintentar con el botón
-          setReciboExterno({ ticket: armado.ticket, agente, externo, aviso: r.error ?? "No se pudo imprimir." });
+          setReciboExterno({ ticket: armado.ticket, agente, aviso: r.error ?? "No se pudo imprimir." });
           return;
         }
-        setReciboExterno({ ticket: null, agente, externo, error: armado.error });
+        setReciboExterno({ ticket: null, agente, error: armado.error });
         return;
       }
       // Cobro con factura CAI: se imprime la factura (original: cliente). Si no sale, la pantalla
@@ -707,7 +736,7 @@ export function FormularioCobro({
           <div className="text-center">
             <h2 className="text-base font-semibold text-ink-900">Cobro registrado</h2>
             <p className="mt-1 text-sm text-ink-500">
-              {reciboExterno.externo ? "Delivery externo · sin factura CAI" : "Sin factura CAI · recibo no fiscal"}
+              Ticket sin factura · no es documento fiscal
             </p>
             {reciboExterno.aviso && (
               <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -720,7 +749,7 @@ export function FormularioCobro({
               <ImpresionTicket
                 ticket={reciboExterno.ticket}
                 agenteUrl={reciboExterno.agente}
-                etiqueta={reciboExterno.externo ? "Imprimir recibo (delivery externo)" : "Imprimir recibo (sin CAI)"}
+                etiqueta="Imprimir ticket sin factura"
               />
             ) : (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{reciboExterno.error ?? "No se pudo armar el recibo."}</p>
@@ -751,27 +780,29 @@ export function FormularioCobro({
           </p>
         )}
 
-        <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-ink-100 p-1" role="group" aria-label="Tipo de cobro">
-          {(
-            [
-              ["normal", config?.activa ? "Factura CAI" : "Cobro normal"],
-              ["externo", "Delivery externo"],
-            ] as const
-          ).map(([valor, etiqueta]) => (
-            <button
-              key={valor}
-              type="button"
-              aria-pressed={modo === valor}
-              onClick={() => setModo(valor)}
-              className={cn(
-                "rounded-lg px-3 py-2 text-sm font-medium transition",
-                modo === valor ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-800"
-              )}
-            >
-              {etiqueta}
-            </button>
-          ))}
-        </div>
+        {facturacionActiva && ticketPermitido && (
+          <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-ink-100 p-1" role="group" aria-label="Tipo de cobro">
+            {(
+              [
+                ["factura", "Facturar"],
+                ["ticket", "Ticket sin factura"],
+              ] as const
+            ).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                aria-pressed={modo === valor}
+                onClick={() => setModo(valor)}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium transition",
+                  modo === valor ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-800"
+                )}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+        )}
 
         <label className="mb-1.5 block text-xs font-medium text-ink-500">Monto</label>
         <div className="relative mb-3">
@@ -784,9 +815,9 @@ export function FormularioCobro({
             className="w-full rounded-lg border border-ink-200 bg-white py-3 pl-8 pr-3 text-lg font-semibold tabular-nums outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
-        {externo && (
-          <p className="mb-3 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
-            Delivery externo: <b>no se emite factura CAI</b>. Se cobra la orden y se muestra un recibo (no fiscal) con el nombre del restaurante, el detalle y el subtotal.
+        {facturacionActiva && sinFactura && (
+          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <b>Ticket sin factura</b>: no se emite factura con CAI. Se cobra la orden y se entrega un ticket (no fiscal) con el detalle y el total.
           </p>
         )}
         {factura && esParcial && (
@@ -795,7 +826,6 @@ export function FormularioCobro({
           </p>
         )}
 
-        {!externo && (
         <SelectField
           label="Forma de pago"
           name="forma_pago"
@@ -812,10 +842,9 @@ export function FormularioCobro({
             </option>
           ))}
         </SelectField>
-        )}
 
         <label htmlFor="referencia-cobro" className="mb-1.5 block text-xs font-medium text-ink-500">
-          {externo ? "Empresa de reparto / # de pedido (opcional)" : "Referencia (opcional)"}
+          Referencia (opcional) — # de pedido, empresa de reparto…
         </label>
         <input id="referencia-cobro" value={referencia} onChange={(e) => setReferencia(e.target.value)} className={cn(inputClase, "mb-4")} />
 
@@ -905,7 +934,7 @@ export function FormularioCobro({
 
         <Button size="lg" className="w-full" disabled={enviando || !!bloqueo || !!faltante} onClick={() => void confirmar(true)}>
           <Printer className="h-4 w-4" strokeWidth={2} />
-          {enviando ? "Cobrando..." : factura ? "Cobrar e imprimir factura (CAI)" : externo ? "Cobrar e imprimir recibo (delivery externo)" : "Cobrar e imprimir recibo (sin CAI)"}
+          {enviando ? "Cobrando..." : factura ? "Cobrar e imprimir factura" : "Cobrar e imprimir ticket"}
         </Button>
         <div className="mt-2 flex gap-2">
           <Button variant="secondary" size="sm" className="flex-1" onClick={onCerrar} disabled={enviando}>
@@ -927,7 +956,7 @@ function FormularioAnular({
   onAnulada,
 }: {
   ordenId: string;
-  mesaId: string;
+  mesaId: string | null;
   onCerrar: () => void;
   onAnulada: () => void;
 }) {

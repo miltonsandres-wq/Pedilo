@@ -6,6 +6,7 @@ import { Check, ChefHat, Clock } from "lucide-react";
 import { db, type OrdenLocal } from "@/lib/offline/db";
 import { marcarListoCocina } from "@/lib/pos/acciones";
 import { cn } from "@/lib/ui";
+import { etiquetaCanal } from "@/lib/pos/canales";
 
 /** Se re-renderiza cada 20s para que "hace X min" en las tarjetas avance solo. */
 function useAhora() {
@@ -90,7 +91,7 @@ function TarjetaOrden({ orden, ahora }: { orden: OrdenLocal; ahora: number }) {
         )}
       >
         <div>
-          <p className="text-lg font-bold leading-tight text-ink-900">{orden.canal && orden.canal !== "local" ? "Delivery" : (mesa?.nombre ?? "Mesa")}</p>
+          <p className="text-lg font-bold leading-tight text-ink-900">{orden.mesa_id ? (mesa?.nombre ?? "Mesa") : etiquetaCanal(orden.canal)}</p>
           {orden.numero_dia != null && (
             <p className="font-mono text-xs text-ink-500">Orden #{orden.numero_dia}</p>
           )}

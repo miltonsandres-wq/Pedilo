@@ -7,13 +7,13 @@ import { ETIQUETA_TIPO_VENTA, type VentaDia } from "@/lib/ventas/ventasDelDia";
 const hora = (iso: string) =>
   new Intl.DateTimeFormat("es-HN", { hour: "2-digit", minute: "2-digit", timeZone: "America/Tegucigalpa" }).format(new Date(iso));
 
-/** Cobros de HOY sin factura CAI (recibo no fiscal o delivery externo), con la acción de pedir su anulación. */
+/** Cobros de HOY sin factura CAI (ticket sin factura), con la acción de pedir su anulación. */
 export function CobrosSinFactura({ ventas, puedeSolicitar }: { ventas: VentaDia[]; puedeSolicitar: boolean }) {
   return (
-    <section className="mt-8" aria-label="Cobros de hoy sin factura CAI">
-      <h2 className="text-base font-semibold text-ink-900">Cobros de hoy sin factura CAI</h2>
-      <p className="mb-3 text-sm text-ink-500">Recibos no fiscales y delivery externo.</p>
-      {ventas.length === 0 && <p className="text-sm text-ink-500">Hoy no hay cobros sin factura CAI.</p>}
+    <section className="mt-8" aria-label="Tickets sin factura de hoy">
+      <h2 className="text-base font-semibold text-ink-900">Tickets sin factura de hoy</h2>
+      <p className="mb-3 text-sm text-ink-500">Cobros que no llevan factura con CAI.</p>
+      {ventas.length === 0 && <p className="text-sm text-ink-500">Hoy no hay tickets sin factura.</p>}
       <div className="space-y-2">
         {ventas.map((v) => (
           <div key={v.ordenId} className="rounded-xl border border-ink-100 bg-white p-3.5 shadow-card">

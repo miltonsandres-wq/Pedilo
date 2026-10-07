@@ -31,15 +31,21 @@ const base = {
 };
 
 describe("clasificarVentas", () => {
-  it("separa con CAI, sin CAI y sin factura (delivery externo), de la más reciente a la más antigua", () => {
+  it("separa facturado (con CAI) de ticket sin factura, de la más reciente a la más antigua", () => {
     const v = clasificarVentas(base);
     expect(v.map((x) => [x.ordenId, x.tipo])).toEqual([
-      ["4", "sin_cai"],
+      ["4", "sin_factura"],
       ["3", "sin_factura"],
       ["2", "con_cai"],
       ["1", "con_cai"],
     ]);
     expect(v.find((x) => x.ordenId === "1")).toMatchObject({ numeroFactura: "001-001-01-00000001", mesa: "Mesa 1", total: 115 });
+  });
+
+  it("el canal del pedido viaja con la venta (salón por omisión)", () => {
+    const v = clasificarVentas({ ...base, ordenes: [orden("1", 115, "2026-10-07T14:00:00Z", { canal: "plataforma", mesa_id: null }), orden("2", 230, "2026-10-07T15:00:00Z")] });
+    expect(v.find((x) => x.ordenId === "1")?.canal).toBe("plataforma");
+    expect(v.find((x) => x.ordenId === "2")?.canal).toBe("local");
   });
 
   it("una factura anulada cuenta como anulada, con su motivo", () => {
@@ -70,7 +76,6 @@ describe("resumirVentas", () => {
     const r = resumirVentas(clasificarVentas({ ...base, solicitudes: [solicitud("4", "aprobada")] }));
     expect(r.porTipo.con_cai).toEqual({ cantidad: 2, total: 345 });
     expect(r.porTipo.sin_factura).toEqual({ cantidad: 1, total: 60 });
-    expect(r.porTipo.sin_cai).toEqual({ cantidad: 0, total: 0 });
     expect(r.anuladas).toEqual({ cantidad: 1, total: 80 });
     expect(r.neto).toEqual({ cantidad: 3, total: 405 });
   });

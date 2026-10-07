@@ -67,5 +67,6 @@ export async function imprimirReciboDeliveryExterno(ordenId: string, referencia?
   );
 }
 
-/** Recibo de un cobro normal en un negocio SIN facturación CAI (no fiscal), listo para imprimir. */
-export const armarReciboSinCai = (ordenId: string) => armarReciboDeliveryExterno(ordenId, null, "Cobro sin factura CAI");
+/** Ticket sin factura (no fiscal), listo para imprimir. `referencia`: empresa de reparto / # de pedido, si hay. */
+export const armarReciboSinCai = (ordenId: string, referencia?: string | null) =>
+  armarReciboDeliveryExterno(ordenId, referencia, "Ticket sin factura");

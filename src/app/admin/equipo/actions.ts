@@ -118,6 +118,7 @@ export async function actualizarUsuario(id: string, formData: FormData) {
     rol: string;
     sucursal_id: string | null;
     activo: boolean;
+    puede_ticket_sin_factura: boolean;
     clave_cifrada?: string;
   } = {
     nombre: String(formData.get("nombre") ?? "").trim(),
@@ -125,6 +126,8 @@ export async function actualizarUsuario(id: string, formData: FormData) {
     sucursal_id: sucursalId,
     // Nadie se desactiva a sí mismo (se quedaría sin acceso al panel)
     activo: id === sesion.id ? true : formData.get("activo") === "on",
+    // Permiso para cobrar con «ticket sin factura» (solo cajeros y administradores)
+    puede_ticket_sin_factura: (rol === "cajero" || rol === "admin") && formData.get("puede_ticket_sin_factura") === "on",
   };
   if (!cambios.nombre) irConError("El nombre no puede quedar vacío.");
 

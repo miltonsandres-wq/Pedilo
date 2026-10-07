@@ -56,9 +56,9 @@ describe("estadoEnTic (la animación de la demo)", () => {
     expect(estadoEnTic(paso, t + TICS_CLIC + TICS_RESULTADO).terminado).toBe(true);
   });
 
-  it("cubre el panel, el delivery y lo nuevo (delivery externo e impresión)", () => {
+  it("cubre el panel, el delivery, el canal del pedido, el ticket sin factura y la impresión", () => {
     const ids = PASOS_DEMO.map((p) => p.id);
-    for (const id of ["equipo", "categoria", "producto", "mesa", "delivery-config", "delivery-zona", "delivery-repartidor", "cobro", "pedido-delivery", "despacho", "externo", "impresion"]) {
+    for (const id of ["equipo", "categoria", "producto", "mesa", "delivery-config", "delivery-zona", "delivery-repartidor", "canal", "cobro", "pedido-delivery", "despacho", "externo", "impresion"]) {
       expect(ids).toContain(id);
     }
   });
@@ -121,7 +121,7 @@ describe("TutorialOnboarding (demo simulada)", () => {
       fireEvent.click(screen.getByRole("button", { name: /Ver demo/ }));
       const total = ticsHastaResultado(PASOS_DEMO[0]) + TICS_RESULTADO + 5;
       await avanzar(total);
-      expect(screen.getByText(/paso 2 de 12/)).toBeTruthy();
+      expect(screen.getByText(/paso 2 de 13/)).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -132,9 +132,9 @@ describe("TutorialOnboarding (demo simulada)", () => {
     render(<TutorialOnboarding completado={false} tenantId={T} />);
     await user.click(await screen.findByRole("button", { name: /Ver demo/ }));
     await user.click(screen.getByRole("button", { name: /Siguiente/ }));
-    expect(screen.getByText(/paso 2 de 12/)).toBeTruthy();
+    expect(screen.getByText(/paso 2 de 13/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Anterior/ }));
-    expect(screen.getByText(/paso 1 de 12/)).toBeTruthy();
+    expect(screen.getByText(/paso 1 de 13/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Pausar demo" }));
     expect(screen.getByRole("button", { name: "Reproducir demo" })).toBeTruthy();
   });

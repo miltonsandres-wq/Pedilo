@@ -220,6 +220,17 @@ export default async function EquipoPage({
                           className="w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
                         />
                       </div>
+                      {(u.rol === "cajero" || u.rol === "admin") && (
+                        <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600" title="Solo funciona si el negocio lo activó en Facturación fiscal">
+                          <input
+                            type="checkbox"
+                            name="puede_ticket_sin_factura"
+                            defaultChecked={u.puede_ticket_sin_factura}
+                            className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                          />
+                          Puede cobrar con ticket sin factura
+                        </label>
+                      )}
                       {u.id !== sesion.id && (
                         <label className="mb-2 flex items-center gap-1.5 text-xs text-ink-600">
                           <input

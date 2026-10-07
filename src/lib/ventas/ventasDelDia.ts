@@ -3,17 +3,15 @@
  * para poder probarlas: `cargarVentasDelDia` (servidor) trae los datos y las usa.
  *
  *  - con_cai:     la orden tiene una factura fiscal (con CAI), vigente o anulada
- *  - sin_factura: cobro de «Delivery externo» (no lleva factura; solo recibo no fiscal)
- *  - sin_cai:     el resto de cobros sin factura fiscal (negocio sin CAI, recibo no fiscal)
+ *  - sin_factura: no tiene factura: se cobró con «ticket sin factura» (recibo no fiscal)
  */
 
-export type TipoVenta = "con_cai" | "sin_cai" | "sin_factura";
+export type TipoVenta = "con_cai" | "sin_factura";
 export type EstadoSolicitud = "pendiente" | "aprobada" | "rechazada";
 
 export const ETIQUETA_TIPO_VENTA: Record<TipoVenta, string> = {
-  con_cai: "Con CAI",
-  sin_cai: "Sin CAI",
-  sin_factura: "Sin factura",
+  con_cai: "Facturado (CAI)",
+  sin_factura: "Ticket sin factura",
 };
 
 export interface OrdenPagada {
@@ -24,6 +22,8 @@ export interface OrdenPagada {
   cliente_nombre: string | null;
   total: number;
   pagada_at: string;
+  /** Canal del pedido (salón, para llevar, delivery, plataforma). */
+  canal?: string | null;
 }
 export interface PagoVenta {
   orden_id: string;
@@ -53,6 +53,7 @@ export interface VentaDia {
   ordenId: string;
   sucursalId: string;
   mesa: string | null;
+  canal: string;
   numeroDia: number | null;
   hora: string;
   cliente: string;
@@ -85,12 +86,13 @@ export function clasificarVentas(datos: {
     const solicitud = solicitudes[0] ?? null;
     const aprobada = solicitudes.find((s) => s.estado === "aprobada") ?? null;
 
-    const tipo: TipoVenta = factura ? "con_cai" : formas.includes("delivery_externo") ? "sin_factura" : "sin_cai";
+    const tipo: TipoVenta = factura ? "con_cai" : "sin_factura";
     const anulada = factura?.estado === "anulada" || !!aprobada;
     return {
       ordenId: o.id,
       sucursalId: o.sucursal_id,
       mesa: o.mesa_id ? (datos.mesas.get(o.mesa_id) ?? null) : null,
+      canal: o.canal ?? "local",
       numeroDia: o.numero_dia,
       hora: o.pagada_at,
       cliente: factura?.cliente_nombre ?? o.cliente_nombre ?? "—",
@@ -119,7 +121,6 @@ const redondear = (n: number) => Math.round(n * 100) / 100;
 export function resumirVentas(ventas: VentaDia[]): ResumenVentas {
   const porTipo: ResumenVentas["porTipo"] = {
     con_cai: { cantidad: 0, total: 0 },
-    sin_cai: { cantidad: 0, total: 0 },
     sin_factura: { cantidad: 0, total: 0 },
   };
   const anuladas = { cantidad: 0, total: 0 };

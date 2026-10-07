@@ -120,3 +120,45 @@ describe("solicitudes de anulación", () => {
     expect(await total()).toBe(antes);
   });
 });
+
+describe("canal del pedido y ticket sin factura (migración 0036)", () => {
+  const MESA = "aaaaaaaa-4444-0000-0000-00000000000a";
+  const orden = (canal: string | null, mesa: string | null, id: string) =>
+    pg.query(
+      "insert into public.ordenes (id, tenant_id, sucursal_id, mesa_id, canal) values ($1,$2,$3,$4,coalesce($5,'local'))",
+      [id, T_A, S_A, mesa, canal]
+    );
+
+  beforeAll(async () => {
+    await pg.exec(`insert into public.mesas (id, tenant_id, sucursal_id, nombre) values ('${MESA}','${T_A}','${S_A}','Mesa 1')`);
+  });
+
+  it("acepta los cuatro canales y los pedidos para llevar / plataforma van sin mesa", async () => {
+    await orden("local", MESA, "dddddddd-0000-0000-0000-000000000001");
+    await orden("para_llevar", null, "dddddddd-0000-0000-0000-000000000002");
+    await orden("plataforma", null, "dddddddd-0000-0000-0000-000000000003");
+    await orden("delivery_telefono", null, "dddddddd-0000-0000-0000-000000000004");
+    const r = await pg.query<{ n: number }>("select count(*)::int as n from public.ordenes where id::text like 'dddddddd-%'");
+    expect(r.rows[0].n).toBe(4);
+  });
+
+  it("un pedido de salón sigue necesitando mesa y un canal inventado se rechaza", async () => {
+    await expect(orden("local", null, "dddddddd-0000-0000-0000-000000000005")).rejects.toThrow();
+    await expect(orden("telepatia", null, "dddddddd-0000-0000-0000-000000000006")).rejects.toThrow();
+  });
+
+  it("guarda la referencia de la plataforma y la marca de ticket sin factura (apagadas por omisión)", async () => {
+    await pg.query("update public.ordenes set referencia_externa='PedidosYa #8841', ticket_sin_factura=true where id='dddddddd-0000-0000-0000-000000000003'");
+    const r = await pg.query<{ referencia_externa: string; ticket_sin_factura: boolean; otra: boolean }>(
+      "select referencia_externa, ticket_sin_factura, (select ticket_sin_factura from public.ordenes where id='dddddddd-0000-0000-0000-000000000002') as otra from public.ordenes where id='dddddddd-0000-0000-0000-000000000003'"
+    );
+    expect(r.rows[0]).toMatchObject({ referencia_externa: "PedidosYa #8841", ticket_sin_factura: true, otra: false });
+  });
+
+  it("el negocio y el usuario traen el ticket sin factura desactivado por omisión", async () => {
+    const t = await pg.query<{ ticket_sin_factura_activo: boolean }>("select ticket_sin_factura_activo from public.tenants where id=$1", [T_A]);
+    const u = await pg.query<{ puede_ticket_sin_factura: boolean }>("select puede_ticket_sin_factura from public.usuarios where id=$1", [CAJERO_A]);
+    expect(t.rows[0].ticket_sin_factura_activo).toBe(false);
+    expect(u.rows[0].puede_ticket_sin_factura).toBe(false);
+  });
+});

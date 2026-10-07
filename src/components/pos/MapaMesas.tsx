@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Users, UtensilsCrossed, UserPlus, X } from "lucide-react";
+import Link from "next/link";
+import { Bike, Package, ShoppingBag, Users, UtensilsCrossed, UserPlus, X } from "lucide-react";
 import { db, type MesaLocal } from "@/lib/offline/db";
 import { abrirOrden } from "@/lib/pos/acciones";
 import { Button } from "@/components/ui/Button";
+import { etiquetaCanal } from "@/lib/pos/canales";
 import { cn } from "@/lib/ui";
 import type { RolUsuario } from "@/lib/types/helpers";
 
@@ -23,6 +25,7 @@ export function MapaMesas({
 }) {
   const router = useRouter();
   const [mesaParaAbrir, setMesaParaAbrir] = useState<MesaLocal | null>(null);
+  const [canalNuevo, setCanalNuevo] = useState<"para_llevar" | "plataforma" | null>(null);
 
   const mesas = useLiveQuery(
     () => db.mesas.where("sucursal_id").equals(sucursalId).filter((m) => m.activa).sortBy("nombre"),
@@ -41,6 +44,9 @@ export function MapaMesas({
   );
 
   const ordenPorMesa = new Map((ordenesAbiertas ?? []).map((o) => [o.mesa_id, o]));
+  // Pedidos abiertos que no son de una mesa (para llevar, plataforma). El delivery se atiende en su propio tablero.
+  const pedidosSinMesa = (ordenesAbiertas ?? []).filter((o) => !o.mesa_id && (o.canal === "para_llevar" || o.canal === "plataforma"));
+  const puedeCrearPedidos = rol === "cajero" || rol === "admin";
   const esMesero = rol === "mesero";
 
   function clicMesa(mesa: MesaLocal) {
@@ -75,6 +81,51 @@ export function MapaMesas({
           </span>
         </div>
       </div>
+
+      {puedeCrearPedidos && (
+        <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label="Nuevo pedido por canal">
+          <span className="text-xs font-medium text-ink-500">Nuevo pedido:</span>
+          <Button size="sm" variant="secondary" onClick={() => setCanalNuevo("para_llevar")}>
+            <ShoppingBag className="h-3.5 w-3.5" strokeWidth={2} />
+            Para llevar
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setCanalNuevo("plataforma")}>
+            <Package className="h-3.5 w-3.5" strokeWidth={2} />
+            Plataforma
+          </Button>
+          <Link
+            href="/pos/delivery"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
+          >
+            <Bike className="h-3.5 w-3.5" strokeWidth={2} />
+            Delivery
+          </Link>
+          <span className="text-xs text-ink-400">Para pedidos de salón, toca una mesa.</span>
+        </div>
+      )}
+
+      {pedidosSinMesa.length > 0 && (
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Pedidos sin mesa</p>
+          <div className="flex flex-wrap gap-2">
+            {pedidosSinMesa.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => router.push(`/pos/orden/${o.id}`)}
+                className="flex items-center gap-2 rounded-xl border-2 border-ocupada-border bg-ocupada-bg px-3 py-2 text-left text-xs font-semibold text-ocupada-text shadow-card hover:brightness-95"
+              >
+                {o.canal === "plataforma" ? <Package className="h-4 w-4" strokeWidth={2} /> : <ShoppingBag className="h-4 w-4" strokeWidth={2} />}
+                <span>
+                  {etiquetaCanal(o.canal)}
+                  {o.numero_dia != null ? ` #${o.numero_dia}` : ""}
+                  <span className="block max-w-40 truncate font-normal opacity-80">{o.referencia_externa || o.cliente_nombre || "Sin nombre"}</span>
+                </span>
+                <span className="font-normal tabular-nums opacity-80">{o.total === 0 ? "sin pedido" : "L. " + o.total.toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {(mesas ?? []).map((mesa) => {
@@ -129,6 +180,17 @@ export function MapaMesas({
           Las mesas en <span className="font-medium text-amber-700">ámbar</span> ya tienen cliente
           sentado y están esperando que tomes su pedido.
         </p>
+      )}
+
+      {canalNuevo && (
+        <ModalNuevoPedido
+          canal={canalNuevo}
+          sucursalId={sucursalId}
+          tenantId={tenantId}
+          usuarioId={usuarioId}
+          onCerrar={() => setCanalNuevo(null)}
+          onCreado={(id) => router.push(`/pos/orden/${id}`)}
+        />
       )}
 
       {mesaParaAbrir && (
@@ -228,6 +290,85 @@ function ModalNuevoCliente({
           </Button>
           <Button size="lg" className="flex-1" disabled={guardando} onClick={() => void confirmar()}>
             {guardando ? "Abriendo..." : "Abrir mesa"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Crea un pedido SIN mesa: el canal (para llevar o plataforma) se elige aquí, al crear el pedido, no al cobrar. */
+function ModalNuevoPedido({
+  canal,
+  sucursalId,
+  tenantId,
+  usuarioId,
+  onCerrar,
+  onCreado,
+}: {
+  canal: "para_llevar" | "plataforma";
+  sucursalId: string;
+  tenantId: string;
+  usuarioId: string;
+  onCerrar: () => void;
+  onCreado: (ordenId: string) => void;
+}) {
+  const [nombre, setNombre] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const esPlataforma = canal === "plataforma";
+
+  async function confirmar() {
+    setGuardando(true);
+    const id = await abrirOrden({
+      mesaId: null,
+      canal,
+      sucursalId,
+      tenantId,
+      usuarioId,
+      clienteNombre: nombre || undefined,
+      referenciaExterna: esPlataforma ? referencia : undefined,
+    });
+    setGuardando(false);
+    onCreado(id);
+  }
+
+  const campo =
+    "mb-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm";
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink-950/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Nuevo pedido ${etiquetaCanal(canal)}`}>
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+              {esPlataforma ? <Package className="h-4 w-4" strokeWidth={2} /> : <ShoppingBag className="h-4 w-4" strokeWidth={2} />}
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-ink-900">Nuevo pedido</h2>
+              <p className="text-xs text-ink-500">{etiquetaCanal(canal)}</p>
+            </div>
+          </div>
+          <button onClick={onCerrar} aria-label="Cerrar" className="rounded-lg p-1 text-ink-400 hover:bg-ink-100">
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        {esPlataforma && (
+          <>
+            <label htmlFor="ref-plataforma" className="mb-1.5 block text-xs font-medium text-ink-500">Plataforma / # de pedido</label>
+            <input id="ref-plataforma" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Ej. PedidosYa #8841" autoFocus className={campo} />
+          </>
+        )}
+        <label htmlFor="nombre-pedido" className="mb-1.5 block text-xs font-medium text-ink-500">Nombre del cliente (opcional)</label>
+        <input id="nombre-pedido" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Carlos" autoFocus={!esPlataforma} className={campo} />
+
+        <div className="mt-2 flex gap-2">
+          <Button variant="secondary" size="lg" className="flex-1" onClick={onCerrar}>
+            Cancelar
+          </Button>
+          <Button size="lg" className="flex-1" disabled={guardando} onClick={() => void confirmar()}>
+            {guardando ? "Creando..." : "Crear pedido"}
           </Button>
         </div>
       </div>

@@ -37,12 +37,17 @@ export interface ProductoLocal {
   plato_dia_fecha?: string | null; // fecha (HN) en que es plato del día
 }
 
+/** Canal del pedido: se elige al CREAR el pedido (salón = local, para llevar, delivery o plataforma). */
+export type CanalOrden = "local" | "para_llevar" | "delivery_web" | "delivery_telefono" | "plataforma";
+
 export interface OrdenLocal {
   id: string;
   sucursal_id: string;
   // null en las ordenes de delivery (no tienen mesa)
   mesa_id: string | null;
-  canal?: "local" | "delivery_web" | "delivery_telefono"; // ausente en cachés viejas = local
+  canal?: CanalOrden; // ausente en cachés viejas = local
+  ticket_sin_factura?: boolean; // cobrada con «ticket sin factura»
+  referencia_externa?: string | null; // empresa de reparto / # de pedido (canal plataforma)
   usuario_id: string | null;
   estado: EstadoOrden;
   total: number;

@@ -8,7 +8,7 @@ import { alertasPorPunto, type NivelAlerta } from "@/lib/fiscal/alertas";
 import { fechaLocalHN, formatearFecha, formatearFechaHora } from "@/lib/fiscal/formato";
 import { calcularRequisitos } from "@/lib/fiscal/requisitos";
 import { cn } from "@/lib/ui";
-import { liberarDispositivo, resolverIncidente } from "./actions";
+import { guardarTicketSinFactura, liberarDispositivo, resolverIncidente } from "./actions";
 
 const NIVEL: Record<NivelAlerta, { texto: string; tono: "success" | "warning" | "danger"; barra: string }> = {
   ok: { texto: "vigente", tono: "success", barra: "bg-libre-text" },
@@ -27,7 +27,7 @@ export default async function FiscalEstadoPage() {
 
   const [{ data: tenant }, { data: sucursales }, { data: emisores }, { data: cajas }, { data: rangos }, { data: incidentes }] =
     await Promise.all([
-      supabase.from("tenants").select("facturacion_fiscal_activa").eq("id", sesion.tenant_id).single(),
+      supabase.from("tenants").select("*").eq("id", sesion.tenant_id).single(),
       supabase.from("sucursales").select("id, nombre").eq("tenant_id", sesion.tenant_id).eq("activo", true).order("nombre"),
       supabase.from("datos_fiscales_emisor").select("sucursal_id, razon_social, rtn, direccion_fiscal").eq("tenant_id", sesion.tenant_id),
       supabase.from("dispositivos_pos").select("id, nombre, sucursal_id, establecimiento, punto_emision, activo, vinculo_hash").eq("tenant_id", sesion.tenant_id),
@@ -63,6 +63,32 @@ export default async function FiscalEstadoPage() {
         <div className="p-5">
           <FormularioActivacion activa={activa} requisitos={requisitos} />
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Ticket sin factura"
+          subtitle="Al cobrar el cajero elige «Facturar» o «Ticket sin factura». Si no lo activas aquí, solo se puede facturar."
+          action={<Badge tone={tenant?.ticket_sin_factura_activo ? "warning" : "neutral"}>{tenant?.ticket_sin_factura_activo ? "activado" : "desactivado"}</Badge>}
+        />
+        <form action={guardarTicketSinFactura} className="space-y-3 p-5">
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-800">
+            <input
+              type="checkbox"
+              name="ticket_sin_factura"
+              defaultChecked={!!tenant?.ticket_sin_factura_activo}
+              className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>
+              Permitir cobrar con <b>ticket sin factura</b>
+              <span className="block text-xs text-ink-500">
+                Lo podrán usar solo los cajeros a los que les des el permiso en <b>Equipo de trabajo</b>. Esas ventas no llevan factura con CAI y
+                se reportan aparte en el cierre.
+              </span>
+            </span>
+          </label>
+          <Button size="sm" variant="dark">Guardar</Button>
+        </form>
       </Card>
 
       <Card>

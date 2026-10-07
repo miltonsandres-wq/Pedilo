@@ -98,7 +98,7 @@ export async function sincronizarFiscal(
   const supabase = createClient();
 
   const [{ data: tenant }, { data: emisores }, { data: sucursal }] = await Promise.all([
-    supabase.from("tenants").select("facturacion_fiscal_activa, logo_url").eq("id", tenantId).single(),
+    supabase.from("tenants").select("*").eq("id", tenantId).single(),
     supabase.from("datos_fiscales_emisor").select("*").eq("tenant_id", tenantId),
     supabase.from("sucursales").select("logo_url").eq("id", sucursalId).single(),
   ]);
@@ -151,6 +151,7 @@ export async function sincronizarFiscal(
 
   const config: ConfigFiscalLocal = {
     activa: tenant.facturacion_fiscal_activa,
+    ticketSinFactura: tenant.ticket_sin_factura_activo === true,
     tenantId,
     emisor,
     logoUrl,

@@ -27,6 +27,8 @@ export interface DispositivoLocal {
 /** Config fiscal cacheada en Dexie (clave "fiscal"): la escribe iniciarSync. */
 export interface ConfigFiscalLocal {
   activa: boolean;
+  /** El dueño permite cobrar con «ticket sin factura» (cada cajero además necesita su permiso). */
+  ticketSinFactura?: boolean;
   tenantId: string;
   emisor: EmisorSnapshot | null;
   /** Logo para imprimir: el de la sucursal y, si no tiene, el del negocio. */

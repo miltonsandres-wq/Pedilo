@@ -1,6 +1,6 @@
 "use client";
 
-import { db } from "@/lib/offline/db";
+import { db, type CanalOrden } from "@/lib/offline/db";
 import { encolar, encolarComanda, encolarSinFlush, flushOutbox } from "@/lib/offline/outbox";
 import {
   emitirDocumentoFiscal,
@@ -27,22 +27,33 @@ import type { FormaPago } from "@/lib/types/helpers";
  * todavía. El mesero la ve aparecer y va a tomar el pedido.
  */
 export async function abrirOrden(params: {
-  mesaId: string;
+  /** null/ausente en pedidos sin mesa (para llevar, plataforma). */
+  mesaId?: string | null;
   sucursalId: string;
   tenantId: string;
   usuarioId: string;
   clienteNombre?: string;
   personas?: number;
+  /** Canal del pedido; por omisión salón ("local"). */
+  canal?: CanalOrden;
+  /** Empresa de reparto / # de pedido (canal plataforma). */
+  referenciaExterna?: string;
 }) {
   const id = crypto.randomUUID();
   const ahora = new Date().toISOString();
   const clienteNombre = params.clienteNombre?.trim() || null;
   const personas = params.personas ?? null;
+  const canal = params.canal ?? "local";
+  const mesaId = params.mesaId ?? null;
+  const referenciaExterna = params.referenciaExterna?.trim() || null;
+  if (canal === "local" && !mesaId) throw new Error("Un pedido de salón necesita una mesa.");
 
   await db.ordenes.add({
     id,
     sucursal_id: params.sucursalId,
-    mesa_id: params.mesaId,
+    mesa_id: mesaId,
+    canal,
+    referencia_externa: referenciaExterna,
     usuario_id: params.usuarioId,
     estado: "abierta",
     total: 0,
@@ -56,19 +67,21 @@ export async function abrirOrden(params: {
     cancelada_at: null,
     motivo_cancelacion: null,
   });
-  await db.mesas.update(params.mesaId, { estado: "ocupada" });
+  if (mesaId) await db.mesas.update(mesaId, { estado: "ocupada" });
 
   await encolar("ordenes", "insert", id, {
     id,
     tenant_id: params.tenantId,
     sucursal_id: params.sucursalId,
-    mesa_id: params.mesaId,
+    mesa_id: mesaId,
+    // El canal solo se manda cuando no es salón: así abrir mesas sigue funcionando aunque falte la migración 0036
+    ...(canal !== "local" ? { canal, referencia_externa: referenciaExterna } : {}),
     usuario_id: params.usuarioId,
     estado: "abierta",
     cliente_nombre: clienteNombre,
     personas,
   });
-  await encolar("mesas", "update", params.mesaId, { estado: "ocupada" });
+  if (mesaId) await encolar("mesas", "update", mesaId, { estado: "ocupada" });
 
   return id;
 }
@@ -187,13 +200,15 @@ export async function enviarACocina(ordenId: string, mesaNombre: string) {
  */
 export async function cobrar(params: {
   ordenId: string;
-  mesaId: string;
+  mesaId: string | null;
   usuarioId: string;
   monto: number;
   formaPago: FormaPago;
   referencia?: string;
   cliente?: DatosCliente;
   exoneracion?: DatosExoneracion;
+  /** «Ticket sin factura»: se cobra sin emitir factura con CAI (queda marcado en la orden). */
+  sinFactura?: boolean;
 }): Promise<{ documentoId: string | null }> {
   const id = crypto.randomUUID();
   const ahora = new Date().toISOString();
@@ -204,9 +219,9 @@ export async function cobrar(params: {
     [db.pagos, db.ordenes, db.mesas, db.orden_items, db.rangos_cai, db.documentos_fiscales, db.config, db.outbox],
     async () => {
       const config = await leerConfigFiscal();
-      // Delivery externo: se cobra SIN factura CAI (solo recibo no fiscal) y sin
+      // Ticket sin factura (o el antiguo «delivery externo»): se cobra SIN factura CAI y sin
       // depender del estado de los rangos; no consume ningún correlativo.
-      const facturar = !!config?.activa && params.formaPago !== "delivery_externo";
+      const facturar = !!config?.activa && !params.sinFactura && params.formaPago !== "delivery_externo";
 
       if (facturar) {
         const bloqueo = await verificarPuedeFacturar();
@@ -229,8 +244,8 @@ export async function cobrar(params: {
       const completa = !!orden && totalPagado >= orden.total;
 
       if (orden && completa) {
-        await db.ordenes.update(params.ordenId, { estado: "pagada", pagada_at: ahora });
-        await db.mesas.update(params.mesaId, { estado: "libre" });
+        await db.ordenes.update(params.ordenId, { estado: "pagada", pagada_at: ahora, ...(params.sinFactura ? { ticket_sin_factura: true } : {}) });
+        if (params.mesaId) await db.mesas.update(params.mesaId, { estado: "libre" });
       }
 
       await encolarSinFlush("pagos", "insert", id, {
@@ -241,6 +256,10 @@ export async function cobrar(params: {
         forma_pago: params.formaPago,
         referencia: params.referencia ?? null,
       });
+
+      if (params.sinFactura && orden && completa) {
+        await encolarSinFlush("ordenes", "update", params.ordenId, { ticket_sin_factura: true });
+      }
 
       if (facturar && orden && completa) {
         const items = await db.orden_items.where("orden_id").equals(params.ordenId).toArray();
@@ -332,7 +351,7 @@ export async function eliminarItem(params: { itemId: string; ordenId: string }) 
  * anular una orden 'abierta' o 'enviada', nunca una ya pagada (esa pantalla
  * ni siquiera la muestra).
  */
-export async function anularOrden(params: { ordenId: string; mesaId: string; motivo?: string }) {
+export async function anularOrden(params: { ordenId: string; mesaId: string | null; motivo?: string }) {
   const ahora = new Date().toISOString();
   const motivo = params.motivo?.trim() || null;
 
@@ -341,14 +360,14 @@ export async function anularOrden(params: { ordenId: string; mesaId: string; mot
     cancelada_at: ahora,
     motivo_cancelacion: motivo,
   });
-  await db.mesas.update(params.mesaId, { estado: "libre" });
+  if (params.mesaId) await db.mesas.update(params.mesaId, { estado: "libre" });
 
   await encolar("ordenes", "update", params.ordenId, {
     estado: "cancelada",
     cancelada_at: ahora,
     motivo_cancelacion: motivo,
   });
-  await encolar("mesas", "update", params.mesaId, { estado: "libre" });
+  if (params.mesaId) await encolar("mesas", "update", params.mesaId, { estado: "libre" });
 }
 
 /**

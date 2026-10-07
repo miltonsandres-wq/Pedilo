@@ -19,6 +19,19 @@ export interface EstadoAccion {
 const texto = (fd: FormData, k: string) => String(fd.get(k) ?? "");
 const RUTA = "/admin/fiscal";
 
+// --- Ticket sin factura (lo activa el dueño) ----------------------------------------
+
+/** Permite (o no) cobrar con «ticket sin factura» en este negocio. Además, cada cajero necesita su permiso. */
+export async function guardarTicketSinFactura(formData: FormData): Promise<void> {
+  const sesion = await requireAdmin();
+  const supabase = await createClient();
+  await supabase
+    .from("tenants")
+    .update({ ticket_sin_factura_activo: formData.get("ticket_sin_factura") === "on" })
+    .eq("id", sesion.tenant_id);
+  revalidatePath(RUTA);
+}
+
 // --- Activación ----------------------------------------------------------------
 
 export async function activarFacturacion(_prev: EstadoAccion | null, formData: FormData): Promise<EstadoAccion> {

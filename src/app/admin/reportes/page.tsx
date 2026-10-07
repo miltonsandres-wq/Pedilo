@@ -1,4 +1,4 @@
-import { Wallet, Flame, Calendar, Receipt, Bike } from "lucide-react";
+import { Wallet, Flame, Calendar, Receipt, Bike, CheckCircle2, TriangleAlert } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { obtenerCierreDiario, rangoDelDia } from "@/lib/reportes/cierreDiario";
@@ -111,6 +111,19 @@ export default async function ReportesPage({
                   )}
                 </ul>
 
+                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">Cierre separado</p>
+                <div className="mb-4 space-y-3" data-testid={`cierre-separado-${s.id}`}>
+                  <BloqueCierre titulo="Facturado (con CAI)" bloque={c.separado.facturado} />
+                  <BloqueCierre titulo="No facturado (tickets sin factura)" bloque={c.separado.noFacturado} />
+                  {c.separado.anulado.cantidad > 0 && <BloqueCierre titulo="Anulado (no suma a lo cobrado)" bloque={c.separado.anulado} tono="anulado" />}
+                  <p className={`flex items-center gap-1.5 text-xs ${c.separado.cuadra ? "text-libre-text" : "font-medium text-red-600"}`}>
+                    {c.separado.cuadra ? <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> : <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} />}
+                    {c.separado.cuadra
+                      ? "Cuadra: facturado + no facturado + anulado = total cobrado, método por método."
+                      : "No cuadra con el total cobrado: revisa los pagos de este día."}
+                  </p>
+                </div>
+
                 {(c.delivery.pedidosEntregados > 0 || c.delivery.liquidaciones > 0) && (
                   <>
                     <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
@@ -149,6 +162,37 @@ export default async function ReportesPage({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function BloqueCierre({
+  titulo,
+  bloque,
+  tono = "normal",
+}: {
+  titulo: string;
+  bloque: { cantidad: number; total: number; porFormaPago: Record<string, number> };
+  tono?: "normal" | "anulado";
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${tono === "anulado" ? "border-red-100 bg-red-50/40" : "border-ink-100 bg-ink-50/50"}`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold text-ink-900">{titulo}</p>
+        <p className={`text-sm font-semibold tabular-nums ${tono === "anulado" ? "text-red-600" : "text-ink-900"}`}>L. {bloque.total.toFixed(2)}</p>
+      </div>
+      <p className="mb-1.5 text-xs text-ink-400">
+        {bloque.cantidad} {bloque.cantidad === 1 ? "orden" : "órdenes"}
+      </p>
+      <ul className="space-y-1 text-xs text-ink-600">
+        {Object.entries(bloque.porFormaPago).map(([forma, monto]) => (
+          <li key={forma} className="flex justify-between capitalize">
+            <span>{forma.replaceAll("_", " ")}</span>
+            <span className="tabular-nums">L. {monto.toFixed(2)}</span>
+          </li>
+        ))}
+        {Object.keys(bloque.porFormaPago).length === 0 && <li className="text-ink-400">Sin cobros.</li>}
+      </ul>
     </div>
   );
 }
