@@ -24,6 +24,12 @@ export interface MesaLocal {
   activa: boolean;
 }
 
+export interface CategoriaLocal {
+  id: string;
+  nombre: string;
+  orden: number;
+}
+
 export interface ProductoLocal {
   id: string;
   sucursal_id: string; // una fila por cada sucursal donde aplica (desnormalizado del join)
@@ -143,6 +149,7 @@ export const CLAVE_DELIVERY_CONFIG = "delivery_config";
 export const db = new Dexie("pos_offline") as Dexie & {
   mesas: EntityTable<MesaLocal, "id">;
   productos: EntityTable<ProductoLocal, "id">;
+  categorias: EntityTable<CategoriaLocal, "id">;
   ordenes: EntityTable<OrdenLocal, "id">;
   orden_items: EntityTable<OrdenItemLocal, "id">;
   pagos: EntityTable<PagoLocal, "id">;
@@ -180,4 +187,10 @@ db.version(3).stores({
   delivery_pedidos: "orden_id, sucursal_id, estado_delivery, repartidor_id",
   repartidores: "id, sucursal_id",
   delivery_zonas: "id, sucursal_id",
+});
+
+// v4: categorías del menú, para que el POS muestre primero las categorías
+// (bebidas, platos fuertes, postres…) y luego sus productos.
+db.version(4).stores({
+  categorias: "id",
 });

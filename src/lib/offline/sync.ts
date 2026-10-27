@@ -152,7 +152,7 @@ async function traerOrdenes(ids: string[]) {
 async function pullInicial(sucursalId: string, tenantId: string) {
   const supabase = createClient();
 
-  const [{ data: sucursal }, { data: mesas }, { data: prodSuc }, { data: ordenes }, { data: formasPago }] =
+  const [{ data: sucursal }, { data: mesas }, { data: prodSuc }, { data: ordenes }, { data: formasPago }, { data: categorias }] =
     await Promise.all([
       supabase.from("sucursales").select("*").eq("id", sucursalId).single(),
       supabase.from("mesas").select("*").eq("sucursal_id", sucursalId),
@@ -170,6 +170,7 @@ async function pullInicial(sucursalId: string, tenantId: string) {
         .select("forma_pago")
         .eq("sucursal_id", sucursalId)
         .eq("activo", true),
+      supabase.from("categorias").select("id, nombre, orden").eq("tenant_id", tenantId),
     ]);
 
   if (sucursal) {
@@ -191,6 +192,11 @@ async function pullInicial(sucursalId: string, tenantId: string) {
 
   if (mesas) {
     await db.mesas.bulkPut(mesas.map((m) => ({ ...m, estado: m.estado as EstadoMesa })));
+  }
+
+  if (categorias) {
+    await db.categorias.clear();
+    await db.categorias.bulkPut(categorias.map((c) => ({ id: c.id, nombre: c.nombre, orden: c.orden })));
   }
 
   if (prodSuc) {

@@ -105,6 +105,7 @@ export function DetalleMesa({
     [sucursalId],
     []
   );
+  const categorias = useLiveQuery(() => db.categorias.toArray(), [], []);
   const formasPago = useLiveQuery(
     () => db.config.get("formas_pago").then((c) => (c?.valor as FormaPago[] | undefined) ?? []),
     [],
@@ -197,7 +198,7 @@ export function DetalleMesa({
         </div>
       </div>
 
-      {puedeTomarPedido && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} />}
+      {puedeTomarPedido && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} categorias={categorias ?? []} />}
 
       {(items ?? []).length > 0 && (
         <div className="mb-2 text-center">
@@ -517,23 +518,39 @@ function FilaItem({
 function FormularioAgregarItem({
   ordenId,
   productos,
+  categorias,
 }: {
   ordenId: string;
-  productos: { id: string; nombre: string; precio: number; plato_dia_fecha?: string | null }[];
+  productos: { id: string; nombre: string; precio: number; categoria_id?: string | null; plato_dia_fecha?: string | null }[];
+  categorias: { id: string; nombre: string; orden: number }[];
 }) {
   const [productoId, setProductoId] = useState("");
+  const [categoriaSel, setCategoriaSel] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState(1);
   const [nota, setNota] = useState("");
 
   const productoElegido = productos.find((p) => p.id === productoId);
-  // Los platos del día de HOY van primero para que el mesero/cajero los encuentre al instante
+  // Los platos del día de HOY tienen su propio botón para encontrarlos al instante
   const platosDelDia = productos.filter((p) => esPlatoDelDia(p.plato_dia_fecha));
-  const resto = productos.filter((p) => !esPlatoDelDia(p.plato_dia_fecha));
-  const opcion = (p: (typeof productos)[number]) => (
-    <option key={p.id} value={p.id}>
-      {p.nombre} — L. {p.precio.toFixed(2)}
-    </option>
-  );
+  const SIN_CATEGORIA = "__sin_categoria__";
+  const DIA = "__plato_dia__";
+  // Solo categorías con productos disponibles; los sueltos van a «Otros»
+  const grupos = [
+    ...(platosDelDia.length > 0 ? [{ id: DIA, nombre: "⭐ Platos del día" }] : []),
+    ...[...categorias]
+      .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+      .filter((c) => productos.some((p) => p.categoria_id === c.id))
+      .map((c) => ({ id: c.id, nombre: c.nombre })),
+    ...(productos.some((p) => !p.categoria_id || !categorias.some((c) => c.id === p.categoria_id))
+      ? [{ id: SIN_CATEGORIA, nombre: "Otros" }]
+      : []),
+  ];
+  const productosDeCategoria =
+    categoriaSel === DIA
+      ? platosDelDia
+      : categoriaSel === SIN_CATEGORIA
+        ? productos.filter((p) => !p.categoria_id || !categorias.some((c) => c.id === p.categoria_id))
+        : productos.filter((p) => p.categoria_id === categoriaSel);
 
   async function agregar() {
     const producto = productos.find((p) => p.id === productoId);
@@ -547,6 +564,7 @@ function FormularioAgregarItem({
       nota: nota || undefined,
     });
     setProductoId("");
+    setCategoriaSel(null);
     setCantidad(1);
     setNota("");
   }
@@ -554,25 +572,49 @@ function FormularioAgregarItem({
   return (
     <div className="rounded-2xl border border-ink-100 bg-white p-3 shadow-card">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Agregar ítem</p>
+      {/* Primero las categorías (bebidas, platos fuertes, postres…); al tocar una salen sus productos */}
+      <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Categorías">
+        {grupos.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={categoriaSel === g.id}
+            onClick={() => {
+              setCategoriaSel(categoriaSel === g.id ? null : g.id);
+              setProductoId("");
+            }}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+              categoriaSel === g.id
+                ? "border-brand-500 bg-brand-500 text-white"
+                : "border-ink-200 bg-white text-ink-700 hover:border-brand-500"
+            }`}
+          >
+            {g.nombre}
+          </button>
+        ))}
+      </div>
+      {categoriaSel && (
+        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {productosDeCategoria.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={productoId === p.id}
+              onClick={() => setProductoId(p.id)}
+              className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                productoId === p.id
+                  ? "border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/20"
+                  : "border-ink-200 bg-white hover:border-brand-500"
+              }`}
+            >
+              <span className="block font-medium text-ink-800">{p.nombre}</span>
+              <span className="block text-xs text-ink-500">L. {p.precio.toFixed(2)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        <select
-          value={productoId}
-          onChange={(e) => setProductoId(e.target.value)}
-          className="min-w-40 flex-1 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        >
-          <option value="">Selecciona un producto</option>
-          {platosDelDia.length > 0 && (
-            <optgroup label="⭐ Platos del día">
-              {platosDelDia.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre} — L. {p.precio.toFixed(2)}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {platosDelDia.length > 0 && <optgroup label="Menú">{resto.map(opcion)}</optgroup>}
-          {platosDelDia.length === 0 && resto.map(opcion)}
-        </select>
         <input
           type="number"
           min={1}

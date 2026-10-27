@@ -2,6 +2,7 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/lib/supabase/client", async () => ({ createClient: (await import("./supabaseSinRed")).clienteSinRed }));
@@ -56,11 +57,12 @@ describe("POS: agregar ítem", () => {
     ]);
     render(<DetalleMesa mesaId={mesaId} sucursalId="S1" usuarioId="U1" rol="cajero" />);
 
-    const grupoDia = await screen.findByRole("group", { name: /Platos del día/ });
-    expect(grupoDia.textContent).toContain("Sopa de res");
-    expect(grupoDia.textContent).not.toContain("Plato de ayer");
-    const grupoMenu = screen.getByRole("group", { name: "Menú" });
-    expect(grupoMenu.textContent).toContain("Coca-Cola");
-    expect(grupoMenu.textContent).toContain("Plato de ayer"); // ayer ya es un producto normal
+    await userEvent.click(await screen.findByRole("tab", { name: /Platos del día/ }));
+    expect(await screen.findByRole("button", { name: /Sopa de res/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Plato de ayer/ })).toBeNull();
+    // ayer ya es un producto normal: sale en «Otros» (sin categoría)
+    await userEvent.click(screen.getByRole("tab", { name: "Otros" }));
+    expect(screen.getByRole("button", { name: /Coca-Cola/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Plato de ayer/ })).toBeTruthy();
   });
 });

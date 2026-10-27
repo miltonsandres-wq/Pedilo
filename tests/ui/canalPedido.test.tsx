@@ -101,7 +101,9 @@ describe("pedido sin mesa: tomar la orden y cobrar", () => {
     render(<DetalleMesa ordenId="O1" sucursalId="S1" usuarioId="U1" rol="cajero" />);
     expect(await screen.findByText("Para llevar")).toBeTruthy();
     expect(screen.getByText("Agregar ítem")).toBeTruthy();
-    expect(await screen.findByRole("option", { name: /Baleada/ })).toBeTruthy();
+    // el producto no tiene categoría: sale bajo «Otros»
+    await userEvent.click(await screen.findByRole("tab", { name: "Otros" }));
+    expect(await screen.findByRole("button", { name: /Baleada/ })).toBeTruthy();
   });
 
   it("al cobrarlo no toca ninguna mesa y queda pagado", async () => {
