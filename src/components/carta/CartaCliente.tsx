@@ -5,6 +5,7 @@ import { CheckCircle2, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { enviarPedidoCliente, type ItemCarrito } from "@/app/carta/[token]/actions";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
+import { formatearLempiras } from "@/lib/delivery/validaciones";
 
 export interface ProductoMenu {
   id: string;
@@ -17,9 +18,8 @@ export interface ProductoMenu {
   plato_dia?: boolean;
 }
 
-// El menú del QR no muestra precios a propósito — lo que se cobra al final
-// lo confirma el cajero (puede ajustar el monto en el cobro), así que
-// mostrarle al cliente un precio "fijo" acá podía ser engañoso.
+// El menú del QR muestra el precio de cada platillo (con ISV incluido) y el total
+// estimado del pedido; lo que se cobra al final lo confirma el cajero.
 export function CartaCliente({
   token,
   categorias,
@@ -35,6 +35,10 @@ export function CartaCliente({
   const [error, setError] = useState<string | null>(null);
 
   const totalItems = Object.values(carrito).reduce((acc, i) => acc + i.cantidad, 0);
+  const totalPedido = Object.entries(carrito).reduce(
+    (acc, [id, i]) => acc + i.cantidad * (productos.find((p) => p.id === id)?.precio ?? 0),
+    0
+  );
 
   function cambiarCantidad(productoId: string, delta: number) {
     setCarrito((prev) => {
@@ -85,8 +89,10 @@ export function CartaCliente({
       {sinCategoria.length > 0 && (
         <Seccion titulo="Más" items={sinCategoria} carrito={carrito} onCambiar={cambiarCantidad} />
       )}
-      {productos.length === 0 && (
+      {productos.length === 0 ? (
         <p className="text-center text-sm text-ink-400">El menú todavía no tiene platillos disponibles.</p>
+      ) : (
+        <p className="mb-16 text-center text-xs text-ink-400">Los precios incluyen ISV.</p>
       )}
 
       {totalItems > 0 && !mostrarCarrito && (
@@ -95,7 +101,7 @@ export function CartaCliente({
           className="fixed inset-x-4 bottom-4 z-10 mx-auto flex max-w-md items-center justify-center gap-2 rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-medium text-white shadow-popover"
         >
           <ShoppingCart className="h-4 w-4" strokeWidth={2} />
-          Ver mi pedido · {totalItems} {totalItems === 1 ? "ítem" : "ítems"}
+          Ver mi pedido · {totalItems} {totalItems === 1 ? "ítem" : "ítems"} · {formatearLempiras(totalPedido)}
         </button>
       )}
 
@@ -129,7 +135,10 @@ export function CartaCliente({
                     if (!p) return null;
                     return (
                       <div key={id} className="flex items-center justify-between py-2.5 text-sm">
-                        <p className="font-medium text-ink-800">{p.nombre}</p>
+                        <div className="min-w-0 pr-2">
+                          <p className="font-medium text-ink-800">{p.nombre}</p>
+                          <p className="text-xs tabular-nums text-ink-500">{formatearLempiras(p.precio * i.cantidad)}</p>
+                        </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => cambiarCantidad(id, -1)}
@@ -149,6 +158,11 @@ export function CartaCliente({
                     );
                   })}
                 </div>
+                <div className="mb-3 flex items-center justify-between border-t border-ink-100 pt-3 text-sm font-semibold text-ink-900">
+                  <span>Total estimado</span>
+                  <span className="tabular-nums">{formatearLempiras(totalPedido)}</span>
+                </div>
+                <p className="mb-3 text-xs text-ink-400">Precios con ISV incluido. El total final lo confirma el cajero.</p>
                 {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
                 <Button
                   size="lg"
@@ -195,6 +209,7 @@ function Seccion({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-ink-900">{p.nombre}</p>
                 {p.descripcion && <p className="mt-0.5 whitespace-pre-line text-xs leading-snug text-ink-500">{p.descripcion}</p>}
+                <p className="mt-1 text-sm font-semibold tabular-nums text-brand-700">{formatearLempiras(p.precio)}</p>
               </div>
               {cantidad === 0 ? (
                 <Button size="sm" onClick={() => onCambiar(p.id, 1)}>

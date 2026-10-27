@@ -40,6 +40,24 @@ describe("carta del QR", () => {
     expect(titulos).toContain("Antojitos");
   });
 
+  it("muestra el precio de cada platillo y avisa que incluye ISV", () => {
+    render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={productos} />);
+    expect(screen.getAllByText("L 45.00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("L 120.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("Los precios incluyen ISV.")).toBeTruthy();
+  });
+
+  it("el pedido muestra el precio de cada línea y el total estimado", async () => {
+    const user = userEvent.setup();
+    render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={[productos[0]]} />);
+    const agregar = screen.getByRole("button", { name: /Agregar/ });
+    await user.click(agregar);
+    await user.click(screen.getByText("1").nextElementSibling as HTMLElement); // «+»
+    await user.click(screen.getByRole("button", { name: /Ver mi pedido/ }));
+    expect(screen.getByText("Total estimado")).toBeTruthy();
+    expect(screen.getAllByText("L 90.00").length).toBeGreaterThan(0); // 2 × 45
+  });
+
   it("sin platos del día no aparece la sección", () => {
     render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={[productos[0]]} />);
     expect(screen.queryByText(/Platos del día/)).toBeNull();
