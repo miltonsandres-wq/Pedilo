@@ -19,15 +19,16 @@ import {
   ShieldAlert,
   ChevronDown,
   Printer,
+  UtensilsCrossed,
   Users,
   X,
 } from "lucide-react";
-import { db, type OrdenItemLocal } from "@/lib/offline/db";
+import { db, type CategoriaLocal, type OrdenItemLocal, type ProductoLocal } from "@/lib/offline/db";
+import { MenuGrafico } from "./MenuGrafico";
 import {
   actualizarCantidadItem,
   actualizarNotaItem,
   actualizarPrecioItem,
-  agregarItem,
   anularOrden,
   cobrar,
   eliminarItem,
@@ -43,7 +44,6 @@ import { SelectField } from "@/components/ui/Field";
 import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
 import { esRtnValido, normalizarRtn } from "@/lib/fiscal/formato";
 import { imprimirPrecuenta } from "@/lib/fiscal/impresion";
-import { esPlatoDelDia } from "@/lib/menu/platosDelDia";
 import { etiquetaCanal } from "@/lib/pos/canales";
 import { cn } from "@/lib/ui";
 
@@ -198,7 +198,7 @@ export function DetalleMesa({
         </div>
       </div>
 
-      {puedeTomarPedido && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} categorias={categorias ?? []} />}
+      {puedeTomarPedido && <FormularioAgregarItem ordenId={orden.id} productos={productos ?? []} categorias={categorias ?? []} items={items ?? []} />}
 
       {(items ?? []).length > 0 && (
         <div className="mb-2 text-center">
@@ -519,131 +519,35 @@ function FormularioAgregarItem({
   ordenId,
   productos,
   categorias,
+  items,
 }: {
   ordenId: string;
-  productos: { id: string; nombre: string; precio: number; categoria_id?: string | null; plato_dia_fecha?: string | null }[];
-  categorias: { id: string; nombre: string; orden: number }[];
+  productos: ProductoLocal[];
+  categorias: CategoriaLocal[];
+  items: OrdenItemLocal[];
 }) {
-  const [productoId, setProductoId] = useState("");
-  const [categoriaSel, setCategoriaSel] = useState<string | null>(null);
-  const [cantidad, setCantidad] = useState(1);
-  const [nota, setNota] = useState("");
-
-  const productoElegido = productos.find((p) => p.id === productoId);
-  // Los platos del día de HOY tienen su propio botón para encontrarlos al instante
-  const platosDelDia = productos.filter((p) => esPlatoDelDia(p.plato_dia_fecha));
-  const SIN_CATEGORIA = "__sin_categoria__";
-  const DIA = "__plato_dia__";
-  // Solo categorías con productos disponibles; los sueltos van a «Otros»
-  const grupos = [
-    ...(platosDelDia.length > 0 ? [{ id: DIA, nombre: "⭐ Platos del día" }] : []),
-    ...[...categorias]
-      .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
-      .filter((c) => productos.some((p) => p.categoria_id === c.id))
-      .map((c) => ({ id: c.id, nombre: c.nombre })),
-    ...(productos.some((p) => !p.categoria_id || !categorias.some((c) => c.id === p.categoria_id))
-      ? [{ id: SIN_CATEGORIA, nombre: "Otros" }]
-      : []),
-  ];
-  const productosDeCategoria =
-    categoriaSel === DIA
-      ? platosDelDia
-      : categoriaSel === SIN_CATEGORIA
-        ? productos.filter((p) => !p.categoria_id || !categorias.some((c) => c.id === p.categoria_id))
-        : productos.filter((p) => p.categoria_id === categoriaSel);
-
-  async function agregar() {
-    const producto = productos.find((p) => p.id === productoId);
-    if (!producto) return;
-    await agregarItem({
-      ordenId,
-      productoId: producto.id,
-      nombreProducto: producto.nombre,
-      precioUnitario: producto.precio,
-      cantidad,
-      nota: nota || undefined,
-    });
-    setProductoId("");
-    setCategoriaSel(null);
-    setCantidad(1);
-    setNota("");
-  }
+  const [abierto, setAbierto] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-ink-100 bg-white p-3 shadow-card">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Agregar ítem</p>
-      {/* Primero las categorías (bebidas, platos fuertes, postres…); al tocar una salen sus productos */}
-      <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Categorías">
-        {grupos.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            role="tab"
-            aria-selected={categoriaSel === g.id}
-            onClick={() => {
-              setCategoriaSel(categoriaSel === g.id ? null : g.id);
-              setProductoId("");
-            }}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-              categoriaSel === g.id
-                ? "border-brand-500 bg-brand-500 text-white"
-                : "border-ink-200 bg-white text-ink-700 hover:border-brand-500"
-            }`}
-          >
-            {g.nombre}
-          </button>
-        ))}
-      </div>
-      {categoriaSel && (
-        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {productosDeCategoria.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              aria-pressed={productoId === p.id}
-              onClick={() => setProductoId(p.id)}
-              className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
-                productoId === p.id
-                  ? "border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/20"
-                  : "border-ink-200 bg-white hover:border-brand-500"
-              }`}
-            >
-              <span className="block font-medium text-ink-800">{p.nombre}</span>
-              <span className="block text-xs text-ink-500">L. {p.precio.toFixed(2)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <input
-          type="number"
-          min={1}
-          value={cantidad}
-          onChange={(e) => setCantidad(Number(e.target.value))}
-          className="w-16 rounded-lg border border-ink-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-4 text-base font-semibold text-white shadow-card active:scale-[0.98]"
+      >
+        <UtensilsCrossed className="h-5 w-5" strokeWidth={2} />
+        Agregar ítem
+      </button>
+      {abierto && (
+        <MenuGrafico
+          ordenId={ordenId}
+          productos={productos}
+          categorias={categorias}
+          items={items}
+          onCerrar={() => setAbierto(false)}
         />
-        <input
-          placeholder="Nota (opcional)"
-          value={nota}
-          onChange={(e) => setNota(e.target.value)}
-          className="flex-1 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-        />
-        <Button disabled={!productoId} onClick={() => void agregar()}>
-          <Plus className="h-4 w-4" strokeWidth={2} />
-          Agregar
-        </Button>
-      </div>
-      {/* Subtotal en vivo: deja clarísimo que la cantidad sí multiplica el
-          precio antes de que el mesero confirme el ítem. */}
-      {productoElegido && (
-        <p className="mt-2 text-right text-xs text-ink-500">
-          {cantidad} × L. {productoElegido.precio.toFixed(2)} ={" "}
-          <span className="font-semibold text-ink-800">
-            L. {(cantidad * productoElegido.precio).toFixed(2)}
-          </span>
-        </p>
       )}
-    </div>
+    </>
   );
 }
 

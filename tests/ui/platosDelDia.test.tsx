@@ -57,12 +57,14 @@ describe("POS: agregar ítem", () => {
     ]);
     render(<DetalleMesa mesaId={mesaId} sucursalId="S1" usuarioId="U1" rol="cajero" />);
 
-    await userEvent.click(await screen.findByRole("tab", { name: /Platos del día/ }));
-    expect(await screen.findByRole("button", { name: /Sopa de res/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Plato de ayer/ })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /^Agregar ítem$/ }));
+    // los platos del día de hoy son la primera categoría y ya salen abiertos
+    expect(screen.getAllByRole("tab")[0].textContent).toMatch(/Platos del día/);
+    expect(await screen.findByRole("button", { name: /Agregar Sopa de res/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Agregar Plato de ayer/ })).toBeNull();
     // ayer ya es un producto normal: sale en «Otros» (sin categoría)
     await userEvent.click(screen.getByRole("tab", { name: "Otros" }));
-    expect(screen.getByRole("button", { name: /Coca-Cola/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Plato de ayer/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Agregar Coca-Cola/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Agregar Plato de ayer/ })).toBeTruthy();
   });
 });

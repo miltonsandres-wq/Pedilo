@@ -29,8 +29,9 @@ describe("el cajero también toma la orden", () => {
     await montar("cajero");
     expect(screen.getByText("Agregar ítem")).toBeTruthy();
     // primero salen las categorías; el producto aparece al tocar su categoría
-    await userEvent.click(await screen.findByRole("tab", { name: "Bebidas" }));
-    expect(await screen.findByRole("button", { name: /Coca-Cola/ })).toBeTruthy();
+    await userEvent.click(await screen.findByRole("button", { name: /^Agregar ítem$/ }));
+    expect(await screen.findByRole("tab", { name: "Bebidas" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Agregar Coca-Cola/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Enviar a cocina/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Cobrar/ })).toBeTruthy();
     expect(screen.queryByText(/Aquí solo cobras/)).toBeNull();
