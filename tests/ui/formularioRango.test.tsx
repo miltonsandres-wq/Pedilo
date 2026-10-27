@@ -27,10 +27,11 @@ beforeEach(() => crearRango.mockReset());
 
 const boton = () => screen.getByRole("button", { name: /Cargar rango|Guardando/ }) as HTMLButtonElement;
 
-async function llenarValido(user: ReturnType<typeof userEvent.setup>) {
+// prefijo = establecimiento + punto de emisión (6 dígitos) de la caja; los números del SAR llevan 16 dígitos
+async function llenarValido(user: ReturnType<typeof userEvent.setup>, prefijo = "000001") {
   await user.type(screen.getByLabelText("CAI"), CAI);
-  await user.type(screen.getByLabelText("Desde (número)"), "1");
-  await user.type(screen.getByLabelText("Hasta (número)"), "500");
+  await user.type(screen.getByLabelText("Desde (número completo)"), `${prefijo}0100000001`);
+  await user.type(screen.getByLabelText("Hasta (número completo)"), `${prefijo}0100000500`);
   await user.type(screen.getByLabelText("Fecha límite de emisión"), "2099-12-31");
 }
 
@@ -66,13 +67,14 @@ describe("FormularioRango con UNA sucursal", () => {
     expect(screen.queryByText(/Formato inválido/)).toBeNull();
   });
 
-  it("solo deja escribir dígitos en desde/hasta y avisa si desde > hasta", async () => {
+  it("pide el número completo del SAR con guiones automáticos (EEE-PPP-TT-CCCCCCCC) y avisa si desde > hasta", async () => {
     const user = userEvent.setup();
     render(<FormularioRango sucursales={una} hoyHN="2030-06-15" />);
-    const desde = screen.getByLabelText("Desde (número)") as HTMLInputElement;
-    await user.type(desde, "1a0b");
-    expect(desde.value).toBe("10");
-    await user.type(screen.getByLabelText("Hasta (número)"), "5");
+    const desde = screen.getByLabelText("Desde (número completo)") as HTMLInputElement;
+    expect(desde.placeholder).toBe("000-001-01-00000001");
+    await user.type(desde, "0a0b00010100000010");
+    expect(desde.value).toBe("000-001-01-00000010");
+    await user.type(screen.getByLabelText("Hasta (número completo)"), "0000010100000005");
     await user.tab();
     expect(screen.getByText(/«Desde» no puede ser mayor que «Hasta»/)).toBeTruthy();
   });
@@ -118,7 +120,7 @@ describe("FormularioRango con UNA sucursal", () => {
     expect(await screen.findByText("Rango cargado.")).toBeTruthy();
     const fd = crearRango.mock.calls[0][1] as FormData;
     expect(Object.fromEntries(fd.entries())).toMatchObject({
-      sucursal_id: "S1", clase: "factura", tipo_doc: "01", cai: CAI, desde: "1", hasta: "500", fecha_limite: "2099-12-31",
+      sucursal_id: "S1", clase: "factura", tipo_doc: "01", cai: CAI, desde: "000-001-01-00000001", hasta: "000-001-01-00000500", fecha_limite: "2099-12-31",
     });
     await waitFor(() => expect((screen.getByLabelText("CAI") as HTMLInputElement).value).toBe(""));
     expect((document.querySelector('input[name="sucursal_id"]') as HTMLInputElement).value).toBe("S1"); // sigue yendo a la única
@@ -141,9 +143,9 @@ describe("FormularioRango con UNA sucursal", () => {
     expect(screen.getByText(/Se traslapa con el rango 400–900/)).toBeTruthy();
     expect(boton().disabled).toBe(true);
 
-    const hasta = screen.getByLabelText("Hasta (número)");
+    const hasta = screen.getByLabelText("Hasta (número completo)");
     await user.clear(hasta);
-    await user.type(hasta, "399");
+    await user.type(hasta, "0000010100000399");
     expect(screen.queryByText(/Se traslapa/)).toBeNull();
     expect(boton().disabled).toBe(false);
   });
@@ -162,7 +164,7 @@ describe("FormularioRango con VARIAS sucursales", () => {
     const user = userEvent.setup();
     render(<FormularioRango sucursales={dos} hoyHN="2030-06-15" />);
     expect(screen.getByLabelText("Sucursal")).toBeTruthy();
-    await llenarValido(user);
+    await llenarValido(user, "001001");
     expect(boton().disabled).toBe(true); // falta elegir sucursal
 
     await user.selectOptions(screen.getByLabelText("Sucursal"), "S2");
@@ -173,11 +175,18 @@ describe("FormularioRango con VARIAS sucursales", () => {
   it("el traslape se evalúa por sucursal: el mismo rango en otra sucursal está bien", async () => {
     const user = userEvent.setup();
     render(<FormularioRango sucursales={dos} hoyHN="2030-06-15" existentes={[{ sucursalId: "S1", tipoDoc: "01", desde: 1, hasta: 500 }]} />);
-    await llenarValido(user);
-    await user.selectOptions(screen.getByLabelText("Sucursal"), "S1");
-    expect(screen.getByText(/Se traslapa con el rango 1–500/)).toBeTruthy();
+    await llenarValido(user, "001001"); // números de la caja de la sucursal Norte (S2)
     await user.selectOptions(screen.getByLabelText("Sucursal"), "S2");
     expect(screen.queryByText(/Se traslapa/)).toBeNull();
     expect(boton().disabled).toBe(false);
+  });
+
+  it("bloquea el rango si los primeros grupos no son los de la caja de la sucursal elegida", async () => {
+    const user = userEvent.setup();
+    render(<FormularioRango sucursales={dos} hoyHN="2030-06-15" />);
+    await llenarValido(user, "001001"); // pertenece a la caja 001-001 (Norte)
+    await user.selectOptions(screen.getByLabelText("Sucursal"), "S1"); // Centro factura con 000-001
+    expect(screen.getByText(/Ese rango es de la caja 001-001, pero Centro factura con 000-001/)).toBeTruthy();
+    expect(boton().disabled).toBe(true);
   });
 });

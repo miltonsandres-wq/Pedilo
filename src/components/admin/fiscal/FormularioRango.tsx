@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { crearRango, type EstadoAccion } from "@/app/admin/fiscal/actions";
 import { Button } from "@/components/ui/Button";
 import { inputClass, labelClass, cn } from "@/lib/ui";
-import { formatearNumeroDocumento, normalizarCai, rangosTraslapan } from "@/lib/fiscal/formato";
+import { formatearNumeroDocumento, mascaraNumeroDocumento, normalizarCai, rangosTraslapan } from "@/lib/fiscal/formato";
 import { validarEntradaRango, type CampoRango } from "@/lib/fiscal/validaciones";
 import { ErrorCampo, ResultadoAccion } from "./ResultadoAccion";
 
@@ -59,6 +59,15 @@ export function FormularioRango({
   const validacion = validarEntradaRango(v, hoyHN);
   const sucursal = sucursales.find((s) => s.id === v.sucursalId);
 
+  // El número del SAR trae el establecimiento y el punto de emisión: deben ser los de la caja de la sucursal
+  let otraCaja: string | undefined;
+  const prefijo = validacion.valor?.prefijo;
+  if (sucursal && prefijo && (prefijo.establecimiento !== sucursal.establecimiento || prefijo.puntoEmision !== sucursal.puntoEmision)) {
+    otraCaja = `Ese rango es de la caja ${prefijo.establecimiento}-${prefijo.puntoEmision}, pero ${sucursal.nombre} factura con ${sucursal.establecimiento}-${sucursal.puntoEmision}.`;
+  }
+  const ejemplo = (n: number) =>
+    `${sucursal?.establecimiento ?? "000"}-${sucursal?.puntoEmision ?? "001"}-${v.tipoDoc.length === 2 ? v.tipoDoc : "01"}-${String(n).padStart(8, "0")}`;
+
   // Traslape con un rango ya cargado para la misma sucursal y el mismo tipo de documento
   let traslape: string | undefined;
   if (sucursal && validacion.ok && validacion.valor) {
@@ -69,7 +78,7 @@ export function FormularioRango({
   }
 
   const errorDe = (c: CampoRango) =>
-    (tocados[c] ? validacion.errores[c] : undefined) ?? (c === "hasta" ? traslape : undefined) ?? estado?.errores?.[c];
+    (tocados[c] ? validacion.errores[c] : undefined) ?? (c === "desde" ? otraCaja : undefined) ?? (c === "hasta" ? traslape : undefined) ?? estado?.errores?.[c];
   const tocar = (c: CampoRango) => setTocados((t) => ({ ...t, [c]: true }));
   const cambiar = <K extends keyof typeof inicial>(campo: K, valor: string) => setV((x) => ({ ...x, [campo]: valor }));
 
@@ -170,34 +179,43 @@ export function FormularioRango({
       </div>
 
       <div>
-        <label className={labelClass} htmlFor="rango-desde">Desde (número)</label>
+        <label className={labelClass} htmlFor="rango-desde">Desde (número completo)</label>
         <input
           id="rango-desde"
           name="desde"
           value={v.desde}
-          onChange={(e) => cambiar("desde", e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => cambiar("desde", mascaraNumeroDocumento(e.target.value))}
           onBlur={() => tocar("desde")}
           inputMode="numeric"
-          placeholder="1"
-          className={inputClass}
+          maxLength={19}
+          autoComplete="off"
+          placeholder={ejemplo(1)}
+          className={cn(inputClass, "font-mono")}
         />
         <ErrorCampo texto={errorDe("desde")} />
       </div>
 
       <div>
-        <label className={labelClass} htmlFor="rango-hasta">Hasta (número)</label>
+        <label className={labelClass} htmlFor="rango-hasta">Hasta (número completo)</label>
         <input
           id="rango-hasta"
           name="hasta"
           value={v.hasta}
-          onChange={(e) => cambiar("hasta", e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => cambiar("hasta", mascaraNumeroDocumento(e.target.value))}
           onBlur={() => tocar("hasta")}
           inputMode="numeric"
-          placeholder="500"
-          className={inputClass}
+          maxLength={19}
+          autoComplete="off"
+          placeholder={ejemplo(500)}
+          className={cn(inputClass, "font-mono")}
         />
         <ErrorCampo texto={errorDe("hasta")} />
       </div>
+
+      <p className="col-span-full -mt-1 text-xs text-ink-500">
+        Escribe los números tal cual los autorizó el SAR: establecimiento-punto de emisión-documento-correlativo
+        (3-3-2-8 dígitos), por ejemplo {ejemplo(1)} hasta {ejemplo(500)}.
+      </p>
 
       <div>
         <label className={labelClass} htmlFor="rango-fecha">Fecha límite de emisión</label>
@@ -221,7 +239,7 @@ export function FormularioRango({
 
       <div className="col-span-full space-y-2">
         <ResultadoAccion estado={estado} />
-        <Button type="submit" disabled={pendiente || !validacion.ok || !!traslape}>
+        <Button type="submit" disabled={pendiente || !validacion.ok || !!traslape || !!otraCaja}>
           <Plus className="h-4 w-4" strokeWidth={2} />
           {pendiente ? "Guardando…" : "Cargar rango"}
         </Button>

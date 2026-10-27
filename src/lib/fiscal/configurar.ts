@@ -67,6 +67,14 @@ export async function cargarRangoCai(supabase: Cliente, tenantId: string, v: Ran
   const caja = sucursal ? await obtenerOCrearCaja(supabase, tenantId, sucursal.id) : null;
   if (!caja) return { ok: false, error: "La sucursal elegida no existe.", errores: { sucursalId: "Elige una sucursal válida." } };
 
+  if (v.prefijo && (v.prefijo.establecimiento !== caja.establecimiento || v.prefijo.puntoEmision !== caja.punto_emision)) {
+    return {
+      ok: false,
+      error: `El rango del SAR es de la caja ${v.prefijo.establecimiento}-${v.prefijo.puntoEmision}, pero esta sucursal factura con ${caja.establecimiento}-${caja.punto_emision}.`,
+      errores: { desde: "Los dos primeros grupos no coinciden con la caja de esta sucursal." },
+    };
+  }
+
   const { error } = await supabase.from("cai_rangos").insert({
     tenant_id: tenantId,
     sucursal_id: caja.sucursal_id,

@@ -121,8 +121,8 @@ describe("AsistenteInicial (configuración al registrar el negocio)", () => {
     expect(screen.getByText(/Carga el CAI de al menos una sucursal/)).toBeTruthy();
 
     await user.type(screen.getByLabelText("CAI"), "a1b2c3-d4");
-    await user.type(screen.getByLabelText("Desde (número)"), "1");
-    await user.type(screen.getByLabelText("Hasta (número)"), "500");
+    await user.type(screen.getByLabelText("Desde (número completo)"), "0000010100000001");
+    await user.type(screen.getByLabelText("Hasta (número completo)"), "0000010100000500");
     await user.type(screen.getByLabelText("Fecha límite de emisión"), "2030-06-01");
     await siguiente(user);
     expect(screen.getByText("Revisa los datos del CAI marcados.")).toBeTruthy();
@@ -145,7 +145,7 @@ describe("AsistenteInicial (configuración al registrar el negocio)", () => {
     const enviado = finalizarConfiguracion.mock.calls[0][0];
     expect(enviado.factura).toBe(true);
     expect(enviado.emisor).toMatchObject({ razonSocial: "Taquería Rosa", rtn: "08011999123456", direccionFiscal: "Col. Palmira" });
-    expect(enviado.rangos).toEqual([{ sucursalId: "S1", cai: CAI, desde: "1", hasta: "500", fechaLimite: "2099-12-31" }]);
+    expect(enviado.rangos).toEqual([{ sucursalId: "S1", cai: CAI, desde: "000-001-01-00000001", hasta: "000-001-01-00000500", fechaLimite: "2099-12-31" }]);
   });
 
   it("con varias sucursales cada una tiene su bloque de datos y de CAI; las que queden vacías se configuran después", async () => {
@@ -163,8 +163,8 @@ describe("AsistenteInicial (configuración al registrar el negocio)", () => {
     const cais = screen.getAllByLabelText("CAI");
     expect(cais).toHaveLength(2);
     await user.type(cais[0], CAI);
-    await user.type(screen.getAllByLabelText("Desde (número)")[0], "1");
-    await user.type(screen.getAllByLabelText("Hasta (número)")[0], "100");
+    await user.type(screen.getAllByLabelText("Desde (número completo)")[0], "0000010100000001");
+    await user.type(screen.getAllByLabelText("Hasta (número completo)")[0], "0000010100000100");
     await user.type(screen.getAllByLabelText("Fecha límite de emisión")[0], "2099-12-31");
     await siguiente(user);
 
@@ -186,8 +186,8 @@ describe("AsistenteInicial (configuración al registrar el negocio)", () => {
     await siguiente(user);
 
     await user.type(screen.getAllByLabelText("CAI")[0], CAI);
-    await user.type(screen.getAllByLabelText("Desde (número)")[0], "1");
-    await user.type(screen.getAllByLabelText("Hasta (número)")[0], "100");
+    await user.type(screen.getAllByLabelText("Desde (número completo)")[0], "0000010100000001");
+    await user.type(screen.getAllByLabelText("Hasta (número completo)")[0], "0000010100000100");
     await user.type(screen.getAllByLabelText("Fecha límite de emisión")[0], "2099-12-31");
     await user.type(screen.getAllByLabelText("CAI")[1], "AB"); // la segunda, a medias
     await siguiente(user);

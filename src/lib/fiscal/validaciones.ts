@@ -1,4 +1,4 @@
-import { esCaiValido, esRtnValido, normalizarCai, normalizarRtn, validarRango } from "./formato";
+import { esCaiValido, esRtnValido, normalizarCai, normalizarRtn, parsearNumeroDocumento, validarRango } from "./formato";
 
 /**
  * Validaciones de los formularios de administración fiscal. Son puras: la UI
@@ -36,6 +36,8 @@ export interface RangoValidado {
   hasta: number;
   fechaLimite: string;
   sucursalId: string;
+  /** Solo si desde/hasta se escribieron completos (EEE-PPP-TT-CCCCCCCC): la caja a la que dice pertenecer el rango del SAR. */
+  prefijo?: { establecimiento: string; puntoEmision: string };
 }
 
 export type CampoRango = keyof EntradaRango;
@@ -60,11 +62,34 @@ export function validarEntradaRango(
   if (!e.cai.trim()) errores.cai = "Escribe el CAI que autorizó el SAR.";
   else if (!esCaiValido(e.cai)) errores.cai = "Formato inválido. Debe ser XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX (letras A-F y números).";
 
-  const desde = Number(e.desde);
-  const hasta = Number(e.hasta);
+  // El SAR autoriza el rango con el número COMPLETO (000-001-01-00000001 a 000-001-01-00000500);
+  // aquí también se acepta solo el correlativo (1, 500) por compatibilidad.
+  let desde = Number(e.desde);
+  let hasta = Number(e.hasta);
+  let prefijo: RangoValidado["prefijo"];
   if (e.desde.trim() === "" || e.hasta.trim() === "") {
     if (e.desde.trim() === "") errores.desde = "Escribe el número inicial.";
     if (e.hasta.trim() === "") errores.hasta = "Escribe el número final.";
+  } else if (e.desde.includes("-") || e.hasta.includes("-")) {
+    const d = parsearNumeroDocumento(e.desde);
+    const h = parsearNumeroDocumento(e.hasta);
+    if (!d) errores.desde = "Escribe el número completo como lo autorizó el SAR: 000-001-01-00000001.";
+    if (!h) errores.hasta = "Escribe el número completo como lo autorizó el SAR: 000-001-01-00000500.";
+    if (d && h) {
+      if (d.establecimiento !== h.establecimiento || d.puntoEmision !== h.puntoEmision) {
+        errores.hasta = "El establecimiento y el punto de emisión (los dos primeros grupos) deben ser iguales en «Desde» y «Hasta».";
+      } else if (d.tipoDoc !== h.tipoDoc) {
+        errores.hasta = "El código del documento (tercer grupo) debe ser igual en «Desde» y «Hasta».";
+      } else if (/^\d{2}$/.test(tipo) && d.tipoDoc !== tipo) {
+        errores.desde = `El número es de un documento tipo ${d.tipoDoc}, pero elegiste el código ${tipo}.`;
+      } else {
+        desde = d.correlativo;
+        hasta = h.correlativo;
+        prefijo = { establecimiento: d.establecimiento, puntoEmision: d.puntoEmision };
+        const problema = validarRango({ desde, hasta });
+        if (problema) errores.hasta = problema;
+      }
+    }
   } else {
     const problema = validarRango({ desde, hasta });
     if (problema) errores.hasta = problema;
@@ -85,6 +110,7 @@ export function validarEntradaRango(
       hasta,
       fechaLimite: e.fechaLimite,
       sucursalId: e.sucursalId,
+      ...(prefijo ? { prefijo } : {}),
     },
   };
 }

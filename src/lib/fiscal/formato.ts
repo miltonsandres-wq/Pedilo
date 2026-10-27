@@ -43,6 +43,27 @@ export function formatearNumeroDocumento(p: PartesNumeroDocumento): string {
   return `${p.establecimiento}-${p.puntoEmision}-${p.tipoDoc}-${String(p.correlativo).padStart(8, "0")}`;
 }
 
+/**
+ * Máscara mientras se escribe el número completo del SAR: deja solo dígitos (máx. 16)
+ * y los agrupa como EEE-PPP-TT-CCCCCCCC (ej. "0000010100000001" -> "000-001-01-00000001").
+ */
+export function mascaraNumeroDocumento(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 16);
+  return [d.slice(0, 3), d.slice(3, 6), d.slice(6, 8), d.slice(8, 16)].filter(Boolean).join("-");
+}
+
+/** Lee un número completo EEE-PPP-TT-CCCCCCCC (con o sin guiones); null si no tiene los 16 dígitos. */
+export function parsearNumeroDocumento(valor: string): PartesNumeroDocumento | null {
+  const d = valor.replace(/[\s-]/g, "");
+  if (!/^\d{16}$/.test(d)) return null;
+  return {
+    establecimiento: d.slice(0, 3),
+    puntoEmision: d.slice(3, 6),
+    tipoDoc: d.slice(6, 8),
+    correlativo: Number(d.slice(8)),
+  };
+}
+
 /** Rellena con ceros a la izquierda (ej. "1" -> "001"). */
 export function rellenarCeros(valor: string | number, largo: number): string {
   return String(valor).padStart(largo, "0");

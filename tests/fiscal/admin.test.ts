@@ -26,6 +26,23 @@ describe("validarEntradaRango", () => {
     expect(validarEntradaRango(entrada({ cai: "Z1B2C3-D4E5F6-A1B2C3-D4E5F6-A1B2C3-D4" }), HOY).ok).toBe(false);
   });
 
+  it("acepta el rango completo del SAR (EEE-PPP-TT-CCCCCCCC) y saca la caja y el correlativo", () => {
+    const r = validarEntradaRango(entrada({ desde: "000-001-01-00000001", hasta: "000-001-01-00000500" }), HOY);
+    expect(r.ok).toBe(true);
+    expect(r.valor).toMatchObject({ desde: 1, hasta: 500, tipoDoc: "01", prefijo: { establecimiento: "000", puntoEmision: "001" } });
+    // también sin guiones
+    expect(validarEntradaRango(entrada({ desde: "0000010100000001", hasta: "000-001-01-00000500" }), HOY).ok).toBe(true);
+  });
+
+  it("rechaza números del SAR incompletos o de cajas/documentos distintos", () => {
+    expect(validarEntradaRango(entrada({ desde: "000-001-01-1", hasta: "000-001-01-00000500" }), HOY).errores.desde).toMatch(/número completo/);
+    expect(validarEntradaRango(entrada({ desde: "000-001-01-00000001", hasta: "500" }), HOY).errores.hasta).toMatch(/número completo/);
+    expect(validarEntradaRango(entrada({ desde: "000-001-01-00000001", hasta: "000-002-01-00000500" }), HOY).errores.hasta).toMatch(/iguales/);
+    expect(validarEntradaRango(entrada({ desde: "000-001-01-00000001", hasta: "000-001-03-00000500" }), HOY).errores.hasta).toMatch(/código del documento/);
+    expect(validarEntradaRango(entrada({ desde: "000-001-03-00000001", hasta: "000-001-03-00000500" }), HOY).errores.desde).toMatch(/tipo 03/);
+    expect(validarEntradaRango(entrada({ desde: "000-001-01-00000900", hasta: "000-001-01-00000500" }), HOY).errores.hasta).toMatch(/mayor/);
+  });
+
   it("valida desde/hasta", () => {
     expect(validarEntradaRango(entrada({ desde: "10", hasta: "5" }), HOY).errores.hasta).toMatch(/mayor/);
     expect(validarEntradaRango(entrada({ desde: "0", hasta: "5" }), HOY).errores.hasta).toBeTruthy();

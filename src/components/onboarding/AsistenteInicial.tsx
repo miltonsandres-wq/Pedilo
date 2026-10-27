@@ -8,7 +8,7 @@ import { SucursalLogoUploader } from "@/components/admin/SucursalLogoUploader";
 import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
-import { normalizarCai, normalizarRtn } from "@/lib/fiscal/formato";
+import { mascaraNumeroDocumento, normalizarCai, normalizarRtn } from "@/lib/fiscal/formato";
 import { validarEmisor, validarEntradaRango, type EntradaEmisor } from "@/lib/fiscal/validaciones";
 import { cn } from "@/lib/ui";
 
@@ -333,11 +333,11 @@ export function AsistenteInicial({
                           </div>
                         </div>
                         <div>
-                          <Field label="Desde (número)" name={`desde-${s.id}`} value={r.desde} inputMode="numeric" placeholder="1" onChange={(e) => cambiarRango(s.id, "desde", e.target.value.replace(/\D/g, ""))} />
+                          <Field label="Desde (número completo)" name={`desde-${s.id}`} value={r.desde} inputMode="numeric" maxLength={19} placeholder="000-001-01-00000001" onChange={(e) => cambiarRango(s.id, "desde", mascaraNumeroDocumento(e.target.value))} />
                           {errores.desde && <p className="mt-1 text-xs text-red-600">{errores.desde}</p>}
                         </div>
                         <div>
-                          <Field label="Hasta (número)" name={`hasta-${s.id}`} value={r.hasta} inputMode="numeric" placeholder="500" onChange={(e) => cambiarRango(s.id, "hasta", e.target.value.replace(/\D/g, ""))} />
+                          <Field label="Hasta (número completo)" name={`hasta-${s.id}`} value={r.hasta} inputMode="numeric" maxLength={19} placeholder="000-001-01-00000500" onChange={(e) => cambiarRango(s.id, "hasta", mascaraNumeroDocumento(e.target.value))} />
                           {errores.hasta && <p className="mt-1 text-xs text-red-600">{errores.hasta}</p>}
                         </div>
                         <div>
