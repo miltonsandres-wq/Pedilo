@@ -1,6 +1,6 @@
 "use client";
 
-import { db, type CanalOrden } from "@/lib/offline/db";
+import { db, type CanalOrden, type OrdenLocal } from "@/lib/offline/db";
 import { encolar, encolarComanda, encolarSinFlush, flushOutbox } from "@/lib/offline/outbox";
 import {
   emitirDocumentoFiscal,
@@ -10,8 +10,10 @@ import {
   type DatosCliente,
   type DatosExoneracion,
 } from "@/lib/fiscal/emision";
+import { CLAVE_EQUIPO, type DetalleVenta } from "@/lib/fiscal/detalleVenta";
+import { etiquetaCanal } from "@/lib/pos/canales";
 import type { Comanda } from "@/lib/printing/types";
-import type { FormaPago } from "@/lib/types/helpers";
+import { ETIQUETA_FORMA_PAGO, type FormaPago } from "@/lib/types/helpers";
 
 /**
  * Todas las acciones del flujo de orden viven acá y escriben PRIMERO en
@@ -270,6 +272,7 @@ export async function cobrar(params: {
           lineas: lineasDesdeItems(items),
           cliente: params.cliente,
           exoneracion: params.exoneracion,
+          detalleVenta: await armarDetalleVenta(orden, params.usuarioId),
         });
         documentoId = doc.id;
       }
@@ -281,6 +284,20 @@ export async function cobrar(params: {
   // (orden -> pagada, mesa -> libre) del lado del servidor cuando este pago
   // llegue, así que no hace falta encolar esos updates aparte.
   return { documentoId };
+}
+
+/** Lo que se imprime en la factura además de lo fiscal: cajero, quién atendió, lugar, # de orden y pagos. */
+async function armarDetalleVenta(orden: OrdenLocal, cajeroId: string): Promise<DetalleVenta> {
+  const equipo = ((await db.config.get(CLAVE_EQUIPO))?.valor as Record<string, string> | undefined) ?? {};
+  const mesa = orden.mesa_id ? await db.mesas.get(orden.mesa_id) : undefined;
+  const pagos = await db.pagos.where("orden_id").equals(orden.id).toArray();
+  return {
+    cajero: equipo[cajeroId] ?? null,
+    atendio: (orden.usuario_id && equipo[orden.usuario_id]) || null,
+    lugar: mesa?.nombre ?? etiquetaCanal(orden.canal),
+    orden: orden.numero_dia,
+    pagos: pagos.map((p) => ({ forma: ETIQUETA_FORMA_PAGO[p.forma_pago as FormaPago] ?? String(p.forma_pago), monto: p.monto })),
+  };
 }
 
 /**

@@ -111,9 +111,52 @@ describe("factura de 80 mm / 48 columnas", () => {
     expect(t[i + 1]).toBe("     queso extra y tocino");
   });
 
-  it("por defecto es 'Original: Cliente'; con opción, 'Copia: Emisor'", () => {
+  it("por defecto es 'Original: Cliente'; con opción, 'Copia: Obligado Tributario Emisor' (texto del SAR)", () => {
     expect(textos(ins)).toContain("Original: Cliente");
-    expect(textos(construirFactura(documento(), { copia: "emisor" }))).toContain("Copia: Emisor");
+    expect(textos(construirFactura(documento(), { copia: "emisor" }))).toContain("Copia: Obligado Tributario Emisor");
+  });
+
+  it("sin RTN del cliente (consumidor final) imprime el RTN genérico, nunca una línea vacía", () => {
+    const t = textos(ins);
+    expect(t).toContain("Cliente: Consumidor Final");
+    expect(t).toContain("RTN: 99999999999999");
+  });
+
+  it("con RTN del cliente imprime ese RTN, no el genérico", () => {
+    const t = textos(construirFactura(documento({ cliente_nombre: "Embajada", cliente_rtn: "08011999123456" })));
+    expect(t).toContain("RTN: 08011999123456");
+    expect(t.join("|")).not.toContain("99999999999999");
+  });
+
+  it("muestra el precio unitario cuando se pidió más de uno", () => {
+    const t = textos(ins);
+    expect(t).toContain("     2 x L. 115.00");
+    expect(t.join("|")).not.toContain("1 x L.");
+  });
+
+  it("imprime cajero, quién atendió, mesa, # de orden y pagos cuando la factura los trae", () => {
+    const con = textos(
+      construirFactura(
+        documento({
+          detalle_venta: {
+            cajero: "María López", atendio: "Carlos Pérez", lugar: "Mesa 4", orden: 12,
+            pagos: [{ forma: "Efectivo", monto: 100 }, { forma: "Tarjeta", monto: 400 }],
+          },
+        })
+      )
+    );
+    expect(con).toContain("Orden: #12");
+    expect(con).toContain("Mesa/Lugar: Mesa 4");
+    expect(con).toContain("Cajero: María López");
+    expect(con).toContain("Atendió: Carlos Pérez");
+    expect(con.some((x) => x.startsWith("Pago Efectivo:") && x.endsWith("100.00"))).toBe(true);
+    expect(con.some((x) => x.startsWith("Pago Tarjeta:") && x.endsWith("400.00"))).toBe(true);
+    // las facturas anteriores (sin detalle) se siguen imprimiendo igual
+    expect(textos(ins).join("|")).not.toMatch(/Cajero:|Atendió:|Mesa\/Lugar:/);
+  });
+
+  it("cierra con agradecimiento", () => {
+    expect(textos(ins)).toContain("¡Gracias por su visita!");
   });
 
   it("la reimpresión se marca y la impresión normal no", () => {

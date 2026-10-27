@@ -3,6 +3,7 @@ import type { EstadoMesa, EstadoOrden } from "@/lib/types/helpers";
 import { db, CLAVE_DELIVERY_CONFIG, type OrdenLocal } from "./db";
 import { flushOutbox } from "./outbox";
 import { solicitarAlmacenamientoPersistente, sincronizarFiscal } from "@/lib/fiscal/sincronizacion";
+import { CLAVE_EQUIPO } from "@/lib/fiscal/detalleVenta";
 
 let iniciado = false;
 
@@ -152,7 +153,7 @@ async function traerOrdenes(ids: string[]) {
 async function pullInicial(sucursalId: string, tenantId: string) {
   const supabase = createClient();
 
-  const [{ data: sucursal }, { data: mesas }, { data: prodSuc }, { data: ordenes }, { data: formasPago }, { data: categorias }] =
+  const [{ data: sucursal }, { data: mesas }, { data: prodSuc }, { data: ordenes }, { data: formasPago }, { data: categorias }, { data: equipo }] =
     await Promise.all([
       supabase.from("sucursales").select("*").eq("id", sucursalId).single(),
       supabase.from("mesas").select("*").eq("sucursal_id", sucursalId),
@@ -171,6 +172,7 @@ async function pullInicial(sucursalId: string, tenantId: string) {
         .eq("sucursal_id", sucursalId)
         .eq("activo", true),
       supabase.from("categorias").select("id, nombre, orden").eq("tenant_id", tenantId),
+      supabase.from("usuarios").select("id, nombre").eq("sucursal_id", sucursalId),
     ]);
 
   if (sucursal) {
@@ -192,6 +194,11 @@ async function pullInicial(sucursalId: string, tenantId: string) {
 
   if (mesas) {
     await db.mesas.bulkPut(mesas.map((m) => ({ ...m, estado: m.estado as EstadoMesa })));
+  }
+
+  if (equipo) {
+    // Nombres del equipo de la sucursal: salen en la factura (cajero / quién atendió)
+    await db.config.put({ clave: CLAVE_EQUIPO, valor: Object.fromEntries(equipo.map((u) => [u.id, u.nombre])) });
   }
 
   if (categorias) {

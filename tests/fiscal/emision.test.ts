@@ -211,6 +211,23 @@ describe("cobrar() con facturación fiscal", () => {
     expect((await db.outbox.toArray()).map((o) => o.tabla).sort()).toEqual(["documentos_fiscales", "pagos"]);
   });
 
+  it("la factura guarda cajero, quién atendió, mesa, # de orden y pagos para imprimirlos", async () => {
+    await sembrar(config());
+    await db.config.put({ clave: "equipo", valor: { U1: "Carlos Pérez", U2: "María López" } });
+    const ordenId = await nuevaOrden();
+    await db.ordenes.update(ordenId, { numero_dia: 12 }); // la tomó U1 (mesero)
+    const { documentoId } = await cobrar({ ordenId, mesaId: "M" + seq, usuarioId: "U2", monto: 230, formaPago: "tarjeta" });
+
+    const doc = await db.documentos_fiscales.get(documentoId!);
+    expect(doc?.detalle_venta).toEqual({
+      cajero: "María López", atendio: "Carlos Pérez", lugar: "Mesa " + seq, orden: 12,
+      pagos: [{ forma: "Tarjeta", monto: 230 }],
+    });
+    // viaja al servidor junto con el resto del documento
+    const enCola = (await db.outbox.toArray()).find((o) => o.tabla === "documentos_fiscales");
+    expect((enCola?.payload as { detalle_venta?: unknown }).detalle_venta).toBeTruthy();
+  });
+
   it("pago parcial: registra el pago pero todavía no factura; el pago final sí", async () => {
     await sembrar(config());
     const ordenId = await nuevaOrden();

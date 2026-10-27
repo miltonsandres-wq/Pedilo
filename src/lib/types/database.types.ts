@@ -323,6 +323,7 @@ export type Database = {
           clase: string
           cliente_nombre: string
           cliente_rtn: string | null
+          detalle_venta: Json | null
           correlativo: number
           created_at: string
           dispositivo_id: string | null
@@ -366,6 +367,7 @@ export type Database = {
           clase?: string
           cliente_nombre?: string
           cliente_rtn?: string | null
+          detalle_venta?: Json | null
           correlativo: number
           created_at?: string
           dispositivo_id?: string | null
@@ -409,6 +411,7 @@ export type Database = {
           clase?: string
           cliente_nombre?: string
           cliente_rtn?: string | null
+          detalle_venta?: Json | null
           correlativo?: number
           created_at?: string
           dispositivo_id?: string | null

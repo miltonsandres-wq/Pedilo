@@ -10,6 +10,14 @@ import {
 import { logoImpresionCacheado, logoImpresionUrlCacheado } from "@/lib/printing/logo";
 import type { Instruccion, ResultadoImpresion } from "@/lib/printing/types";
 import { leerConfigFiscal } from "./emision";
+import { CLAVE_EQUIPO } from "./detalleVenta";
+
+/** Nombre de un compañero de la sucursal (cacheado al sincronizar); null si no se conoce. */
+async function nombreDelEquipo(usuarioId: string | null): Promise<string | null> {
+  if (!usuarioId) return null;
+  const equipo = (await db.config.get(CLAVE_EQUIPO))?.valor as Record<string, string> | undefined;
+  return equipo?.[usuarioId] ?? null;
+}
 
 /**
  * Orquestación de impresión de documentos: arma el ticket (documentoTexto.ts),
@@ -91,6 +99,7 @@ export async function imprimirPrecuenta(ordenId: string, mesaNombre: string): Pr
     mesa: mesaNombre,
     numeroDia: orden.numero_dia,
     clienteNombre: orden.cliente_nombre,
+    atendio: await nombreDelEquipo(orden.usuario_id),
     fecha: new Date(),
     lineas: items.map((i) => ({
       nombre: i.nombre_producto,
@@ -168,6 +177,7 @@ export async function armarPrecuenta(ordenId: string, mesaNombre: string): Promi
     mesa: mesaNombre,
     numeroDia: orden.numero_dia,
     clienteNombre: orden.cliente_nombre,
+    atendio: await nombreDelEquipo(orden.usuario_id),
     fecha: new Date(),
     lineas: items.map((i) => ({
       nombre: i.nombre_producto,

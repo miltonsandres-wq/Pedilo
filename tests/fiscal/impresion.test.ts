@@ -110,10 +110,10 @@ describe("imprimirDocumentoFiscal", () => {
     expect(textos(enviados[0].body).join("|")).not.toContain("REIMPRESIÓN");
   });
 
-  it("la copia para el emisor dice 'Copia: Emisor' y no cuenta como original ni como reimpresión", async () => {
+  it("la copia para el emisor dice 'Copia: Obligado Tributario Emisor' y no cuenta como original ni como reimpresión", async () => {
     const doc = await nuevoDocumento();
     await imprimirDocumentoFiscal(doc.id, { copia: "emisor" });
-    expect(textos(enviados[0].body)).toContain("Copia: Emisor");
+    expect(textos(enviados[0].body)).toContain("Copia: Obligado Tributario Emisor");
     expect(textos(enviados[0].body).join("|")).not.toContain("REIMPRESIÓN");
     expect((await db.documentos_fiscales.get(doc.id))?.impreso_at).toBeFalsy(); // el original sigue pendiente
 

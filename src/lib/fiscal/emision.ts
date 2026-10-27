@@ -5,6 +5,7 @@ import { calcularImpuestos, type LineaFiscal, type OpcionesImpuestos, type TasaI
 import { esRtnValido, formatearNumeroDocumento, normalizarRtn } from "./formato";
 import { FiscalError, planificarEmision, type ClaseDocumento } from "./rangos";
 import { totalEnLetras } from "./totalLetras";
+import type { DetalleVenta } from "./detalleVenta";
 
 export interface EmisorSnapshot {
   razon_social: string | null;
@@ -78,6 +79,8 @@ export interface DatosEmision {
   opciones?: Omit<OpcionesImpuestos, "exonerado">;
   cliente?: DatosCliente;
   exoneracion?: DatosExoneracion;
+  /** Cajero, quién atendió, mesa, # de orden y pagos: se imprimen en la factura. */
+  detalleVenta?: DetalleVenta;
   clase?: ClaseDocumento;
   documentoReferenciaId?: string;
   ahora?: Date;
@@ -259,6 +262,7 @@ export async function emitirDocumentoFiscal(datos: DatosEmision): Promise<Docume
       anulada_por: null,
       documento_referencia_id: datos.documentoReferenciaId ?? null,
       motivo_nota: vacioANulo(datos.motivoNota),
+      detalle_venta: (datos.detalleVenta as DocumentoFiscalLocal["detalle_venta"]) ?? null,
       created_at: ahora.toISOString(),
       sync_estado: "pendiente",
       sync_detalle: null,

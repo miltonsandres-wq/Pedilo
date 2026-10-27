@@ -1,4 +1,5 @@
-import { formatearFecha, formatearFechaHora, formatearNumeroDocumento } from "@/lib/fiscal/formato";
+import { RTN_CONSUMIDOR_FINAL, formatearFecha, formatearFechaHora, formatearNumeroDocumento } from "@/lib/fiscal/formato";
+import type { DetalleVenta } from "@/lib/fiscal/detalleVenta";
 import type { Instruccion, InstruccionTexto } from "./types";
 
 /**
@@ -75,10 +76,12 @@ export interface DocumentoImprimible {
   total_letras: string;
   lineas: LineaImprimible[];
   motivo_nota?: string | null;
+  /** Cajero, quién atendió, mesa/lugar, # de orden y pagos (facturas nuevas; las viejas no lo tienen). */
+  detalle_venta?: DetalleVenta | null;
 }
 
 export interface OpcionesFactura {
-  /** "cliente" = "Original: Cliente" (por defecto); "emisor" = "Copia: Emisor". */
+  /** "cliente" = "Original: Cliente" (por defecto); "emisor" = "Copia: Obligado Tributario Emisor" (el texto del SAR). */
   copia?: "cliente" | "emisor";
   /** Reimpresión: se marca "REIMPRESIÓN" y NO consume correlativo. */
   reimpresion?: boolean;
@@ -159,6 +162,7 @@ function filasDetalle(lineas: LineaImprimible[]): InstruccionTexto[] {
     const desc = envolver(l.nombre, COLUMNAS - 18);
     out.push(texto(`${String(l.cantidad).padEnd(5)}${desc[0].padEnd(COLUMNAS - 18)}${dinero(l.total).padStart(13)}`));
     for (const extra of desc.slice(1)) out.push(texto(`${" ".repeat(5)}${extra}`));
+    if (l.cantidad > 1) out.push(texto(`${" ".repeat(5)}${l.cantidad} x L. ${dinero(l.precio_unitario)}`));
   }
   return out;
 }
@@ -194,6 +198,11 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
   out.push(...campo("No.:", doc.numero_completo));
   out.push(texto("CAI:"), texto(doc.cai));
   out.push(...campo("Fecha:", formatearFechaHora(new Date(doc.fecha_emision))));
+  const venta = doc.detalle_venta;
+  if (venta?.orden != null) out.push(...campo("Orden:", `#${venta.orden}`));
+  if (venta?.lugar) out.push(...campo("Mesa/Lugar:", venta.lugar));
+  if (venta?.cajero) out.push(...campo("Cajero:", venta.cajero));
+  if (venta?.atendio) out.push(...campo("Atendió:", venta.atendio));
 
   if (opciones.referencia) {
     out.push({ op: "linea" }, texto("Documento de referencia:", { bold: true }));
@@ -205,7 +214,8 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
 
   out.push({ op: "linea" });
   out.push(...campo("Cliente:", doc.cliente_nombre || "Consumidor Final"));
-  out.push(...campo("RTN:", doc.cliente_rtn));
+  // Sin RTN del cliente (consumidor final) se imprime el RTN genérico, no una línea vacía
+  out.push(...campo("RTN:", doc.cliente_rtn || RTN_CONSUMIDOR_FINAL));
 
   out.push({ op: "linea" });
   out.push(...filasDetalle(doc.lineas));
@@ -223,6 +233,10 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
 
   out.push({ op: "salto" });
   out.push(...izquierda(`SON: ${doc.total_letras}`));
+  if (venta?.pagos?.length) {
+    out.push({ op: "salto" });
+    for (const p of venta.pagos) out.push(...par(`Pago ${p.forma}:`, dinero(p.monto)).map((t) => texto(t)));
+  }
 
   // Estos tres se imprimen SIEMPRE, aunque estén vacíos
   out.push({ op: "linea" });
@@ -245,7 +259,8 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
 
   out.push({ op: "salto" });
   out.push(...centrado("La factura es beneficio de todos, ¡exíjala!"));
-  out.push(...centrado(opciones.copia === "emisor" ? "Copia: Emisor" : "Original: Cliente", { bold: true }));
+  out.push(...centrado("¡Gracias por su visita!"));
+  out.push(...centrado(opciones.copia === "emisor" ? "Copia: Obligado Tributario Emisor" : "Original: Cliente", { bold: true }));
 
   out.push({ op: "salto", n: 3 }, { op: "cortar" });
   return out;
@@ -260,6 +275,8 @@ export interface DatosPrecuenta {
   mesa: string;
   numeroDia: number | null;
   clienteNombre: string | null;
+  /** Quién atiende la mesa (mesero), si se conoce. */
+  atendio?: string | null;
   fecha: Date;
   lineas: LineaImprimible[];
   total: number;
@@ -279,6 +296,7 @@ export function construirPrecuenta(d: DatosPrecuenta): Instruccion[] {
   out.push(...campo("Mesa:", d.mesa));
   if (d.numeroDia != null) out.push(...campo("Orden:", `#${d.numeroDia}`));
   if (d.clienteNombre) out.push(...campo("Cliente:", d.clienteNombre));
+  if (d.atendio) out.push(...campo("Atendió:", d.atendio));
   out.push(...campo("Fecha:", formatearFechaHora(d.fecha)));
 
   out.push({ op: "linea" });

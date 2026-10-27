@@ -14,6 +14,9 @@ export function esCaiValido(valor: string): boolean {
   return CAI_REGEX.test(normalizarCai(valor));
 }
 
+/** RTN que se imprime cuando el cliente no da el suyo («Consumidor Final»). Solo se imprime: en la base no se guarda. */
+export const RTN_CONSUMIDOR_FINAL = "99999999999999";
+
 /** Deja solo dígitos: el RTN suele escribirse como 0801-1999-123456. */
 export function normalizarRtn(valor: string): string {
   return valor.replace(/\D/g, "");
