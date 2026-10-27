@@ -78,7 +78,8 @@ export interface AlertaPunto {
  */
 export function alertasPorPunto(rangos: RangoParaAlerta[], hoyHN: string): AlertaPunto[] {
   const grupos = new Map<string, RangoParaAlerta[]>();
-  for (const r of rangos) {
+  // Los dados de baja (cargados por error) ya no cuentan: ni para emitir ni para alertar
+  for (const r of rangos.filter((x) => x.estado !== "baja")) {
     const clave = `${r.sucursal_id}|${r.establecimiento}|${r.punto_emision}|${r.tipo_doc}`;
     grupos.set(clave, [...(grupos.get(clave) ?? []), r]);
   }

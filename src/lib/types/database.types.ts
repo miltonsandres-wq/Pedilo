@@ -1880,7 +1880,7 @@ export type Database = {
       refrescar_estados_cai: { Args: never; Returns: undefined }
       sincronizar_documento_fiscal: { Args: { p_doc: Json }; Returns: Json }
       vincular_dispositivo: {
-        Args: { p_id: string; p_token: string }
+        Args: { p_forzar?: boolean; p_id: string; p_token: string }
         Returns: {
           activo: boolean
           created_at: string

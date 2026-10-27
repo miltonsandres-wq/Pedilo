@@ -8,7 +8,7 @@ import { alertasPorPunto, type NivelAlerta } from "@/lib/fiscal/alertas";
 import { fechaLocalHN, formatearFecha, formatearFechaHora } from "@/lib/fiscal/formato";
 import { calcularRequisitos } from "@/lib/fiscal/requisitos";
 import { cn } from "@/lib/ui";
-import { guardarTicketSinFactura, liberarDispositivo, resolverIncidente } from "./actions";
+import { guardarTicketSinFactura, resolverIncidente } from "./actions";
 
 const NIVEL: Record<NivelAlerta, { texto: string; tono: "success" | "warning" | "danger"; barra: string }> = {
   ok: { texto: "vigente", tono: "success", barra: "bg-libre-text" },
@@ -25,19 +25,17 @@ export default async function FiscalEstadoPage() {
   const supabase = await createClient();
   const hoy = fechaLocalHN(new Date());
 
-  const [{ data: tenant }, { data: sucursales }, { data: emisores }, { data: cajas }, { data: rangos }, { data: incidentes }] =
+  const [{ data: tenant }, { data: sucursales }, { data: emisores }, { data: rangos }, { data: incidentes }] =
     await Promise.all([
       supabase.from("tenants").select("*").eq("id", sesion.tenant_id).single(),
       supabase.from("sucursales").select("id, nombre").eq("tenant_id", sesion.tenant_id).eq("activo", true).order("nombre"),
       supabase.from("datos_fiscales_emisor").select("sucursal_id, razon_social, rtn, direccion_fiscal").eq("tenant_id", sesion.tenant_id),
-      supabase.from("dispositivos_pos").select("id, nombre, sucursal_id, establecimiento, punto_emision, activo, vinculo_hash").eq("tenant_id", sesion.tenant_id),
       supabase.from("cai_rangos").select("*").eq("tenant_id", sesion.tenant_id),
       supabase.from("incidentes_fiscales").select("*").eq("tenant_id", sesion.tenant_id).eq("resuelto", false).order("created_at", { ascending: false }),
     ]);
 
   const activa = !!tenant?.facturacion_fiscal_activa;
   const nombreSucursal = new Map((sucursales ?? []).map((s) => [s.id, s.nombre]));
-  const nombreCaja = new Map((cajas ?? []).map((c) => [`${c.sucursal_id}|${c.establecimiento}|${c.punto_emision}`, c.nombre]));
 
   const requisitos = calcularRequisitos(
     {
@@ -92,18 +90,17 @@ export default async function FiscalEstadoPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Estado de los rangos por caja" subtitle="Alerta al 85 % consumido y a 30 días de la fecha límite." />
+        <CardHeader title="Estado de los rangos" subtitle="Alerta al 85 % consumido y a 30 días de la fecha límite." />
         <div className="divide-y divide-ink-100">
           {puntos.length === 0 && <p className="p-5 text-sm text-ink-500">Todavía no hay rangos cargados. Agrégalos en «Rangos CAI».</p>}
           {puntos.map((p) => {
             const n = NIVEL[p.nivel];
             const pct = Math.min(100, Math.round(p.resumen.pctConsumido * 100));
-            const caja = nombreCaja.get(`${p.sucursal_id}|${p.establecimiento}|${p.punto_emision}`);
             return (
               <div key={p.clave} className="p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-ink-900">
-                    {nombreSucursal.get(p.sucursal_id) ?? "Sucursal"} · {caja ?? "Caja"}
+                    {nombreSucursal.get(p.sucursal_id) ?? "Sucursal"}
                   </p>
                   <span className="font-mono text-xs text-ink-500">{p.establecimiento}-{p.punto_emision}-{p.tipo_doc}</span>
                   <Badge tone="neutral">{CLASE[p.clase] ?? p.clase}</Badge>
@@ -121,34 +118,6 @@ export default async function FiscalEstadoPage() {
                   </span>
                   {p.hayRelevo && <span className="text-libre-text">rango siguiente ya cargado</span>}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Caja de cobro"
-          subtitle="Cada sucursal cobra y factura desde una caja, que se vincula sola la primera vez que se abre el POS. Si cambias de equipo o reinstalas, pulsa «Liberar» y vuelve a abrir el POS."
-        />
-        <div className="divide-y divide-ink-100">
-          {(sucursales ?? []).map((sc) => {
-            const caja = (cajas ?? []).find((c) => c.sucursal_id === sc.id && c.activo);
-            return (
-              <div key={sc.id} className="flex flex-wrap items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink-900">{sc.nombre}</p>
-                  <p className="font-mono text-xs text-ink-500">
-                    {caja ? `${caja.establecimiento}-${caja.punto_emision}` : "sin caja"}
-                  </p>
-                </div>
-                {caja?.vinculo_hash ? <Badge tone="success">vinculada</Badge> : <Badge tone="warning">sin vincular</Badge>}
-                {caja?.vinculo_hash && (
-                  <form action={liberarDispositivo.bind(null, caja.id)}>
-                    <Button size="sm" variant="secondary" type="submit">Liberar</Button>
-                  </form>
-                )}
               </div>
             );
           })}

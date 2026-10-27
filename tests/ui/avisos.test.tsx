@@ -8,7 +8,7 @@ const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace }) }));
 
 const vincular = vi.fn();
-vi.mock("@/lib/fiscal/sincronizacion", () => ({ vincularDispositivoLocal: (id: string) => vincular(id) }));
+vi.mock("@/lib/fiscal/sincronizacion", () => ({ vincularDispositivoLocal: (id: string, o?: { forzar?: boolean }) => vincular(id, o) }));
 
 const imprimir = vi.fn();
 const armar = vi.fn();
@@ -79,14 +79,14 @@ describe("AvisosFiscales", () => {
     expect(container.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it("caja sin vincular: aviso rojo con botón para vincular", async () => {
+  it("equipo sin la caja: aviso rojo con botón para usarla aquí", async () => {
     await sembrarFiscal(configFiscal({ dispositivo: null }));
     render(<AvisosFiscales />);
-    expect(await screen.findByText(/todavía no está vinculada a la sucursal/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Vincular esta caja/ })).toBeTruthy();
+    expect(await screen.findByText(/Este equipo todavía no tiene la caja de la sucursal/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Usar la caja en este equipo/ })).toBeTruthy();
   });
 
-  it("vincular: lista solo los puntos libres y vincula el elegido", async () => {
+  it("usar la caja: ofrece la libre y la que tiene otro equipo (quitándosela); ignora las desactivadas", async () => {
     await sembrarFiscal(configFiscal({ dispositivo: null }));
     await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
     dispositivosRemotos.mockReturnValue({
@@ -101,39 +101,53 @@ describe("AvisosFiscales", () => {
     const user = userEvent.setup();
     render(<AvisosFiscales />);
 
-    await user.click(await screen.findByRole("button", { name: /Vincular esta caja/ }));
-    expect(await screen.findByText("Caja 1")).toBeTruthy();
-    expect(screen.queryByText(/Caja 2/)).toBeNull(); // ya vinculada a otra caja
-    expect(screen.queryByText("Caja vieja")).toBeNull(); // desactivada
+    await user.click(await screen.findByRole("button", { name: /Usar la caja en este equipo/ }));
+    expect(await screen.findByText("Usar la caja aquí")).toBeTruthy();
+    expect(screen.getByText("Quitársela al otro equipo y usarla aquí")).toBeTruthy();
+    expect(screen.queryByText("001-003")).toBeNull(); // desactivada
 
-    await user.click(screen.getByText("Caja 1"));
-    await waitFor(() => expect(vincular).toHaveBeenCalledWith("D1"));
-    await waitFor(() => expect(screen.queryByText("Elige el que le corresponde a este dispositivo.", { exact: false })).toBeNull());
+    await user.click(screen.getByText("Quitársela al otro equipo y usarla aquí"));
+    await waitFor(() => expect(vincular).toHaveBeenCalledWith("D2", { forzar: true }));
   });
 
-  it("vincular: si el punto ya lo tiene otra caja muestra el motivo", async () => {
+  it("usar la caja libre no fuerza nada", async () => {
     await sembrarFiscal(configFiscal({ dispositivo: null }));
     await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
     dispositivosRemotos.mockReturnValue({
       data: [{ id: "D1", nombre: "Caja 1", establecimiento: "001", punto_emision: "001", vinculo_hash: null, activo: true }],
       error: null,
     });
-    vincular.mockRejectedValue(new Error("Ese punto de emisión ya está vinculado a otra caja."));
+    vincular.mockResolvedValue({ id: "D1" });
     const user = userEvent.setup();
     render(<AvisosFiscales />);
-    await user.click(await screen.findByRole("button", { name: /Vincular esta caja/ }));
-    await user.click(await screen.findByText("Caja 1"));
-    expect(await screen.findByText("Ese punto de emisión ya está vinculado a otra caja.")).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: /Usar la caja en este equipo/ }));
+    await user.click(await screen.findByText("Usar la caja aquí"));
+    await waitFor(() => expect(vincular).toHaveBeenCalledWith("D1", { forzar: false }));
   });
 
-  it("vincular: sin puntos libres explica qué hacer", async () => {
+  it("usar la caja: si falla muestra el motivo", async () => {
+    await sembrarFiscal(configFiscal({ dispositivo: null }));
+    await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
+    dispositivosRemotos.mockReturnValue({
+      data: [{ id: "D1", nombre: "Caja 1", establecimiento: "001", punto_emision: "001", vinculo_hash: null, activo: true }],
+      error: null,
+    });
+    vincular.mockRejectedValue(new Error("No se pudo vincular la caja. Revisa tu conexión."));
+    const user = userEvent.setup();
+    render(<AvisosFiscales />);
+    await user.click(await screen.findByRole("button", { name: /Usar la caja en este equipo/ }));
+    await user.click(await screen.findByText("Usar la caja aquí"));
+    expect(await screen.findByText("No se pudo vincular la caja. Revisa tu conexión.")).toBeTruthy();
+  });
+
+  it("usar la caja: si la sucursal no tiene ninguna activa, avisa", async () => {
     await sembrarFiscal(configFiscal({ dispositivo: null }));
     await db.config.put({ clave: "sucursal", valor: { id: "S1", nombre: "Centro", agenteImpresionUrl: null } });
     dispositivosRemotos.mockReturnValue({ data: [], error: null });
     const user = userEvent.setup();
     render(<AvisosFiscales />);
-    await user.click(await screen.findByRole("button", { name: /Vincular esta caja/ }));
-    expect(await screen.findByText(/ya está vinculada a otro equipo/)).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: /Usar la caja en este equipo/ }));
+    expect(await screen.findByText(/no tiene una caja activa/)).toBeTruthy();
   });
 
   it("rango agotado o vencido: bloqueo rojo visible", async () => {

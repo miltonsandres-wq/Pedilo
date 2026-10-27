@@ -49,16 +49,31 @@ export async function obtenerTokenDispositivo(): Promise<string> {
   return token;
 }
 
+/** sha256 (hex) del token de este navegador: lo mismo que guarda el servidor al vincular. null si el entorno no lo puede calcular. */
+async function hashTokenDispositivo(): Promise<string | null> {
+  try {
+    const token = await obtenerTokenDispositivo();
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
+
 /** Vincula esta caja a un dispositivo libre del catálogo y lo guarda en la config local. */
-export async function vincularDispositivoLocal(dispositivoId: string): Promise<DispositivoLocal> {
+export async function vincularDispositivoLocal(dispositivoId: string, opciones: { forzar?: boolean } = {}): Promise<DispositivoLocal> {
   const supabase = createClient();
   const token = await obtenerTokenDispositivo();
-  const { data, error } = await supabase.rpc("vincular_dispositivo", { p_id: dispositivoId, p_token: token });
+  const { data, error } = await supabase.rpc("vincular_dispositivo", {
+    p_id: dispositivoId,
+    p_token: token,
+    p_forzar: opciones.forzar === true,
+  });
 
   if (error || !data) {
     const msg = error?.message ?? "";
     if (msg.includes("YA_VINCULADO")) {
-      throw new Error("Ese punto de emisión ya está vinculado a otra caja. Pídele al administrador que lo libere.");
+      throw new Error("La caja de esta sucursal la está usando otro equipo. Usa «Usar la caja en este equipo» para quedártela aquí.");
     }
     if (msg.includes("NO_DISPONIBLE")) throw new Error("Ese dispositivo ya no está disponible.");
     throw new Error(msg || "No se pudo vincular la caja. Revisa tu conexión.");
@@ -133,8 +148,10 @@ export async function sincronizarFiscal(
       .eq("id", dispositivo.id)
       .maybeSingle();
     if (!error) {
+      // Si otro equipo se quedó con la caja (su hash ya no es el de este navegador), este deja de facturar
+      const miHash = fila?.vinculo_hash ? await hashTokenDispositivo() : null;
       dispositivo =
-        fila && fila.activo && fila.vinculo_hash
+        fila && fila.activo && fila.vinculo_hash && (miHash === null || fila.vinculo_hash === miHash)
           ? {
               id: fila.id,
               nombre: fila.nombre,
@@ -162,7 +179,7 @@ export async function sincronizarFiscal(
 
   // Cada sucursal tiene UNA caja de cobro: el cajero la vincula solo la primera vez que abre
   // el POS (los meseros no, para no quitarle la caja al cajero). Si ya la usa otra caja o no hay
-  // conexión, queda el aviso para vincularla a mano o pedir al admin que la libere.
+  // conexión, queda el aviso para que el cajero la tome desde el POS.
   if (config.activa && !dispositivo && opciones.autoVincular) {
     if (await autoVincularCaja(sucursalId)) return; // vincular ya sincronizó rangos y documentos
   }

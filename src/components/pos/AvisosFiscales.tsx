@@ -39,11 +39,11 @@ export function AvisosFiscales() {
     avisos.push({
       clave: "sin-dispositivo",
       tono: "rojo",
-      texto: "Esta caja todavía no está vinculada a la sucursal: no se puede cobrar hasta vincularla. Si otra caja ya cobra aquí, pídele al administrador que la libere en Facturación fiscal.",
+      texto: "Este equipo todavía no tiene la caja de la sucursal: no se puede cobrar hasta que la uses aquí.",
       accion: (
         <Button size="sm" variant="dark" onClick={() => setVinculando(true)}>
           <Link2 className="h-3.5 w-3.5" strokeWidth={2} />
-          Vincular esta caja
+          Usar la caja en este equipo
         </Button>
       ),
     });
@@ -115,6 +115,8 @@ interface DispositivoLibre {
   nombre: string;
   establecimiento: string;
   punto_emision: string;
+  /** Otro equipo la tiene: al elegirla se la quita (solo debe pasar al cambiar de equipo). */
+  ocupada: boolean;
 }
 
 function VincularCajaModal({ onCerrar }: { onCerrar: () => void }) {
@@ -137,18 +139,22 @@ function VincularCajaModal({ onCerrar }: { onCerrar: () => void }) {
         .order("nombre");
       if (!vivo) return;
       if (err) return setError("No se pudo cargar la lista. Revisa tu conexión a internet.");
-      setLibres((data ?? []).filter((d) => d.activo && !d.vinculo_hash));
+      setLibres(
+        (data ?? [])
+          .filter((d) => d.activo)
+          .map((d) => ({ id: d.id, nombre: d.nombre, establecimiento: d.establecimiento, punto_emision: d.punto_emision, ocupada: !!d.vinculo_hash }))
+      );
     })();
     return () => {
       vivo = false;
     };
   }, []);
 
-  async function vincular(id: string) {
+  async function vincular(id: string, forzar: boolean) {
     setError(null);
     setVinculandoId(id);
     try {
-      await vincularDispositivoLocal(id);
+      await vincularDispositivoLocal(id, { forzar });
       onCerrar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo vincular.");
@@ -160,14 +166,14 @@ function VincularCajaModal({ onCerrar }: { onCerrar: () => void }) {
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink-950/40 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 shadow-popover sm:rounded-2xl">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink-900">Vincular esta caja</h2>
+          <h2 className="text-base font-semibold text-ink-900">Usar la caja en este equipo</h2>
           <button onClick={onCerrar} className="rounded-lg p-1 text-ink-400 hover:bg-ink-100">
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
         <p className="mb-4 text-sm text-ink-500">
-          Cada caja factura con su propio punto de emisión y no se comparte con otra. Elige el que le
-          corresponde a este dispositivo.
+          La sucursal cobra y factura desde una sola caja. Si la estaba usando otro equipo, al elegirla aquí
+          ese equipo deja de poder facturar.
         </p>
 
         {libres === null && !error && (
@@ -176,23 +182,22 @@ function VincularCajaModal({ onCerrar }: { onCerrar: () => void }) {
           </p>
         )}
         {libres?.length === 0 && (
-          <p className="text-sm text-ink-600">
-            La caja de esta sucursal ya está vinculada a otro equipo. El administrador puede liberarla en
-            Admin › Facturación fiscal › Estado › Caja de cobro.
-          </p>
+          <p className="text-sm text-ink-600">Esta sucursal no tiene una caja activa. Avísale al administrador.</p>
         )}
         <div className="space-y-2">
           {(libres ?? []).map((d) => (
             <button
               key={d.id}
               disabled={vinculandoId !== null}
-              onClick={() => void vincular(d.id)}
+              onClick={() => void vincular(d.id, d.ocupada)}
               className="flex w-full items-center justify-between rounded-xl border border-ink-200 px-4 py-3 text-left transition hover:border-brand-500 hover:bg-brand-50 disabled:opacity-50"
             >
               <span>
-                <span className="block text-sm font-medium text-ink-900">{d.nombre}</span>
+                <span className="block text-sm font-medium text-ink-900">
+                  {d.ocupada ? "Quitársela al otro equipo y usarla aquí" : "Usar la caja aquí"}
+                </span>
                 <span className="font-mono text-xs text-ink-500">
-                  Est. {d.establecimiento} · Punto {d.punto_emision}
+                  {d.establecimiento}-{d.punto_emision}
                 </span>
               </span>
               {vinculandoId === d.id && <Loader2 className="h-4 w-4 animate-spin text-brand-600" strokeWidth={2} />}

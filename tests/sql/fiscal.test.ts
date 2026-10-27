@@ -330,6 +330,18 @@ describe("dispositivos: un punto de emisión, un navegador", () => {
     await comoUsuario(pg, CAJERO_A, () => pg.query("select public.vincular_dispositivo($1,$2)", [id, t2]));
   });
 
+  it("con p_forzar el cajero de la sucursal se queda con la caja sin que el admin la libere", async () => {
+    const { rows } = await pg.query<{ id: string }>("select id from public.dispositivos_pos where punto_emision='010'");
+    const id = rows[0].id;
+    const t3 = "33333333-3333-3333-3333-333333333333";
+    await comoUsuario(pg, CAJERO_A, () => pg.query("select public.vincular_dispositivo($1,$2,true)", [id, t3]));
+    const hash = await pg.query<{ ok: boolean }>(
+      "select vinculo_hash = encode(sha256(convert_to($2::text,'utf8')),'hex') as ok from public.dispositivos_pos where id=$1",
+      [id, t3]
+    );
+    expect(hash.rows[0].ok).toBe(true);
+  });
+
   it("un dispositivo de otro tenant no se puede vincular", async () => {
     const { rows } = await pg.query<{ id: string }>("select id from public.dispositivos_pos where punto_emision='010'");
     await expect(
@@ -453,5 +465,24 @@ describe("notas de crédito entre negocios", () => {
       ])).rows[0].r
     );
     expect(r).toMatchObject({ ok: false, tipo: "referencia_invalida" });
+  });
+});
+
+describe("dar de baja un rango ya usado", () => {
+  it("no se borra, pero el admin lo da de baja: no se reactiva solo y sus números siguen ocupados", async () => {
+    const id = await crearRango({ establecimiento: "002", punto_emision: "002", cai: CAI2, desde: 1, hasta: 5, estado: "activo" });
+    await pg.query("update public.cai_rangos set siguiente = 3 where id = $1", [id]); // ya emitió 2 documentos
+
+    await expect(
+      comoUsuario(pg, ADMIN_A, () => pg.query("delete from public.cai_rangos where id=$1", [id]))
+    ).rejects.toThrow(/EN_USO/);
+
+    await comoUsuario(pg, ADMIN_A, () => pg.query("update public.cai_rangos set estado='baja' where id=$1", [id]));
+    await pg.query("select public.refrescar_estados_cai()");
+    const r = await pg.query<{ estado: string; siguiente: number }>("select estado, siguiente from public.cai_rangos where id=$1", [id]);
+    expect(r.rows[0]).toEqual({ estado: "baja", siguiente: 3 });
+
+    // sigue ocupando sus números: no se puede volver a cargar el mismo rango
+    await expect(crearRango({ establecimiento: "002", punto_emision: "002", cai: CAI, desde: 1, hasta: 5 })).rejects.toThrow(/sin_traslape|conflicting|exclusion/i);
   });
 });

@@ -262,7 +262,24 @@ describe("sincronizarFiscal: configuración, emisor, logo y vinculación", () =>
     await vincularDispositivoLocal(DISP);
     // otro navegador: token distinto
     await db.config.delete("dispositivo_token");
-    await expect(vincularDispositivoLocal(DISP)).rejects.toThrow(/ya está vinculado/);
+    await expect(vincularDispositivoLocal(DISP)).rejects.toThrow(/la está usando otro equipo/);
+  });
+
+  it("el cajero puede quedarse con la caja aunque otro equipo la tenga, y el equipo anterior deja de facturar", async () => {
+    await sembrarRangos([{ desde: 1, hasta: 10, estado: "activo" }]);
+    await vincularDispositivoLocal(DISP);
+    const tokenA = (await db.config.get("dispositivo_token"))!.valor as string;
+
+    // otro equipo (token distinto) toma la caja
+    await db.config.delete("dispositivo_token");
+    const dispositivo = await vincularDispositivoLocal(DISP, { forzar: true });
+    expect(dispositivo.id).toBe(DISP);
+
+    // el equipo anterior vuelve a sincronizar: ya no es suya
+    await db.config.put({ clave: "dispositivo_token", valor: tokenA });
+    await sincronizarFiscal(S, T);
+    expect((await leerConfigFiscal())?.dispositivo).toBeNull();
+    await expect(emitir(1)).rejects.toMatchObject({ codigo: "sin_dispositivo" });
   });
 
   it("sin red, sincronizar no rompe nada y conserva lo cacheado", async () => {

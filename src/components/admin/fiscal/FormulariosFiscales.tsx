@@ -7,6 +7,7 @@ import { Ban, Check, Power, Trash2 } from "lucide-react";
 import {
   activarFacturacion,
   anularDocumento,
+  darDeBajaRango,
   eliminarRango,
   guardarEmisor,
   type EstadoAccion,
@@ -213,6 +214,38 @@ export function BotonEliminarRango({ id }: { id: string }) {
       >
         <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
         Borrar
+      </Button>
+      {error && <span className="mt-1 max-w-56 text-right text-xs text-red-600">{error}</span>}
+    </span>
+  );
+}
+
+/** Rango cargado por error que ya emitió documentos: no se borra, se da de baja y deja de usarse. */
+export function BotonDarDeBajaRango({ id }: { id: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [trabajando, setTrabajando] = useState(false);
+  return (
+    <span className="inline-flex flex-col items-end">
+      <Button
+        size="sm"
+        variant="danger"
+        type="button"
+        disabled={trabajando}
+        onClick={async () => {
+          if (
+            !window.confirm(
+              "¿Dar de baja este rango? Ya emitió documentos, así que no se borra: queda en el historial y deja de usarse para facturar. Sus números no se pueden volver a cargar. Si era tu único CAI, tendrás que cargar uno nuevo para seguir facturando."
+            )
+          )
+            return;
+          setTrabajando(true);
+          const r = await darDeBajaRango(id);
+          setTrabajando(false);
+          setError(r.ok ? null : (r.error ?? "No se pudo dar de baja."));
+        }}
+      >
+        <Ban className="h-3.5 w-3.5" strokeWidth={2} />
+        Dar de baja
       </Button>
       {error && <span className="mt-1 max-w-56 text-right text-xs text-red-600">{error}</span>}
     </span>

@@ -95,6 +95,13 @@ describe("alertasPorPunto", () => {
   }
   const nivel = (l: RangoParaAlerta[]) => alertasPorPunto(l, HOY).map((a) => a.nivel);
 
+  it("un rango dado de baja no cuenta: ni alerta ni bloquea al punto", () => {
+    expect(alertasPorPunto([r({ id: "r9", estado: "baja", siguiente: 100 })], HOY)).toHaveLength(0);
+    const a = alertasPorPunto([r({ id: "r9", estado: "baja", desde: 200, hasta: 300, siguiente: 250 }), r()], HOY);
+    expect(a).toHaveLength(1);
+    expect(a[0].rangoId).toBe("r1");
+  });
+
   it("agrupa por sucursal + punto + tipo", () => {
     const a = alertasPorPunto([r(), r({ id: "r2", punto_emision: "002" }), r({ id: "r3", tipo_doc: "03", clase: "nota_credito" })], HOY);
     expect(a).toHaveLength(3);

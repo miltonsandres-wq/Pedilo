@@ -2,14 +2,14 @@ import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { BotonEliminarRango } from "@/components/admin/fiscal/FormulariosFiscales";
+import { BotonDarDeBajaRango, BotonEliminarRango } from "@/components/admin/fiscal/FormulariosFiscales";
 import { FormularioRango } from "@/components/admin/fiscal/FormularioRango";
 import { resumirRango, type NivelAlerta } from "@/lib/fiscal/alertas";
 import { fechaLocalHN, formatearFecha, formatearNumeroDocumento } from "@/lib/fiscal/formato";
 
 const CLASE: Record<string, string> = { factura: "Factura", nota_credito: "Nota de crédito", nota_debito: "Nota de débito" };
 const TONO: Record<string, "success" | "warning" | "danger" | "neutral" | "brand"> = {
-  activo: "success", pendiente: "brand", agotado: "neutral", vencido: "danger",
+  activo: "success", pendiente: "brand", agotado: "neutral", vencido: "danger", baja: "neutral",
 };
 const NIVEL_TEXTO: Partial<Record<NivelAlerta, string>> = { consumo: "85 % consumido", vencimiento: "por vencer" };
 
@@ -41,7 +41,7 @@ export default async function FiscalRangosPage() {
       <Card>
         <CardHeader
           title="Rangos autorizados"
-          subtitle="Un rango activo por caja y tipo de documento. Los pendientes se activan solos cuando el activo se agota o vence."
+          subtitle="Un rango activo por sucursal y tipo de documento. Los pendientes se activan solos cuando el activo se agota o vence. ¿Lo cargaste por error? Si nunca se usó, bórralo; si ya emitió documentos, dalo de baja."
         />
         <div className="divide-y divide-ink-100">
           {(rangos ?? []).length === 0 && <p className="p-5 text-sm text-ink-500">Todavía no hay rangos. Carga el CAI que te autorizó el SAR abajo.</p>}
@@ -64,6 +64,7 @@ export default async function FiscalRangosPage() {
                   </p>
                 </div>
                 {r.siguiente === r.desde && <BotonEliminarRango id={r.id} />}
+                {r.siguiente > r.desde && (r.estado === "activo" || r.estado === "pendiente") && <BotonDarDeBajaRango id={r.id} />}
               </div>
             );
           })}

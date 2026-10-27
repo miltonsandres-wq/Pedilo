@@ -100,16 +100,6 @@ export async function guardarEmisor(_prev: EstadoAccion | null, formData: FormDa
   return { ok: true, mensaje: "Datos fiscales guardados." };
 }
 
-// --- Caja de cobro de cada sucursal (se crea sola) ---------------------------------
-
-/** Desvincula la caja física: la próxima vez que se abra el POS deberá vincularse de nuevo. */
-export async function liberarDispositivo(id: string): Promise<void> {
-  await requireAdmin();
-  const supabase = await createClient();
-  await supabase.from("dispositivos_pos").update({ vinculo_hash: null, vinculado_at: null }).eq("id", id);
-  revalidatePath(RUTA, "layout");
-}
-
 // --- Rangos CAI ------------------------------------------------------------------
 
 export async function crearRango(_prev: EstadoAccion | null, formData: FormData): Promise<EstadoAccion> {
@@ -135,6 +125,25 @@ export async function crearRango(_prev: EstadoAccion | null, formData: FormData)
 
   revalidatePath(RUTA, "layout");
   return { ok: true, mensaje: "Rango cargado. Si la caja no tenía uno activo, ya quedó activo." };
+}
+
+/**
+ * Un rango cargado por error que YA emitió documentos no se borra (son documentos fiscales):
+ * se da de baja, queda en el historial y deja de usarse para facturar.
+ */
+export async function darDeBajaRango(id: string): Promise<EstadoAccion> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cai_rangos")
+    .update({ estado: "baja" })
+    .eq("id", id)
+    .in("estado", ["activo", "pendiente"])
+    .select("id");
+  if (error) return { ok: false, error: mensajeDeErrorFiscal(error, "No se pudo dar de baja el rango.") };
+  if (!data || data.length === 0) return { ok: false, error: "Ese rango ya no está activo ni pendiente." };
+  revalidatePath(RUTA, "layout");
+  return { ok: true };
 }
 
 export async function eliminarRango(id: string): Promise<EstadoAccion> {
