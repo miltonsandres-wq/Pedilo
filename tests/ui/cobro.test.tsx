@@ -207,3 +207,55 @@ describe("«Cobrar e imprimir factura (CAI)»", () => {
     expect(onCobrado.mock.calls[0][0]).toBeTruthy(); // id de la factura: la pantalla siguiente deja imprimirla
   });
 });
+
+describe("cobro gráfico: forma de pago y efectivo recibido", () => {
+  it("la forma de pago son botones con el estado marcado; efectivo viene elegido", async () => {
+    const { user } = await abrirCobro();
+    const efectivo = screen.getByRole("button", { name: "Efectivo" });
+    const tarjeta = screen.getByRole("button", { name: "Tarjeta" });
+    expect(efectivo.getAttribute("aria-pressed")).toBe("true");
+    expect(tarjeta.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByRole("combobox")).toBeNull();
+
+    await user.click(tarjeta);
+    expect(tarjeta.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByLabelText(/Efectivo recibido/)).toBeNull(); // el cambio solo aplica al efectivo
+  });
+
+  it("efectivo: los botones rápidos llenan el recibido y se muestra el cambio en grande", async () => {
+    const { user } = await abrirCobro(230);
+    expect(screen.queryByText("Cambio a devolver")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "L 500" }));
+    expect((screen.getByLabelText(/Efectivo recibido/) as HTMLInputElement).value).toBe("500");
+    expect(screen.getByText("Cambio a devolver")).toBeTruthy();
+    expect(screen.getByText("L. 270.00")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Exacto" }));
+    expect((screen.getByLabelText(/Efectivo recibido/) as HTMLInputElement).value).toBe("230");
+    expect(screen.getByText("L. 0.00")).toBeTruthy();
+  });
+
+  it("si el efectivo recibido no alcanza, avisa cuánto falta y no deja cobrar", async () => {
+    const { user } = await abrirCobro(230);
+    await user.type(screen.getByLabelText(/Efectivo recibido/), "200");
+    expect(screen.getByText("Falta")).toBeTruthy();
+    expect(screen.getByText("El efectivo recibido no alcanza: faltan L. 30.00.")).toBeTruthy();
+    expect((confirmar() as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("cobra normal sin anotar el efectivo recibido", async () => {
+    const { user, onCobrado } = await abrirCobro();
+    await user.click(confirmar());
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+  });
+
+  it("con factura: el efectivo recibido y el cambio quedan en la factura", async () => {
+    await sembrarFiscal(configFiscal());
+    const { user, onCobrado } = await abrirCobro(230);
+    await user.click(await screen.findByRole("button", { name: "L 500" }));
+    await user.click(await screen.findByRole("button", { name: /Cobrar e imprimir factura/ }));
+    await waitFor(() => expect(onCobrado).toHaveBeenCalledWith(null));
+    const doc = (await db.documentos_fiscales.toArray())[0];
+    expect(doc.detalle_venta).toMatchObject({ recibido: 500, cambio: 270 });
+  });
+});

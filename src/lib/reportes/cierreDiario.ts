@@ -4,6 +4,7 @@ import { resumirLiquidaciones, type ResumenDeliveryCierre } from "@/lib/delivery
 import { separarCierre, type CierreSeparado } from "./separarCierre";
 import { fechaLocalHN } from "@/lib/fiscal/formato";
 import { rangoDiaHN } from "@/lib/ventas/ventasDelDia";
+import { ventasPorCategoria, ventasPorHora, type VentaPorCategoria, type VentaPorHora } from "./graficas";
 
 /**
  * El cierre diario NO es una tabla: es una consulta que suma los `pagos`
@@ -18,6 +19,10 @@ export interface CierreDiario {
   /** Lo facturado (con CAI) por un lado y lo no facturado (tickets sin factura) por otro, cada uno por método de pago. */
   separado: CierreSeparado;
   productosMasVendidos: { nombre: string; cantidad: number; subtotal: number }[];
+  /** Lo cobrado por hora del día (hora de Honduras); solo las horas con ventas. */
+  porHora: VentaPorHora[];
+  /** Lo vendido por categoría del menú (de las órdenes pagadas). */
+  porCategoria: VentaPorCategoria[];
   /** Delivery del día: entregas y liquidaciones de repartidores (el efectivo que entregaron en caja). */
   delivery: ResumenDeliveryCierre;
 }
@@ -28,7 +33,7 @@ export async function obtenerCierreDiario(
 ): Promise<CierreDiario> {
   const { data: pagos } = await supabase
     .from("pagos")
-    .select("orden_id, monto, forma_pago")
+    .select("orden_id, monto, forma_pago, created_at")
     .eq("sucursal_id", params.sucursalId)
     .gte("created_at", params.desde)
     .lte("created_at", params.hasta);
@@ -79,11 +84,24 @@ export async function obtenerCierreDiario(
   const ordenIds = (ordenesPagadas ?? []).map((o) => o.id);
 
   let productosMasVendidos: CierreDiario["productosMasVendidos"] = [];
+  let porCategoria: VentaPorCategoria[] = [];
   if (ordenIds.length > 0) {
     const { data: items } = await supabase
       .from("orden_items")
-      .select("nombre_producto, cantidad, precio_unitario")
+      .select("producto_id, nombre_producto, cantidad, precio_unitario")
       .in("orden_id", ordenIds);
+
+    // Categoría de cada producto vendido (para la gráfica por categoría)
+    const idsProducto = [...new Set((items ?? []).map((i) => i.producto_id).filter((x): x is string => !!x))];
+    const [{ data: productos }, { data: categorias }] = await Promise.all([
+      idsProducto.length ? supabase.from("productos").select("id, categoria_id").in("id", idsProducto) : { data: [] },
+      supabase.from("categorias").select("id, nombre"),
+    ]);
+    porCategoria = ventasPorCategoria(
+      (items ?? []).map((i) => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: Number(i.precio_unitario) })),
+      new Map((productos ?? []).map((p) => [p.id, p.categoria_id])),
+      new Map((categorias ?? []).map((c) => [c.id, c.nombre]))
+    );
 
     const acumulado = new Map<string, { cantidad: number; subtotal: number }>();
     for (const item of items ?? []) {
@@ -123,6 +141,8 @@ export async function obtenerCierreDiario(
     porFormaPago,
     separado,
     productosMasVendidos,
+    porHora: ventasPorHora((pagos ?? []).map((p) => ({ monto: Number(p.monto), created_at: p.created_at }))),
+    porCategoria,
     delivery: resumirLiquidaciones(entregados ?? 0, (liquidaciones ?? []).map((l) => ({
       total_efectivo_cobrado: Number(l.total_efectivo_cobrado), total_entregado_en_caja: Number(l.total_entregado_en_caja),
       diferencia: Number(l.diferencia), total_pago_envios: Number(l.total_pago_envios),

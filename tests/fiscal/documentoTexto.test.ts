@@ -229,3 +229,25 @@ describe("utilidades", () => {
     expect(dinero(1234.5)).toBe("1,234.50");
   });
 });
+
+describe("factura: efectivo recibido y cambio", () => {
+  const conPagos = (extra: object) =>
+    textos(construirFactura(documento({ detalle_venta: { pagos: [{ forma: "Efectivo", monto: 400 }], ...extra } })));
+
+  it("imprime Efectivo recibido y Cambio cuando existen", () => {
+    const t = conPagos({ recibido: 500, cambio: 100 });
+    expect(t.some((x) => x.startsWith("Efectivo recibido:") && x.endsWith("500.00"))).toBe(true);
+    expect(t.some((x) => x.startsWith("Cambio:") && x.endsWith("100.00"))).toBe(true);
+  });
+
+  it("pago justo: recibido sin línea de cambio", () => {
+    const t = conPagos({ recibido: 400 });
+    expect(t.some((x) => x.startsWith("Efectivo recibido:"))).toBe(true);
+    expect(t.join("|")).not.toContain("Cambio:");
+  });
+
+  it("sin esos datos (tarjeta, facturas anteriores) no imprime ninguna de las dos líneas", () => {
+    const t = conPagos({});
+    expect(t.join("|")).not.toMatch(/Efectivo recibido:|Cambio:/);
+  });
+});

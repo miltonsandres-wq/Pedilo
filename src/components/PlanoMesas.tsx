@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { moverMesa } from "@/app/admin/mesas/actions";
 import type { Tables } from "@/lib/types/helpers";
+import { mesasDeZona, zonasDeMesas } from "@/lib/pos/plano";
 import { cn } from "@/lib/ui";
 
 type Mesa = Tables<"mesas">;
@@ -152,6 +153,11 @@ function MesaConSillas({ mesa, arrastrando }: { mesa: Mesa; arrastrando: boolean
  */
 export function PlanoMesas({ mesas }: { mesas: Mesa[] }) {
   const lienzoRef = useRef<HTMLDivElement>(null);
+  // Con varias zonas (Terraza, Salón…) cada una se acomoda en su propio lienzo, igual que en el POS
+  const zonas = zonasDeMesas(mesas);
+  const [zonaSel, setZonaSel] = useState<string | null>(null);
+  const zona = zonaSel && zonas.includes(zonaSel) ? zonaSel : (zonas[0] ?? null);
+  const visibles = zonas.length > 1 && zona ? mesasDeZona(mesas, zona) : mesas;
   const [posiciones, setPosiciones] = useState<Record<string, { x: number; y: number }>>(
     Object.fromEntries(mesas.map((m) => [m.id, { x: m.pos_x ?? 10, y: m.pos_y ?? 10 }]))
   );
@@ -194,9 +200,32 @@ export function PlanoMesas({ mesas }: { mesas: Mesa[] }) {
   }
 
   return (
+    <div>
+      {zonas.length > 1 && (
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Zonas del local">
+          {zonas.map((z) => (
+            <button
+              key={z}
+              type="button"
+              role="tab"
+              aria-selected={zona === z}
+              onClick={() => setZonaSel(z)}
+              className={cn(
+                "shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition",
+                zona === z ? "border-brand-500 bg-brand-500 text-white" : "border-ink-200 bg-white text-ink-700 hover:border-brand-500"
+              )}
+            >
+              {z}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="mb-2 text-xs text-ink-500">
+        Arrastra cada mesa a su lugar: así la verán el cajero y los meseros en el POS.
+      </p>
     <div
       ref={lienzoRef}
-      className="relative h-[28rem] w-full overflow-hidden rounded-2xl border border-ink-100 shadow-card"
+      className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-ink-100 shadow-card sm:aspect-[4/3]"
       style={{
         backgroundColor: "#f3e9dc",
         // "Piso de madera" sutil: vetas verticales (tablones) + una veta
@@ -205,8 +234,8 @@ export function PlanoMesas({ mesas }: { mesas: Mesa[] }) {
           "repeating-linear-gradient(90deg, rgba(120,84,45,0.07) 0px, rgba(120,84,45,0.07) 1px, transparent 1px, transparent 46px), repeating-linear-gradient(0deg, rgba(120,84,45,0.04) 0px, rgba(120,84,45,0.04) 1px, transparent 1px, transparent 180px), linear-gradient(160deg, rgba(255,255,255,0.5), transparent 40%)",
       }}
     >
-      {mesas.map((m) => {
-        const pos = posiciones[m.id] ?? { x: 10, y: 10 };
+      {visibles.map((m) => {
+        const pos = posiciones[m.id] ?? { x: m.pos_x ?? 10, y: m.pos_y ?? 10 };
         const arrastrando = arrastrandoId === m.id;
         return (
           <div
@@ -225,6 +254,7 @@ export function PlanoMesas({ mesas }: { mesas: Mesa[] }) {
           Agrega una mesa para verla aquí
         </p>
       )}
+    </div>
     </div>
   );
 }

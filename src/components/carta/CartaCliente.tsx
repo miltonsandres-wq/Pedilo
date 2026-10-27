@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { enviarPedidoCliente, type ItemCarrito } from "@/app/carta/[token]/actions";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/ui";
+import { MenuGraficoCliente } from "@/components/menu/MenuGraficoCliente";
 import { formatearLempiras } from "@/lib/delivery/validaciones";
 
 export interface ProductoMenu {
@@ -71,28 +71,15 @@ export function CartaCliente({
     }
   }
 
-  const sinCategoria = productos.filter((p) => !p.categoria_id);
-  const platosDelDia = productos.filter((p) => p.plato_dia);
+  const cantidades = Object.fromEntries(Object.entries(carrito).map(([id, i]) => [id, i.cantidad]));
 
   return (
     <div>
-      {platosDelDia.length > 0 && (
-        <Seccion titulo="⭐ Platos del día" items={platosDelDia} carrito={carrito} onCambiar={cambiarCantidad} />
-      )}
-      {categorias.map((cat) => {
-        const items = productos.filter((p) => p.categoria_id === cat.id);
-        if (items.length === 0) return null;
-        return (
-          <Seccion key={cat.id} titulo={cat.nombre} items={items} carrito={carrito} onCambiar={cambiarCantidad} />
-        );
-      })}
-      {sinCategoria.length > 0 && (
-        <Seccion titulo="Más" items={sinCategoria} carrito={carrito} onCambiar={cambiarCantidad} />
-      )}
+      <MenuGraficoCliente productos={productos} categorias={categorias} cantidades={cantidades} onCambiar={cambiarCantidad} />
       {productos.length === 0 ? (
         <p className="text-center text-sm text-ink-400">El menú todavía no tiene platillos disponibles.</p>
       ) : (
-        <p className="mb-16 text-center text-xs text-ink-400">Los precios incluyen ISV.</p>
+        <p className="mb-16 mt-4 text-center text-xs text-ink-400">Los precios incluyen ISV.</p>
       )}
 
       {totalItems > 0 && !mostrarCarrito && (
@@ -178,67 +165,5 @@ export function CartaCliente({
         </div>
       )}
     </div>
-  );
-}
-
-function Seccion({
-  titulo,
-  items,
-  carrito,
-  onCambiar,
-}: {
-  titulo: string;
-  items: ProductoMenu[];
-  carrito: Record<string, { cantidad: number; nota: string }>;
-  onCambiar: (productoId: string, delta: number) => void;
-}) {
-  return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">{titulo}</h2>
-      <div className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
-        {items.map((p) => {
-          const cantidad = carrito[p.id]?.cantidad ?? 0;
-          return (
-            <div key={p.id} className="flex items-center gap-3 p-3">
-              {p.foto_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.foto_url} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
-              ) : (
-                <div className="h-14 w-14 shrink-0 rounded-lg bg-ink-50" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink-900">{p.nombre}</p>
-                {p.descripcion && <p className="mt-0.5 whitespace-pre-line text-xs leading-snug text-ink-500">{p.descripcion}</p>}
-                <p className="mt-1 text-sm font-semibold tabular-nums text-brand-700">{formatearLempiras(p.precio)}</p>
-              </div>
-              {cantidad === 0 ? (
-                <Button size="sm" onClick={() => onCambiar(p.id, 1)}>
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-                  Agregar
-                </Button>
-              ) : (
-                <div className={cn("flex items-center gap-2 rounded-full bg-brand-50 px-2 py-1")}>
-                  <button
-                    onClick={() => onCambiar(p.id, -1)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-brand-700 shadow-sm"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </button>
-                  <span className="w-4 text-center text-sm font-medium tabular-nums text-brand-800">
-                    {cantidad}
-                  </span>
-                  <button
-                    onClick={() => onCambiar(p.id, 1)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-brand-700 shadow-sm"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }

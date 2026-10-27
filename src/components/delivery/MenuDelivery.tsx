@@ -14,6 +14,7 @@ import {
 import {
   ETIQUETA_METODO, formatearLempiras, validarCheckout, type DatosCheckout, type ErroresCheckout, type MetodoPago,
 } from "@/lib/delivery/validaciones";
+import { MenuGraficoCliente } from "@/components/menu/MenuGraficoCliente";
 import type { Punto } from "./MapaPin";
 
 // Leaflet toca `window`: solo en el navegador
@@ -69,8 +70,7 @@ export function MenuDeliveryCliente({ menu }: { menu: MenuDelivery }) {
 
   const unidades = totalUnidades(carrito);
   const sub = subtotal(carrito, menu.productos);
-  const sinCategoria = menu.productos.filter((p) => !p.categoria_id);
-  const platosDelDia = menu.productos.filter((p) => p.plato_dia);
+  const cantidades = Object.fromEntries(Object.entries(carrito).map(([id, l]) => [id, l.cantidad]));
 
   return (
     <div>
@@ -84,25 +84,17 @@ export function MenuDeliveryCliente({ menu }: { menu: MenuDelivery }) {
         </div>
       )}
 
-      {platosDelDia.length > 0 && (
-        <Seccion titulo="⭐ Platos del día" items={platosDelDia} carrito={carrito} activo={menu.abierto}
-          onCambiar={(id, d) => setCarrito((c) => cambiarCantidad(c, id, d))} />
-      )}
-      {menu.categorias.map((cat) => {
-        const items = menu.productos.filter((p) => p.categoria_id === cat.id);
-        return items.length ? (
-          <Seccion key={cat.id} titulo={cat.nombre} items={items} carrito={carrito} activo={menu.abierto}
-            onCambiar={(id, d) => setCarrito((c) => cambiarCantidad(c, id, d))} />
-        ) : null;
-      })}
-      {sinCategoria.length > 0 && (
-        <Seccion titulo="Más" items={sinCategoria} carrito={carrito} activo={menu.abierto}
-          onCambiar={(id, d) => setCarrito((c) => cambiarCantidad(c, id, d))} />
-      )}
+      <MenuGraficoCliente
+        productos={menu.productos}
+        categorias={menu.categorias}
+        cantidades={cantidades}
+        activo={menu.abierto}
+        onCambiar={(id, d) => setCarrito((c) => cambiarCantidad(c, id, d))}
+      />
       {menu.productos.length === 0 && (
         <p className="py-10 text-center text-sm text-ink-400">El menú todavía no tiene platillos disponibles.</p>
       )}
-      <p className="mt-2 text-center text-xs text-ink-400">Los precios incluyen ISV.</p>
+      <p className="mb-16 mt-4 text-center text-xs text-ink-400">Los precios incluyen ISV.</p>
 
       {menu.abierto && unidades > 0 && paso === "cerrado" && !confirmado && (
         <button
@@ -158,49 +150,6 @@ function Hoja({ titulo, onCerrar, children }: { titulo: string; onCerrar: () => 
         <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
-  );
-}
-
-function Seccion({
-  titulo, items, carrito, activo, onCambiar,
-}: {
-  titulo: string;
-  items: MenuDelivery["productos"];
-  carrito: Carrito;
-  activo: boolean;
-  onCambiar: (id: string, delta: number) => void;
-}) {
-  return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">{titulo}</h2>
-      <div className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
-        {items.map((p) => {
-          const cantidad = carrito[p.id]?.cantidad ?? 0;
-          return (
-            <div key={p.id} className="flex items-center gap-3 p-3">
-              {p.foto_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.foto_url} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
-              ) : (
-                <div className="h-16 w-16 shrink-0 rounded-lg bg-ink-50" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink-900">{p.nombre}</p>
-                {p.descripcion && <p className="mt-0.5 whitespace-pre-line text-xs leading-snug text-ink-500">{p.descripcion}</p>}
-                <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink-800">{formatearLempiras(p.precio)}</p>
-              </div>
-              {!activo ? null : cantidad === 0 ? (
-                <Button size="sm" type="button" onClick={() => onCambiar(p.id, 1)}>
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2} /> Agregar
-                </Button>
-              ) : (
-                <Cantidad cantidad={cantidad} onCambiar={(d) => onCambiar(p.id, d)} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 

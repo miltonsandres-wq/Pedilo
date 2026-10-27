@@ -207,6 +207,8 @@ export async function cobrar(params: {
   monto: number;
   formaPago: FormaPago;
   referencia?: string;
+  /** Efectivo que entregó el cliente (para imprimir «Efectivo recibido» y «Cambio» en la factura). */
+  efectivoRecibido?: number;
   cliente?: DatosCliente;
   exoneracion?: DatosExoneracion;
   /** «Ticket sin factura»: se cobra sin emitir factura con CAI (queda marcado en la orden). */
@@ -272,7 +274,7 @@ export async function cobrar(params: {
           lineas: lineasDesdeItems(items),
           cliente: params.cliente,
           exoneracion: params.exoneracion,
-          detalleVenta: await armarDetalleVenta(orden, params.usuarioId),
+          detalleVenta: await armarDetalleVenta(orden, params.usuarioId, params.monto, params.efectivoRecibido),
         });
         documentoId = doc.id;
       }
@@ -287,7 +289,12 @@ export async function cobrar(params: {
 }
 
 /** Lo que se imprime en la factura además de lo fiscal: cajero, quién atendió, lugar, # de orden y pagos. */
-async function armarDetalleVenta(orden: OrdenLocal, cajeroId: string): Promise<DetalleVenta> {
+async function armarDetalleVenta(
+  orden: OrdenLocal,
+  cajeroId: string,
+  montoCobrado: number,
+  efectivoRecibido?: number
+): Promise<DetalleVenta> {
   const equipo = ((await db.config.get(CLAVE_EQUIPO))?.valor as Record<string, string> | undefined) ?? {};
   const mesa = orden.mesa_id ? await db.mesas.get(orden.mesa_id) : undefined;
   const pagos = await db.pagos.where("orden_id").equals(orden.id).toArray();
@@ -297,6 +304,13 @@ async function armarDetalleVenta(orden: OrdenLocal, cajeroId: string): Promise<D
     lugar: mesa?.nombre ?? etiquetaCanal(orden.canal),
     orden: orden.numero_dia,
     pagos: pagos.map((p) => ({ forma: ETIQUETA_FORMA_PAGO[p.forma_pago as FormaPago] ?? String(p.forma_pago), monto: p.monto })),
+    // Efectivo recibido y cambio del último pago (solo si el cajero los anotó y alcanzan para lo cobrado)
+    ...(efectivoRecibido != null && efectivoRecibido >= montoCobrado
+      ? {
+          recibido: efectivoRecibido,
+          ...(efectivoRecibido > montoCobrado ? { cambio: Math.round((efectivoRecibido - montoCobrado) * 100) / 100 } : {}),
+        }
+      : {}),
   };
 }
 

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
-import { Bike, Package, ShoppingBag, Users, UtensilsCrossed, UserPlus, X } from "lucide-react";
+import { Bike, Package, ShoppingBag, UtensilsCrossed, UserPlus, X, type LucideIcon } from "lucide-react";
 import { db, type MesaLocal } from "@/lib/offline/db";
+import { SalonMesas } from "./SalonMesas";
 import { abrirOrden } from "@/lib/pos/acciones";
 import { Button } from "@/components/ui/Button";
 import { etiquetaCanal } from "@/lib/pos/canales";
@@ -132,53 +133,7 @@ export function MapaMesas({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {(mesas ?? []).map((mesa) => {
-          const orden = ordenPorMesa.get(mesa.id);
-          const sinPedido = orden && orden.total === 0;
-          const estilo = !orden
-            ? "border-libre-border bg-libre-bg text-libre-text hover:brightness-95"
-            : sinPedido
-              ? "border-amber-300 bg-amber-50 text-amber-800 hover:brightness-95"
-              : "border-ocupada-border bg-ocupada-bg text-ocupada-text hover:brightness-95";
-
-          return (
-            <button
-              key={mesa.id}
-              onClick={() => clicMesa(mesa)}
-              className={cn(
-                "flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 p-3 text-sm font-semibold shadow-card transition active:scale-95",
-                estilo
-              )}
-            >
-              <UtensilsCrossed className="h-5 w-5 opacity-70" strokeWidth={2} />
-              <span>{mesa.nombre}</span>
-              {orden ? (
-                <>
-                  {orden.cliente_nombre && (
-                    <span className="max-w-full truncate text-[11px] font-normal opacity-80">
-                      {orden.cliente_nombre}
-                    </span>
-                  )}
-                  <span className="text-[11px] font-normal opacity-70">
-                    {sinPedido ? "sin pedido" : "L. " + orden.total.toFixed(2)}
-                  </span>
-                </>
-              ) : (
-                <span className="flex items-center gap-1 text-[11px] font-normal opacity-70">
-                  <Users className="h-3 w-3" strokeWidth={2} />
-                  {mesa.capacidad}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {(mesas ?? []).length === 0 && (
-          <p className="col-span-full text-sm text-ink-500">
-            No hay mesas configuradas todavía (pídele al admin que las cree).
-          </p>
-        )}
-      </div>
+      <SalonMesas mesas={mesas ?? []} ordenPorMesa={ordenPorMesa} onClic={clicMesa} />
 
       {esMesero && (
         <p className="mt-6 text-xs text-ink-400">
@@ -215,6 +170,21 @@ export function MapaMesas({
 }
 
 type OrigenPedido = "local" | "para_llevar" | "plataforma" | "delivery";
+
+/** Las tarjetas de «¿De dónde es el pedido?», en el orden de siempre; Delivery solo si está habilitado. */
+function opcionesOrigen(
+  mesaNombre: string,
+  deliveryHabilitado: boolean
+): { valor: OrigenPedido; titulo: string; detalle: string; icono: LucideIcon }[] {
+  return [
+    { valor: "local", titulo: "Restaurante", detalle: `en ${mesaNombre}`, icono: UtensilsCrossed },
+    { valor: "para_llevar", titulo: "Para llevar", detalle: "sin ocupar mesa", icono: ShoppingBag },
+    ...(deliveryHabilitado
+      ? [{ valor: "delivery" as const, titulo: "Delivery", detalle: "a domicilio", icono: Bike }]
+      : []),
+    { valor: "plataforma", titulo: "Plataforma", detalle: "PedidosYa, Hugo…", icono: Package },
+  ];
+}
 
 function ModalNuevoCliente({
   mesa,
@@ -297,18 +267,31 @@ function ModalNuevoCliente({
 
         {puedeElegirOrigen && (
           <>
-            <label htmlFor="origen-pedido" className="mb-1.5 block text-xs font-medium text-ink-500">¿De dónde es el pedido?</label>
-            <select
-              id="origen-pedido"
-              value={origen}
-              onChange={(e) => setOrigen(e.target.value as OrigenPedido)}
-              className="mb-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm"
-            >
-              <option value="local">Restaurante (en {mesa.nombre})</option>
-              <option value="para_llevar">Para llevar</option>
-              {deliveryHabilitado && <option value="delivery">Delivery</option>}
-              <option value="plataforma">Plataforma (PedidosYa, Hugo…)</option>
-            </select>
+            <p id="origen-pedido-titulo" className="mb-1.5 block text-xs font-medium text-ink-500">¿De dónde es el pedido?</p>
+            <div className="mb-3 grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="origen-pedido-titulo">
+              {opcionesOrigen(mesa.nombre, deliveryHabilitado).map((o) => {
+                const activo = origen === o.valor;
+                return (
+                  <button
+                    key={o.valor}
+                    type="button"
+                    role="radio"
+                    aria-checked={activo}
+                    onClick={() => setOrigen(o.valor)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3.5 text-center transition active:scale-95",
+                      activo
+                        ? "border-brand-500 bg-brand-50 text-brand-800 shadow-card"
+                        : "border-ink-200 bg-white text-ink-700 hover:border-brand-500"
+                    )}
+                  >
+                    <o.icono className="h-7 w-7" strokeWidth={1.75} />
+                    <span className="text-sm font-semibold">{o.titulo}</span>
+                    <span className="text-[11px] font-normal leading-tight opacity-70">{o.detalle}</span>
+                  </button>
+                );
+              })}
+            </div>
           </>
         )}
 

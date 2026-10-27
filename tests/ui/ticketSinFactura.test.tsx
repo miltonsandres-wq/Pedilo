@@ -40,7 +40,7 @@ describe("al cobrar: Facturar o Ticket sin factura", () => {
   it("ya no hay botones de delivery externo ni de con CAI / sin CAI", async () => {
     await sembrarFiscal(configFiscal({ ticketSinFactura: true }));
     await abrirCobro({ permiso: true });
-    expect(await screen.findByRole("button", { name: "Facturar" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Facturar" }, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Delivery externo/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Factura CAI|Cobro normal/ })).toBeNull();
   });

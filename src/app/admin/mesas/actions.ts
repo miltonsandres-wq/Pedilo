@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { normalizarMensajeFlyer } from "@/lib/flyer/mensaje";
+import { posicionInicial } from "@/lib/pos/plano";
 
 export async function crearMesa(formData: FormData) {
   const sesion = await requireAdmin();
@@ -12,6 +13,14 @@ export async function crearMesa(formData: FormData) {
 
   const forma = String(formData.get("forma") ?? "cuadrada");
 
+  // Cada mesa nueva nace en un lugar distinto del plano (no todas apiladas en el mismo punto)
+  const { count } = await supabase
+    .from("mesas")
+    .select("*", { count: "exact", head: true })
+    .eq("sucursal_id", sucursalId)
+    .eq("activa", true);
+  const inicial = posicionInicial(count ?? 0);
+
   await supabase.from("mesas").insert({
     tenant_id: sesion.tenant_id,
     sucursal_id: sucursalId,
@@ -19,8 +28,8 @@ export async function crearMesa(formData: FormData) {
     capacidad: Number(formData.get("capacidad") ?? 4),
     zona: String(formData.get("zona") ?? "") || null,
     forma: forma === "redonda" ? "redonda" : "cuadrada",
-    pos_x: 10,
-    pos_y: 10,
+    pos_x: inicial.x,
+    pos_y: inicial.y,
   });
 
   revalidatePath("/admin/mesas");
@@ -55,8 +64,12 @@ export async function regenerarQrMesa(id: string) {
 /** Se llama al soltar una mesa en el plano visual (drag & drop). */
 export async function moverMesa(id: string, posX: number, posY: number) {
   await requireAdmin();
+  if (!Number.isFinite(posX) || !Number.isFinite(posY)) return;
   const supabase = await createClient();
-  await supabase.from("mesas").update({ pos_x: posX, pos_y: posY }).eq("id", id);
+  // Siempre dentro del lienzo (0–100 %), aunque llegue un valor raro
+  const x = Math.min(100, Math.max(0, posX));
+  const y = Math.min(100, Math.max(0, posY));
+  await supabase.from("mesas").update({ pos_x: x, pos_y: y }).eq("id", id);
   revalidatePath("/admin/mesas");
 }
 

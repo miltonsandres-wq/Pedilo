@@ -35,24 +35,54 @@ describe("carta del QR", () => {
 
   it("muestra la sección «Platos del día» primero, con solo los de hoy", () => {
     render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={productos} />);
-    const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(titulos[0]).toMatch(/Platos del día/);
-    expect(titulos).toContain("Antojitos");
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs[0]).toMatch(/Platos del día/);
+    expect(tabs).toContain("Antojitos");
+    // los platos del día de hoy ya salen abiertos
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toMatch(/Platos del día/);
+    expect(screen.getByText("Pollo con tajadas")).toBeTruthy();
   });
 
-  it("muestra el precio de cada platillo y avisa que incluye ISV", () => {
+  it("muestra el precio de cada platillo y avisa que incluye ISV", async () => {
+    const user = userEvent.setup();
     render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={productos} />);
-    expect(screen.getAllByText("L 45.00").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("L 120.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("L 120.00")).toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Antojitos" }));
+    expect(screen.getByText("L 45.00")).toBeTruthy();
     expect(screen.getByText("Los precios incluyen ISV.")).toBeTruthy();
+  });
+
+  it("las categorías son botones: al elegir una salen solo sus platos, en tarjetas con foto o su marcador", async () => {
+    const user = userEvent.setup();
+    const menu = [
+      { id: "A", nombre: "Baleada", descripcion: "Con queso y frijoles", precio: 45, foto_url: "https://x.test/b.jpg", categoria_id: "C1" },
+      { id: "B", nombre: "Coca-Cola", descripcion: null, precio: 30, foto_url: null, categoria_id: "C2" },
+      { id: "C", nombre: "Sopa suelta", descripcion: null, precio: 80, foto_url: null, categoria_id: null },
+    ];
+    const { container } = render(
+      <CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }, { id: "C2", nombre: "Bebidas" }]} productos={menu} />
+    );
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Antojitos", "Bebidas", "Más"]);
+    expect(screen.getByRole("tab", { name: "Antojitos" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText("Baleada")).toBeTruthy();
+    expect(screen.queryByText("Coca-Cola")).toBeNull();
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("https://x.test/b.jpg");
+
+    await user.click(screen.getByRole("tab", { name: "Bebidas" }));
+    expect(screen.getByText("Coca-Cola")).toBeTruthy();
+    expect(screen.queryByText("Baleada")).toBeNull();
+    expect(container.querySelector("img")).toBeNull(); // sin foto: marcador, no imagen rota
+
+    await user.click(screen.getByRole("tab", { name: "Más" })); // sin categoría
+    expect(screen.getByText("Sopa suelta")).toBeTruthy();
   });
 
   it("el pedido muestra el precio de cada línea y el total estimado", async () => {
     const user = userEvent.setup();
     render(<CartaCliente token="T" categorias={[{ id: "C1", nombre: "Antojitos" }]} productos={[productos[0]]} />);
-    const agregar = screen.getByRole("button", { name: /Agregar/ });
-    await user.click(agregar);
-    await user.click(screen.getByText("1").nextElementSibling as HTMLElement); // «+»
+    await user.click(screen.getByRole("button", { name: "Agregar Baleada" }));
+    await user.click(screen.getByRole("button", { name: "Sumar uno de Baleada" })); // el contador sobre la tarjeta
+    expect(screen.getByLabelText("2 de Baleada")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Ver mi pedido/ }));
     expect(screen.getByText("Total estimado")).toBeTruthy();
     expect(screen.getAllByText("L 90.00").length).toBeGreaterThan(0); // 2 × 45

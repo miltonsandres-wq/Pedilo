@@ -11,6 +11,10 @@ export interface DetalleVenta {
   /** Número de orden del día. */
   orden?: number | null;
   pagos?: { forma: string; monto: number }[];
+  /** Efectivo que entregó el cliente en el último pago (solo si pagó en efectivo y lo anotó el cajero). */
+  recibido?: number | null;
+  /** Cambio devuelto: recibido menos lo cobrado. Solo si hubo cambio. */
+  cambio?: number | null;
 }
 
 /** Clave de la config local con los nombres del equipo de la sucursal: { [usuarioId]: nombre }. */

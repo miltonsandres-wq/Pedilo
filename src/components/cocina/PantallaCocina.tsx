@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, ChefHat, Clock } from "lucide-react";
+import { AlertTriangle, Check, ChefHat, Clock, MessageSquareWarning } from "lucide-react";
 import { db, type OrdenLocal } from "@/lib/offline/db";
 import { marcarListoCocina } from "@/lib/pos/acciones";
 import { cn } from "@/lib/ui";
 import { etiquetaCanal } from "@/lib/pos/canales";
+import { ETIQUETA_URGENCIA, minutosDesde, nivelUrgencia, type NivelUrgencia } from "@/lib/cocina/urgencia";
 
 /** Se re-renderiza cada 20s para que "hace X min" en las tarjetas avance solo. */
 function useAhora() {
@@ -17,6 +18,14 @@ function useAhora() {
   }, []);
   return ahora;
 }
+
+// Semáforo de la tarjeta: verde / ámbar / rojo. El color nunca va solo: cada nivel
+// lleva también su palabra («En tiempo», «Atender», «¡Urgente!») y el crítico un ícono.
+const ESTILO: Record<NivelUrgencia, { borde: string; franja: string }> = {
+  fresco: { borde: "border-emerald-500", franja: "bg-emerald-700 text-white" },
+  atencion: { borde: "border-amber-400", franja: "bg-amber-400 text-ink-950" },
+  critico: { borde: "border-red-500", franja: "bg-red-600 text-white" },
+};
 
 export function PantallaCocina({ sucursalId }: { sucursalId: string }) {
   const ahora = useAhora();
@@ -35,17 +44,23 @@ export function PantallaCocina({ sucursalId }: { sucursalId: string }) {
   if (ordenes.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-ink-400">
-        <ChefHat className="h-12 w-12" strokeWidth={1.5} />
-        <p className="text-lg font-medium">Todo al día — sin órdenes pendientes</p>
+        <ChefHat className="h-16 w-16" strokeWidth={1.5} />
+        <p className="text-2xl font-semibold">Todo al día</p>
+        <p className="text-base">No hay órdenes pendientes</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {ordenes.map((orden) => (
-        <TarjetaOrden key={orden.id} orden={orden} ahora={ahora} />
-      ))}
+    <div>
+      <p className="px-4 pt-4 text-sm font-medium text-ink-400">
+        {ordenes.length} {ordenes.length === 1 ? "orden pendiente" : "órdenes pendientes"} · la más antigua primero
+      </p>
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {ordenes.map((orden) => (
+          <TarjetaOrden key={orden.id} orden={orden} ahora={ahora} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -59,10 +74,9 @@ function TarjetaOrden({ orden, ahora }: { orden: OrdenLocal; ahora: number }) {
   );
   const [marcando, setMarcando] = useState(false);
 
-  const minutos = orden.enviada_at
-    ? Math.max(0, Math.floor((ahora - new Date(orden.enviada_at).getTime()) / 60_000))
-    : 0;
-  const urgencia = minutos >= 10 ? "critico" : minutos >= 5 ? "atencion" : "fresco";
+  const minutos = minutosDesde(orden.enviada_at, ahora);
+  const urgencia = nivelUrgencia(minutos);
+  const estilo = ESTILO[urgencia];
 
   async function marcarListo() {
     setMarcando(true);
@@ -75,58 +89,58 @@ function TarjetaOrden({ orden, ahora }: { orden: OrdenLocal; ahora: number }) {
 
   return (
     <div
-      className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border-2 bg-white shadow-lg",
-        urgencia === "critico" && "border-red-400",
-        urgencia === "atencion" && "border-amber-400",
-        urgencia === "fresco" && "border-ink-100"
-      )}
+      data-urgencia={urgencia}
+      className={cn("flex flex-col overflow-hidden rounded-2xl border-4 bg-white shadow-lg", estilo.borde)}
     >
-      <div
-        className={cn(
-          "flex items-center justify-between px-4 py-3",
-          urgencia === "critico" && "bg-red-50",
-          urgencia === "atencion" && "bg-amber-50",
-          urgencia === "fresco" && "bg-ink-50"
-        )}
-      >
-        <div>
-          <p className="text-lg font-bold leading-tight text-ink-900">{orden.mesa_id ? (mesa?.nombre ?? "Mesa") : etiquetaCanal(orden.canal)}</p>
-          {orden.numero_dia != null && (
-            <p className="font-mono text-xs text-ink-500">Orden #{orden.numero_dia}</p>
-          )}
-        </div>
-        <span
-          className={cn(
-            "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
-            urgencia === "critico" && "bg-red-500 text-white",
-            urgencia === "atencion" && "bg-amber-500 text-white",
-            urgencia === "fresco" && "bg-ink-200 text-ink-700"
-          )}
-        >
-          <Clock className="h-3 w-3" strokeWidth={2.5} />
+      {/* Franja del semáforo: tiempo transcurrido bien grande, legible a distancia */}
+      <div className={cn("flex items-center justify-between gap-3 px-4 py-2", estilo.franja)}>
+        <span className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide">
+          {urgencia === "critico" && <AlertTriangle className="h-4 w-4" strokeWidth={2.5} />}
+          {ETIQUETA_URGENCIA[urgencia]}
+        </span>
+        <span className="flex items-center gap-1.5 text-3xl font-black tabular-nums leading-none">
+          <Clock className="h-6 w-6" strokeWidth={2.5} />
           {minutos} min
         </span>
       </div>
 
+      <div className="flex items-end justify-between gap-3 border-b-2 border-ink-100 px-4 py-3">
+        <p className="min-w-0 truncate text-3xl font-black leading-tight text-ink-950">
+          {orden.mesa_id ? (mesa?.nombre ?? "Mesa") : etiquetaCanal(orden.canal)}
+        </p>
+        {orden.numero_dia != null && (
+          <p className="shrink-0 rounded-lg bg-ink-900 px-2.5 py-1 font-mono text-xl font-bold text-white">
+            #{orden.numero_dia}
+          </p>
+        )}
+      </div>
+
       <ul className="flex-1 divide-y divide-ink-100">
         {items.map((item) => (
-          <li key={item.id} className="px-4 py-2.5">
-            <p className="text-base font-semibold text-ink-900">
-              <span className="text-brand-600">{item.cantidad}×</span> {item.nombre_producto}
-            </p>
-            {item.nota && <p className="mt-0.5 text-sm italic text-ink-500">* {item.nota}</p>}
+          <li key={item.id} className="flex items-start gap-3 px-4 py-3">
+            <span className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-xl bg-brand-600 px-2 text-3xl font-black tabular-nums text-white">
+              {item.cantidad}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xl font-bold leading-snug text-ink-950">{item.nombre_producto}</p>
+              {item.nota && (
+                <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1.5 text-base font-semibold leading-snug text-amber-950">
+                  <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.5} />
+                  {item.nota}
+                </p>
+              )}
+            </div>
           </li>
         ))}
-        {items.length === 0 && <li className="px-4 py-3 text-sm text-ink-400">Sin ítems.</li>}
+        {items.length === 0 && <li className="px-4 py-3 text-base text-ink-400">Sin ítems.</li>}
       </ul>
 
       <button
         type="button"
         onClick={() => void marcarListo()}
-        className="flex items-center justify-center gap-2 bg-ink-900 py-3 text-sm font-semibold text-white transition hover:bg-ink-800"
+        className="flex h-16 items-center justify-center gap-2 bg-emerald-600 text-2xl font-black text-white transition hover:bg-emerald-700 active:scale-[0.99]"
       >
-        <Check className="h-4 w-4" strokeWidth={2.5} />
+        <Check className="h-7 w-7" strokeWidth={3} />
         Listo
       </button>
     </div>

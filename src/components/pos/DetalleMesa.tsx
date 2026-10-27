@@ -6,7 +6,13 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowLeft,
   Ban,
+  Banknote,
   ChefHat,
+  CreditCard,
+  FileText,
+  Landmark,
+  Ticket,
+  Wallet,
   Check,
   Minus,
   MessageSquarePlus,
@@ -40,7 +46,6 @@ import { agenteImpresionUrl, armarFactura, armarPrecuenta, marcarFacturaImpresa,
 import { imprimirDirecto } from "@/lib/printing/imprimirDirecto";
 import { ImpresionTicket } from "./ImpresionTicket";
 import { Button } from "@/components/ui/Button";
-import { SelectField } from "@/components/ui/Field";
 import { evaluarFacturacion, leerConfigFiscal } from "@/lib/fiscal/emision";
 import { esRtnValido, normalizarRtn } from "@/lib/fiscal/formato";
 import { imprimirPrecuenta } from "@/lib/fiscal/impresion";
@@ -551,6 +556,21 @@ function FormularioAgregarItem({
   );
 }
 
+const ICONO_FORMA_PAGO: Record<string, typeof Wallet> = {
+  efectivo: Banknote,
+  tarjeta: CreditCard,
+  transferencia: Landmark,
+};
+
+const redondear2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Montos rápidos de efectivo: exacto no va aquí (tiene su botón); sí el siguiente múltiplo de 50 y los billetes de 100, 200 y 500 que alcanzan. */
+function montosRapidosEfectivo(monto: number): number[] {
+  if (!(monto > 0)) return [];
+  const sugeridos = [Math.ceil(monto / 50) * 50, 100, 200, 500, 1000].filter((v) => v >= monto && v !== monto);
+  return [...new Set(sugeridos)].sort((a, b) => a - b).slice(0, 4);
+}
+
 export function FormularioCobro({
   ordenId,
   mesaId,
@@ -580,6 +600,8 @@ export function FormularioCobro({
   const [modo, setModo] = useState<"factura" | "ticket">("factura");
   const [formaPago, setFormaPago] = useState<FormaPago>(formasNormales[0] ?? "efectivo");
   const [referencia, setReferencia] = useState(referenciaInicial);
+  // Efectivo que entrega el cliente (vacío = justo lo cobrado, sin cambio)
+  const [recibidoTxt, setRecibidoTxt] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tras un cobro SIN factura CAI (delivery externo o negocio sin CAI) se ofrece imprimir el recibo antes de cerrar
@@ -615,6 +637,16 @@ export function FormularioCobro({
     else if (!esRtnValido(clienteRtn)) faltante = `El RTN debe tener 14 dígitos (lleva ${digitosRtn.length}).`;
   }
 
+  // Efectivo recibido y cambio a devolver (solo si paga en efectivo y anotó cuánto entregó)
+  const esEfectivo = formaPago === "efectivo";
+  const recibidoNum = recibidoTxt.trim() === "" ? null : Number(recibidoTxt);
+  const hayRecibido = esEfectivo && recibidoNum != null && Number.isFinite(recibidoNum) && recibidoNum > 0;
+  const cambio = hayRecibido ? redondear2(recibidoNum! - monto) : null;
+  if (!faltante && hayRecibido && cambio! < 0) {
+    faltante = `El efectivo recibido no alcanza: faltan L. ${(-cambio!).toFixed(2)}.`;
+  }
+  const formasMostradas = formasNormales.length > 0 ? formasNormales : (["efectivo", "tarjeta", "transferencia"] as FormaPago[]);
+
   /** `imprimir`: cobra y manda el comprobante a imprimir en el mismo paso (sin pantallas intermedias). */
   async function confirmar(imprimir = true) {
     setError(null);
@@ -628,6 +660,7 @@ export function FormularioCobro({
         formaPago,
         sinFactura,
         referencia: referencia || undefined,
+        efectivoRecibido: hayRecibido ? recibidoNum! : undefined,
         cliente: pideCliente ? { nombre: clienteNombre, rtn: clienteRtn } : undefined,
         exoneracion: factura && hayExoneracion
           ? {
@@ -727,24 +760,29 @@ export function FormularioCobro({
         )}
 
         {facturacionActiva && ticketPermitido && (
-          <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-ink-100 p-1" role="group" aria-label="Tipo de cobro">
+          <div className="mb-4 grid grid-cols-2 gap-2" role="group" aria-label="Tipo de cobro">
             {(
               [
-                ["factura", "Facturar"],
-                ["ticket", "Ticket sin factura"],
+                ["factura", "Facturar", "Con CAI y RTN", FileText],
+                ["ticket", "Ticket sin factura", "No fiscal", Ticket],
               ] as const
-            ).map(([valor, etiqueta]) => (
+            ).map(([valor, etiqueta, detalle, Icono]) => (
               <button
                 key={valor}
                 type="button"
+                aria-label={etiqueta}
                 aria-pressed={modo === valor}
                 onClick={() => setModo(valor)}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition",
-                  modo === valor ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-800"
+                  "flex flex-col items-center gap-1 rounded-2xl border-2 px-3 py-3 text-center transition active:scale-[0.97]",
+                  modo === valor
+                    ? "border-brand-500 bg-brand-500/10 text-brand-800"
+                    : "border-ink-200 bg-white text-ink-600 hover:border-brand-500"
                 )}
               >
-                {etiqueta}
+                <Icono className="h-6 w-6" strokeWidth={1.75} />
+                <span className="text-sm font-semibold leading-tight">{etiqueta}</span>
+                <span className="text-[11px] text-ink-500">{detalle}</span>
               </button>
             ))}
           </div>
@@ -772,22 +810,82 @@ export function FormularioCobro({
           </p>
         )}
 
-        <SelectField
-          label="Forma de pago"
-          name="forma_pago"
-          value={formaPago}
-          onChange={(e) => setFormaPago(e.target.value as FormaPago)}
-          className="mb-3"
-        >
-          {(formasNormales.length > 0
-            ? formasNormales
-            : (["efectivo", "tarjeta", "transferencia"] as const)
-          ).map((f) => (
-            <option key={f} value={f}>
-              {ETIQUETA_FORMA_PAGO[f] ?? f}
-            </option>
-          ))}
-        </SelectField>
+        <p className="mb-1.5 text-xs font-medium text-ink-500">Forma de pago</p>
+        <div className="mb-3 grid grid-cols-3 gap-2" role="group" aria-label="Forma de pago">
+          {formasMostradas.map((f) => {
+            const Icono = ICONO_FORMA_PAGO[f] ?? Wallet;
+            return (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={formaPago === f}
+                onClick={() => setFormaPago(f)}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition active:scale-[0.97]",
+                  formaPago === f
+                    ? "border-brand-500 bg-brand-500/10 text-brand-800"
+                    : "border-ink-200 bg-white text-ink-600 hover:border-brand-500"
+                )}
+              >
+                <Icono className="h-7 w-7" strokeWidth={1.75} />
+                <span className="text-sm font-semibold leading-tight">{ETIQUETA_FORMA_PAGO[f] ?? f}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {esEfectivo && (
+          <div className="mb-4 rounded-2xl border border-ink-100 bg-ink-50/60 p-3">
+            <label htmlFor="efectivo-recibido" className="mb-1.5 block text-xs font-medium text-ink-500">
+              Efectivo recibido (opcional)
+            </label>
+            <div className="relative mb-2">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">L.</span>
+              <input
+                id="efectivo-recibido"
+                type="number"
+                step="0.01"
+                min={0}
+                inputMode="decimal"
+                value={recibidoTxt}
+                onChange={(e) => setRecibidoTxt(e.target.value)}
+                placeholder={monto > 0 ? monto.toFixed(2) : "0.00"}
+                className="w-full rounded-lg border border-ink-200 bg-white py-2.5 pl-8 pr-3 text-lg font-semibold tabular-nums outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setRecibidoTxt(monto > 0 ? String(monto) : "")}
+                className="rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-brand-500 active:scale-95"
+              >
+                Exacto
+              </button>
+              {montosRapidosEfectivo(monto).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setRecibidoTxt(String(v))}
+                  className="rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium tabular-nums text-ink-700 hover:border-brand-500 active:scale-95"
+                >
+                  L {v}
+                </button>
+              ))}
+            </div>
+            {hayRecibido && (
+              <div
+                className={cn(
+                  "mt-3 rounded-xl px-3 py-2 text-center",
+                  cambio! >= 0 ? "bg-libre-bg text-libre-text" : "bg-red-50 text-red-700"
+                )}
+                aria-live="polite"
+              >
+                <p className="text-xs font-medium">{cambio! >= 0 ? "Cambio a devolver" : "Falta"}</p>
+                <p className="text-3xl font-bold tabular-nums">L. {Math.abs(cambio!).toFixed(2)}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <label htmlFor="referencia-cobro" className="mb-1.5 block text-xs font-medium text-ink-500">
           Referencia (opcional) — # de pedido, empresa de reparto…

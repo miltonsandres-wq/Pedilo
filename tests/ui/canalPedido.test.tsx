@@ -133,11 +133,14 @@ describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
     return user;
   };
 
-  it("muestra la lista Restaurante / Para llevar / Delivery / Plataforma, con Restaurante por omisión", async () => {
+  const tarjeta = (nombre: RegExp) => screen.findByRole("radio", { name: nombre });
+
+  it("muestra cuatro tarjetas Restaurante / Para llevar / Delivery / Plataforma, con Restaurante elegida", async () => {
     await abrir();
-    const lista = (await screen.findByLabelText("¿De dónde es el pedido?")) as HTMLSelectElement;
-    expect(lista.value).toBe("local");
-    expect(Array.from(lista.options).map((o) => o.value)).toEqual(["local", "para_llevar", "delivery", "plataforma"]);
+    const grupo = await screen.findByRole("radiogroup", { name: "¿De dónde es el pedido?" });
+    const tarjetas = Array.from(grupo.querySelectorAll('[role="radio"]'));
+    expect(tarjetas.map((t) => t.querySelector("span")?.textContent)).toEqual(["Restaurante", "Para llevar", "Delivery", "Plataforma"]);
+    expect(tarjetas.map((t) => t.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
   });
 
   it("Restaurante sigue el flujo normal: abre la mesa con su cliente y personas", async () => {
@@ -152,7 +155,7 @@ describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
 
   it("Para llevar crea el pedido sin ocupar la mesa y sigue al flujo normal del pedido", async () => {
     const user = await abrir();
-    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "para_llevar");
+    await user.click(await tarjeta(/Para llevar/));
     expect(screen.queryByLabelText(/Personas/)).toBeNull(); // sin personas ni mesa
     await user.type(screen.getByLabelText(/Nombre del cliente/), "Carlos");
     await user.click(screen.getByRole("button", { name: "Crear pedido" }));
@@ -165,7 +168,7 @@ describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
 
   it("Plataforma pide la empresa / # de pedido", async () => {
     const user = await abrir();
-    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "plataforma");
+    await user.click(await tarjeta(/Plataforma/));
     await user.type(screen.getByLabelText(/Plataforma \/ # de pedido/), "Hugo #12");
     await user.click(screen.getByRole("button", { name: "Crear pedido" }));
     await waitFor(() => expect(push).toHaveBeenCalled());
@@ -174,7 +177,7 @@ describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
 
   it("Delivery lleva al flujo de delivery (pedido por teléfono) y no crea ninguna orden aquí", async () => {
     const user = await abrir();
-    await user.selectOptions(await screen.findByLabelText("¿De dónde es el pedido?"), "delivery");
+    await user.click(await tarjeta(/Delivery/));
     await user.click(screen.getByRole("button", { name: "Ir a delivery" }));
     expect(push).toHaveBeenCalledWith("/pos/delivery?nuevo=1");
     expect(await db.ordenes.count()).toBe(0);
@@ -182,13 +185,14 @@ describe("al abrir la mesa: ¿de dónde es el pedido?", () => {
 
   it("sin delivery habilitado la opción Delivery no aparece", async () => {
     await abrir("cajero", false);
-    const lista = (await screen.findByLabelText("¿De dónde es el pedido?")) as HTMLSelectElement;
-    expect(Array.from(lista.options).map((o) => o.value)).toEqual(["local", "para_llevar", "plataforma"]);
+    const grupo = await screen.findByRole("radiogroup", { name: "¿De dónde es el pedido?" });
+    const nombres = Array.from(grupo.querySelectorAll('[role="radio"]')).map((t) => t.querySelector("span")?.textContent);
+    expect(nombres).toEqual(["Restaurante", "Para llevar", "Plataforma"]);
   });
 
   it("el mesero abre la mesa del restaurante, sin lista de origen", async () => {
     await abrir("mesero");
     await screen.findByRole("button", { name: "Abrir mesa" });
-    expect(screen.queryByLabelText("¿De dónde es el pedido?")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
   });
 });

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { fechaLocalHN, formatearFechaHora, primerDiaDelMes } from "@/lib/fiscal/formato";
 import { fechaValida } from "@/lib/ventas/ventasDelDia";
+import { BarrasHorizontales, ColumnasPorHora } from "@/components/admin/reportes/Graficas";
+import { filasFormaPago, horasContinuas } from "@/lib/reportes/graficas";
 import { cerrarDia } from "./actions";
 
 export default async function ReportesPage({
@@ -135,20 +137,34 @@ export default async function ReportesPage({
                   </p>
                 </div>
 
-                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Ventas por hora</p>
+                <div className="mb-5" data-testid={`grafica-horas-${s.id}`}>
+                  <ColumnasPorHora datos={horasContinuas(c.porHora)} />
+                </div>
+
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
                   Por forma de pago
                 </p>
-                <ul className="mb-4 space-y-1.5 text-sm text-ink-700">
-                  {Object.entries(c.porFormaPago).map(([forma, monto]) => (
-                    <li key={forma} className="flex justify-between capitalize">
-                      <span>{forma.replaceAll("_", " ")}</span>
-                      <span className="font-medium">L. {monto.toFixed(2)}</span>
-                    </li>
-                  ))}
-                  {Object.keys(c.porFormaPago).length === 0 && (
-                    <li className="text-ink-400">Sin cobros ese día.</li>
-                  )}
-                </ul>
+                <div className="mb-5" data-testid={`grafica-pagos-${s.id}`}>
+                  <BarrasHorizontales
+                    titulo="Por forma de pago"
+                    vacio="Sin cobros ese día."
+                    filas={filasFormaPago(c.porFormaPago).map((f) => ({
+                      nombre: f.nombre,
+                      valor: f.total,
+                      detalle: c.totalCobrado > 0 ? `${Math.round((f.total / c.totalCobrado) * 100)} %` : undefined,
+                    }))}
+                  />
+                </div>
+
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Por categoría</p>
+                <div className="mb-5" data-testid={`grafica-categorias-${s.id}`}>
+                  <BarrasHorizontales
+                    titulo="Ventas por categoría"
+                    vacio="Sin ventas ese día."
+                    filas={c.porCategoria.map((x) => ({ nombre: x.nombre, valor: x.total }))}
+                  />
+                </div>
 
                 <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">Cierre separado</p>
                 <div className="mb-4 space-y-3" data-testid={`cierre-separado-${s.id}`}>
@@ -179,23 +195,18 @@ export default async function ReportesPage({
                   </>
                 )}
 
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-400">
                   <Flame className="h-3.5 w-3.5" strokeWidth={2} />
                   Más vendidos
                 </p>
-                <ul className="mb-5 space-y-1.5 text-sm text-ink-700">
-                  {c.productosMasVendidos.map((p) => (
-                    <li key={p.nombre} className="flex justify-between">
-                      <span>
-                        {p.nombre} ×{p.cantidad}
-                      </span>
-                      <span className="font-medium">L. {p.subtotal.toFixed(2)}</span>
-                    </li>
-                  ))}
-                  {c.productosMasVendidos.length === 0 && (
-                    <li className="text-ink-400">Sin ventas ese día.</li>
-                  )}
-                </ul>
+                <div className="mb-5" data-testid={`grafica-platos-${s.id}`}>
+                  <BarrasHorizontales
+                    titulo="Platos más vendidos"
+                    vacio="Sin ventas ese día."
+                    formato={(n) => `${n} ${n === 1 ? "unidad" : "unidades"}`}
+                    filas={c.productosMasVendidos.map((p) => ({ nombre: p.nombre, valor: p.cantidad, detalle: `L. ${p.subtotal.toFixed(2)}` }))}
+                  />
+                </div>
 
                 {!cierreDe.get(s.id) && fecha <= hoy && (
                   <form action={cerrarDia} className="space-y-2 border-t border-ink-100 pt-4">

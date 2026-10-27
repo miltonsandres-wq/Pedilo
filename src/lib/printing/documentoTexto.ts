@@ -236,6 +236,8 @@ export function construirFactura(doc: DocumentoImprimible, opciones: OpcionesFac
   if (venta?.pagos?.length) {
     out.push({ op: "salto" });
     for (const p of venta.pagos) out.push(...par(`Pago ${p.forma}:`, dinero(p.monto)).map((t) => texto(t)));
+    if (venta.recibido != null) out.push(...par("Efectivo recibido:", dinero(venta.recibido)).map((t) => texto(t)));
+    if (venta.cambio != null && venta.cambio > 0) out.push(...par("Cambio:", dinero(venta.cambio)).map((t) => texto(t, { bold: true })));
   }
 
   // Estos tres se imprimen SIEMPRE, aunque estén vacíos
